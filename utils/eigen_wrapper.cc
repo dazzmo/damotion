@@ -13,6 +13,11 @@ FunctionWrapper& FunctionWrapper::operator=(const FunctionWrapper& other) {
     return *this;
 }
 
+FunctionWrapper::~FunctionWrapper() {
+    // Release memory for casadi function
+    f_.release(mem_);
+}
+
 FunctionWrapper& FunctionWrapper::operator=(casadi::Function f) {
     if (f.is_null()) {
         return *this;
@@ -20,8 +25,14 @@ FunctionWrapper& FunctionWrapper::operator=(casadi::Function f) {
 
     f_ = f;
 
+    // Checkout memory object for function
+    mem_ = f.checkout();
+
     // Resize work vectors
-    in_data_.assign(f_.sz_arg(), nullptr);
+    in_data_ptr_.assign(f_.sz_arg(), nullptr);
+
+    iw_.assign(f_.sz_iw(), 0);
+    dw_.assign(f_.sz_w(), 0.0);
 
     // Set all outputs to dense
     is_out_sparse_ = std::vector<bool>(f_.n_out(), false);
@@ -36,6 +47,7 @@ FunctionWrapper& FunctionWrapper::operator=(casadi::Function f) {
         cols_.push_back(cols);
         // Assign data for output
         out_data_.emplace_back(sparsity.nnz(), 0);
+        out_data_ptr_.push_back(out_data_.back().data());
         // Create dense matrix
         out_.push_back(Eigen::MatrixXd(sparsity.rows(), sparsity.columns()));
         // Create emptry sparse matrix
@@ -45,15 +57,12 @@ FunctionWrapper& FunctionWrapper::operator=(casadi::Function f) {
     return *this;
 }
 
-void FunctionWrapper::call(bool sparse) {}
-
 void FunctionWrapper::setSparseOutput(int i) {
     // Set output flag to true and remove dense matrix data
     is_out_sparse_[i] = true;
     out_[i].resize(0, 0);
-
     // Create sparsity pattern for the output
-    out_sparse_[i] = createSparseMatrix(f_.sparsity_out(i));
+    out_sparse_[i] = createSparseMatrix(f_.sparsity_out(i), rows_[i], cols_[i]);
 }
 
 void FunctionWrapper::setInput(int i, Eigen::Ref<const Eigen::VectorXd> x) {
@@ -73,7 +82,12 @@ void FunctionWrapper::setInput(int i, Eigen::Ref<const Eigen::VectorXd> x) {
     }
 
     // Otherwise, add vector data pointer to input
-    in_data_[i] = x.data();
+    in_data_ptr_[i] = x.data();
+}
+
+void FunctionWrapper::call() {
+    // Call the function
+    f_(in_data_ptr_.data(), out_data_ptr_.data(), iw_.data(), dw_.data(), mem_);
 }
 
 const Eigen::MatrixXd& FunctionWrapper::getOutput(int i) {
@@ -82,7 +96,7 @@ const Eigen::MatrixXd& FunctionWrapper::getOutput(int i) {
     const casadi::Sparsity& sp = f_.sparsity_out(i);
     // Set non-zero entries in the dense matrix
     for (int k = 0; k < sp.nnz(); ++k) {
-        out_[i](rows_[i][k], cols_[i][k]);
+        out_[i](rows_[i][k], cols_[i][k]) = out_data_[i][k];
     }
     // Return the dense output i
     return out_[i];
@@ -101,7 +115,8 @@ const Eigen::SparseMatrix<double>& FunctionWrapper::getOutputSparse(int i) {
 }
 
 Eigen::SparseMatrix<double> FunctionWrapper::createSparseMatrix(
-    const casadi::Sparsity& sparsity) {
+    const casadi::Sparsity& sparsity, std::vector<casadi_int>& rows,
+    std::vector<casadi_int>& cols) {
     // Create Eigen::SparseMatrix from sparsity information
     Eigen::SparseMatrix<double> M(sparsity.rows(), sparsity.columns());
 
@@ -111,7 +126,7 @@ Eigen::SparseMatrix<double> FunctionWrapper::createSparseMatrix(
 
     // Set triplets initialised with zero value
     for (int k = 0; k < sparsity.nnz(); ++k) {
-        triplets[k] = Eigen::Triplet<double>(rows_[i][k], cols_[i][k]);
+        triplets[k] = Eigen::Triplet<double>(rows[k], cols[k]);
     }
 
     // Create matrix from triplets

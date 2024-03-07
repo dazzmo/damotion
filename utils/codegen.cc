@@ -1,9 +1,7 @@
 #include "utils/codegen.h"
 
-using namespace casadi_utils;
-
-casadi::Function codegen(const casadi::Function &f,
-                         const std::string &dir = "./") {
+casadi::Function casadi_utils::codegen(const casadi::Function &f,
+                         const std::string &dir) {
     // Create binary in desired directory
     // Get current path
     auto path = std::filesystem::current_path();

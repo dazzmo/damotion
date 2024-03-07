@@ -28,10 +28,10 @@ class FunctionWrapper {
     FunctionWrapper(casadi::Function f);
     FunctionWrapper &operator=(casadi::Function f);
 
-    FunctionWrapper(const FunctionWrapper & other);
-    WrappedFunction& operator=(const WrappedFunction&);
+    FunctionWrapper(const FunctionWrapper &other);
+    FunctionWrapper &operator=(const FunctionWrapper &other);
 
-    ~FunctionWrapper() = default;
+    ~FunctionWrapper();
 
     /**
      * @brief Sets the i-th input for the function
@@ -44,9 +44,8 @@ class FunctionWrapper {
     /**
      * @brief Calls the function with the current inputs
      *
-     * @param sparse
      */
-    void call(bool sparse = false);
+    void call();
 
     /**
      * @brief Indicate that the output will be sparse
@@ -74,8 +73,11 @@ class FunctionWrapper {
 
    private:
     // Data input vector for casadi function
-    std::vector<const double *> in_data_;
-    // Data output from casadi function
+    std::vector<const double *> in_data_ptr_;
+    // Data output pointers for casadi function
+    std::vector<double *> out_data_ptr_;
+
+    // Non-zero data for each output
     std::vector<std::vector<double>> out_data_;
 
     // Dense matrix outputs
@@ -91,11 +93,20 @@ class FunctionWrapper {
     // Flag to indicate if output has been set as sparse
     std::vector<bool> is_out_sparse_;
 
+    // Memory allocated for function evaluation
+    int mem_;
+
+    // Integer working vector
+    std::vector<casadi_int> iw_;
+    // Double working vector
+    std::vector<double> dw_;
+
     // Underlying function
     casadi::Function f_;
 
     Eigen::SparseMatrix<double> createSparseMatrix(
-        const casadi::Sparsity &sparsity);
+        const casadi::Sparsity &sparsity, std::vector<casadi_int> &rows,
+        std::vector<casadi_int> &cols);
 };
 
 }  // namespace eigen

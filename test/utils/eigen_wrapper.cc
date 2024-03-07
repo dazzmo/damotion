@@ -1,0 +1,73 @@
+#include "utils/eigen_wrapper.h"
+
+#include <gtest/gtest.h>
+
+#include "utils/codegen.h"
+
+TEST(EigenWrapperLoad, BasicAssertions) {
+    // Create codegen function
+    casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
+    casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});
+
+    casadi_utils::eigen::FunctionWrapper wrapper(f);
+
+    // Evaluate function
+    Eigen::VectorXd x_in(1), y_in(1), output(1);
+    x_in.setRandom();
+    y_in.setRandom();
+
+    wrapper.setInput(0, x_in);
+    wrapper.setInput(1, y_in);
+    wrapper.call();
+    output = wrapper.getOutput(0);
+
+    EXPECT_DOUBLE_EQ(output[0], (x_in[0] + y_in[0]));
+}
+
+TEST(EigenWrapperSparse, BasicAssertions) {
+    // Create codegen function
+    casadi::SX x = casadi::SX::sym("x");
+    casadi::SX y(2, 2);
+    y(0, 0) = 1.0;
+    y(1, 1) = 1.0;
+
+    casadi::Function f("sparse_test", {x}, {y}, {"x"}, {"y"});
+
+    casadi_utils::eigen::FunctionWrapper wrapper(
+        casadi_utils::codegen(f, "./tmp"));
+
+    // Evaluate function
+    Eigen::VectorXd x_in(1);
+    x_in.setRandom();
+
+    Eigen::Matrix2d I;
+    I.setIdentity();
+
+    wrapper.setInput(0, x_in);
+    wrapper.setSparseOutput(0);
+    wrapper.call();
+    Eigen::SparseMatrix<double> res = wrapper.getOutputSparse(0);
+
+    EXPECT_TRUE(res.isApprox(I));
+}
+
+TEST(EigenWrapperCodegenLoad, BasicAssertions) {
+    // Create codegen function
+    casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
+    casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});
+
+    casadi_utils::eigen::FunctionWrapper wrapper(
+        casadi_utils::codegen(f, "./tmp"));
+
+    // Evaluate function
+    Eigen::VectorXd x_in(1), y_in(1), output(1);
+    x_in.setRandom();
+    y_in.setRandom();
+
+    wrapper.setInput(0, x_in);
+    wrapper.setInput(1, y_in);
+    wrapper.call();
+    output = wrapper.getOutput(0);
+
+    EXPECT_DOUBLE_EQ(output[0], (x_in[0] + y_in[0]));
+}
