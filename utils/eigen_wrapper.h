@@ -4,15 +4,46 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <casadi/casadi.hpp>
+#include <pinocchio/autodiff/casadi.hpp>
 
 namespace casadi_utils {
 namespace eigen {
 
 template <typename T, int rows, int cols>
-void toEigen(const casadi::Matrix<T> &C, Eigen::Matrix<T, rows, cols> &E) {}
+void toEigen(const casadi::Matrix<T> &C, Eigen::Matrix<T, rows, cols> &E) {
+    E.setZero(C.rows(), C.columns());
+    std::memcpy(E.data(), C.ptr(), sizeof(T) * C.rows() * C.columns());
+}
 
 template <typename T, int rows, int cols>
-void toCasadi(const Eigen::Matrix<T, rows, cols> &E, casadi::Matrix<T> &C) {}
+void toCasadi(const Eigen::Matrix<T, rows, cols> &E, casadi::Matrix<T> &C) {
+    C.resize(E.rows(), E.cols());
+    C = casadi::Matrix<T>::zeros(E.rows(), E.cols());
+    std::memcpy(C.ptr(), E.data(), sizeof(T) * E.rows() * E.cols());
+}
+
+template <typename T, int rows, int cols>
+void toEigen(const casadi::Matrix<T> &C,
+             Eigen::Matrix<casadi::Matrix<T>, rows, cols> &E) {
+    E.setZero(C.rows(), C.columns());
+    for (int i = 0; i < C.rows(); ++i) {
+        for (int j = 0; j < C.columns(); ++j) {
+            E(i, j) = casadi::Matrix<T>(C(i, j));
+        }
+    }
+}
+
+template <typename T, int rows, int cols>
+void toCasadi(const Eigen::Matrix<casadi::Matrix<T>, rows, cols> &E,
+              casadi::Matrix<T> &C) {
+    C.resize(E.rows(), E.cols());
+    C = casadi::Matrix<T>::zeros(E.rows(), E.cols());
+    for (int i = 0; i < E.rows(); ++i) {
+        for (int j = 0; j < E.cols(); ++j) {
+            C(i, j) = E(i, j)->at(0);
+        }
+    }
+}
 
 template <typename T>
 class SparseMatrixWrapper {};

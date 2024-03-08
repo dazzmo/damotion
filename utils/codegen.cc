@@ -18,7 +18,7 @@ casadi::Function casadi_utils::codegen(const casadi::Function &f,
     std::string f_name = f.name() + "_codegen_" + std::to_string(hash);
 
     // Check if file exists
-    if (!std::filesystem::exists(f_name)) {
+    if (!std::filesystem::exists(f_name + ".so")) {
         // If binary doesn't exist, create it
         f.generate(f_name + ".c");
         std::cout << f_name + " not found. Compiling...\n";

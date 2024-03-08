@@ -4,6 +4,8 @@
 
 #include "utils/codegen.h"
 
+using namespace casadi_utils::eigen;
+
 TEST(EigenWrapperLoad, BasicAssertions) {
     // Create codegen function
     casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
@@ -22,6 +24,23 @@ TEST(EigenWrapperLoad, BasicAssertions) {
     output = wrapper.getOutput(0);
 
     EXPECT_DOUBLE_EQ(output[0], (x_in[0] + y_in[0]));
+}
+
+TEST(ToCasadiDM, BasicAssertions) {
+    // Create codegen function
+    int n = 10;
+    Eigen::VectorXd x(n);
+    x.setRandom();
+
+    // Convert to casadi::DM
+    casadi::DM xd;
+    toCasadi(x, xd);
+
+    // Convert back to Eigen::VectorXd
+    Eigen::VectorXd xt;
+    toEigen(xd, xt);
+    
+    EXPECT_TRUE(x.isApprox(xt));
 }
 
 TEST(EigenWrapperSparse, BasicAssertions) {
