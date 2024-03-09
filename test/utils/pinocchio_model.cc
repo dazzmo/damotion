@@ -139,3 +139,29 @@ TEST(PinocchioModelWrapper, RNEATestCodegen) {
 
     EXPECT_TRUE(u.isApprox(uc));
 }
+
+TEST(PinocchioModelWrapper, EndEffector) {
+    pinocchio::Model model;
+    pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
+    pinocchio::Data data(model);
+
+    casadi_utils::PinocchioModelWrapper wrapper(model);
+
+    wrapper.addEndEffector("tool0");
+
+    Eigen::VectorXd q = pinocchio::randomConfiguration(model);
+    // Create function wrapper for end-effector Jacobian
+    casadi::Function ee = wrapper.end_effector_jac(0);
+    std::cout << ee << std::endl;
+    casadi_utils::eigen::FunctionWrapper ee_jac(ee);
+    // Evaluate Jacobian at nominal configuration
+    ee_jac.setSparseOutput(0);
+    ee_jac.setInput(0, q);
+    std::cout << ee_jac.getOutputSparse(0) << std::endl;
+
+    ee_jac.call();
+
+    std::cout << ee_jac.getOutputSparse(0) << std::endl;
+
+    EXPECT_TRUE(true);
+}

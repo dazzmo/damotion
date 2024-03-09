@@ -10,6 +10,8 @@
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/multibody/model.hpp>
 
+#include <pinocchio/autodiff/casadi/math/quaternion.hpp>
+
 #include "utils/eigen_wrapper.h"
 
 namespace casadi_utils {

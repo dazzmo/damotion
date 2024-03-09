@@ -6,7 +6,7 @@
 
 using namespace casadi_utils::eigen;
 
-TEST(EigenWrapperLoad, BasicAssertions) {
+TEST(EigenWrapper, EigenWrapperLoad) {
     // Create codegen function
     casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
     casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});
@@ -26,7 +26,7 @@ TEST(EigenWrapperLoad, BasicAssertions) {
     EXPECT_DOUBLE_EQ(output[0], (x_in[0] + y_in[0]));
 }
 
-TEST(ToCasadiDM, BasicAssertions) {
+TEST(EigenWrapper, ToCasadiDM) {
     // Create codegen function
     int n = 10;
     Eigen::VectorXd x(n);
@@ -43,7 +43,7 @@ TEST(ToCasadiDM, BasicAssertions) {
     EXPECT_TRUE(x.isApprox(xt));
 }
 
-TEST(EigenWrapperSparse, BasicAssertions) {
+TEST(EigenWrapper, EigenWrapperSparse) {
     // Create codegen function
     casadi::SX x = casadi::SX::sym("x");
     casadi::SX y(2, 2);
@@ -70,7 +70,7 @@ TEST(EigenWrapperSparse, BasicAssertions) {
     EXPECT_TRUE(res.isApprox(I));
 }
 
-TEST(EigenWrapperCodegenLoad, BasicAssertions) {
+TEST(EigenWrapper, EigenWrapperCodegenLoad) {
     // Create codegen function
     casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
     casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});

@@ -18,8 +18,14 @@ void toEigen(const casadi::Matrix<T> &C, Eigen::Matrix<T, rows, cols> &E) {
 template <typename T, int rows, int cols>
 void toCasadi(const Eigen::Matrix<T, rows, cols> &E, casadi::Matrix<T> &C) {
     C.resize(E.rows(), E.cols());
-    C = casadi::Matrix<T>::zeros(E.rows(), E.cols());
-    std::memcpy(C.ptr(), E.data(), sizeof(T) * E.rows() * E.cols());
+    for (int i = 0; i < E.rows(); ++i) {
+        for (int j = 0; j < E.cols(); ++j) {
+            // Only fill in non-zero entries
+            if (!casadi::is_zero(E(i, j))) {
+                C(i, j) = E(i, j);
+            }
+        }
+    }
 }
 
 template <typename T, int rows, int cols>
@@ -37,10 +43,12 @@ template <typename T, int rows, int cols>
 void toCasadi(const Eigen::Matrix<casadi::Matrix<T>, rows, cols> &E,
               casadi::Matrix<T> &C) {
     C.resize(E.rows(), E.cols());
-    C = casadi::Matrix<T>::zeros(E.rows(), E.cols());
     for (int i = 0; i < E.rows(); ++i) {
         for (int j = 0; j < E.cols(); ++j) {
-            C(i, j) = E(i, j)->at(0);
+            // Only fill in non-zero entries
+            if (!casadi::is_zero(E(i, j)->at(0))) {
+                C(i, j) = E(i, j)->at(0);
+            }
         }
     }
 }

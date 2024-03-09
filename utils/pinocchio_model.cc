@@ -24,7 +24,7 @@ casadi::Function PinocchioModelWrapper::aba() {
     eigen::toEigen(tau, taue);
 
     Eigen::VectorX<casadi::Matrix<AD>> ae =
-        pinocchio::aba<casadi::Matrix<AD>>(model_, data_, qe, ve, taue );
+        pinocchio::aba<casadi::Matrix<AD>>(model_, data_, qe, ve, taue);
 
     // Create AD equivalent
     eigen::toCasadi(ae, a);
@@ -40,7 +40,8 @@ casadi::Function PinocchioModelWrapper::aba() {
         // Create constraint force vector
         casadi::Matrix<AD> f = casadi::Matrix<AD>::sym("f", nc);
         int idx = 0;
-        // Augment generalised input tau to also include constraint forces in joint-space 
+        // Augment generalised input tau to also include constraint forces in
+        // joint-space
         for (int i = 0; i < ee_.size(); ++i) {
             casadi::Function &J = ee_jac_[i];
             casadi::Matrix<AD> Jc = J({q})[0];
@@ -129,18 +130,32 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
     // Perform forward kinematics and compute frames
     pinocchio::framesForwardKinematics(model_, data_, qe);
     // Get position of the end-effector in the desired frame
-    Eigen::VectorX<AD> xe;  //= data_.oMf[model_.getFrameId(frame_name)].;
+    Eigen::VectorX<casadi::Matrix<AD>> xe(7);
+    // Convert position and orientation of point to translation and quaternion
+    xe.topRows(3) = data_.oMf[model_.getFrameId(frame_name)].translation();
+    Eigen::Matrix3<casadi::Matrix<AD>> R =
+        data_.oMf[model_.getFrameId(frame_name)].rotation();
+    
+    Eigen::Quaternion<casadi::Matrix<AD>> qR;
+    pinocchio::quaternion::assignQuaternion(qR, R);
+    // Convert rotation matrix to quaternion representation
+    xe.bottomRows(4) << qR.w(), qR.vec();
+    
     eigen::toCasadi(xe, x);
 
     // Get jacobian of this site with respect to the configuration of the
     // Compute Jacobian
     pinocchio::DataTpl<casadi::Matrix<AD>>::Matrix6x Je(6, model_.nv);
     Je.setZero();
-    pinocchio::getFrameJacobian(model_, data_, model_.getFrameId(frame_name),
-                                pinocchio::LOCAL_WORLD_ALIGNED, Je);
+    // pinocchio::computeFrameJacobian()
+    pinocchio::computeFrameJacobian(model_, data_, qe,
+                                    model_.getFrameId(frame_name),
+                                    pinocchio::LOCAL_WORLD_ALIGNED, Je);
 
     casadi::Matrix<AD> J;
     eigen::toCasadi(Je, J);
+
+    std::cout << J << std::endl;
 
     // Add full constraint subspace unless otherwise stated
     ee_constraint_subspace_.push_back(Eigen::Vector<double, 6>::Ones());
