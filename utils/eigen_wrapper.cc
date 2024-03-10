@@ -62,7 +62,6 @@ void FunctionWrapper::setSparseOutput(int i) {
     is_out_sparse_[i] = true;
     out_[i].resize(0, 0);
     // Create sparsity pattern for the output
-    std::cout << "Sparsity:  " << f_.sparsity_out(i) << std::endl;
     out_sparse_[i] = createSparseMatrix(f_.sparsity_out(i), rows_[i], cols_[i]);
 }
 
@@ -131,8 +130,6 @@ Eigen::SparseMatrix<double> FunctionWrapper::createSparseMatrix(
 
     // Create matrix from triplets
     M.setFromTriplets(triplets.begin(), triplets.end());
-
-    std::cout << M << std::endl;
 
     return M;
 }

@@ -151,17 +151,40 @@ TEST(PinocchioModelWrapper, EndEffector) {
 
     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
     // Create function wrapper for end-effector Jacobian
-    casadi::Function ee = wrapper.end_effector_jac(0);
-    std::cout << ee << std::endl;
-    casadi_utils::eigen::FunctionWrapper ee_jac(ee);
+    casadi_utils::eigen::FunctionWrapper ee_jac(wrapper.end_effector_jac(0)), ee(wrapper.end_effector(0));
+    
+    ee.setInput(0, q);
+    ee.call();
+    std::cout << ee.getOutput(0) << std::endl;
+    
     // Evaluate Jacobian at nominal configuration
     ee_jac.setSparseOutput(0);
     ee_jac.setInput(0, q);
-    std::cout << ee_jac.getOutputSparse(0) << std::endl;
 
     ee_jac.call();
-
     std::cout << ee_jac.getOutputSparse(0) << std::endl;
+
+    EXPECT_TRUE(true);
+}
+
+TEST(PinocchioModelWrapper, RNEAWithEndEffector) {
+    pinocchio::Model model;
+    pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
+    pinocchio::Data data(model);
+
+    casadi_utils::PinocchioModelWrapper wrapper(model);
+
+    wrapper.addEndEffector("tool0");
+    Eigen::Matrix<double, 6, 3> S;
+    S.setZero();
+    S.topRows(3).setIdentity();
+
+    std::cout << S << std::endl;
+    wrapper.setEndEffectorConstraintSubspace(0, S);
+
+    casadi::Function rnea = wrapper.rnea();
+
+    std::cout << rnea << std::endl;
 
     EXPECT_TRUE(true);
 }

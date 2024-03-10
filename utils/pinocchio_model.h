@@ -50,7 +50,7 @@ class PinocchioModelWrapper {
      * @param S
      */
     void setEndEffectorConstraintSubspace(int i,
-                                          const Eigen::Vector<double, 6> &S);
+                                          const Eigen::Matrix<double, 6, -1> &S);
                                           
     void addEndEffector(const std::string &frame_name);
 
@@ -70,7 +70,7 @@ class PinocchioModelWrapper {
     // algorithms
     std::vector<casadi::Function> ee_;
     std::vector<casadi::Function> ee_jac_;
-    std::vector<Eigen::Vector<double, 6>> ee_constraint_subspace_;
+    std::vector<Eigen::Matrix<double, 6, -1>> ee_constraint_subspace_;
 };
 
 }  // namespace casadi_utils

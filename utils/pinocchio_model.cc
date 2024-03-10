@@ -86,7 +86,7 @@ casadi::Function PinocchioModelWrapper::rnea() {
         // Determine for each end-effector how many contact forces to include
         int nc = 0;
         for (int i = 0; i < ee_.size(); ++i) {
-            nc += ee_constraint_subspace_[i].count();
+            nc += ee_constraint_subspace_[i].cols();
         }
         // Create constraint force vector
         casadi::Matrix<AD> f = casadi::Matrix<AD>::sym("f", nc);
@@ -96,10 +96,13 @@ casadi::Function PinocchioModelWrapper::rnea() {
             casadi::Function &J = ee_jac_[i];
             casadi::Matrix<AD> Jc = J({q})[0];
             // Get slice of constraint forces for end effector
-            int nci = ee_constraint_subspace_[i].count();
+            int nci = ee_constraint_subspace_[i].cols();
+            casadi::DM Sd;
+            eigen::toCasadi(ee_constraint_subspace_[i], Sd);
+            casadi::Matrix<AD> Sc = Sd;
             casadi::Matrix<AD> fi = f(casadi::Slice(idx, idx + nci));
             // Determine joint-space forces
-            u -= mtimes(Jc.T(), fi);
+            u -= mtimes(mtimes(Jc.T(), Sc), fi);
             // Increase index in force vector
             idx += nci;
         }
@@ -113,8 +116,9 @@ casadi::Function PinocchioModelWrapper::rnea() {
     }
 };
 
+// ! Create selector MATRIX S which will be at most 6 x 6
 void PinocchioModelWrapper::setEndEffectorConstraintSubspace(
-    int i, const Eigen::Vector<double, 6> &S) {
+    int i, const Eigen::Matrix<double, 6, -1> &S) {
     ee_constraint_subspace_[i] = S;
 };
 
@@ -135,12 +139,12 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
     xe.topRows(3) = data_.oMf[model_.getFrameId(frame_name)].translation();
     Eigen::Matrix3<casadi::Matrix<AD>> R =
         data_.oMf[model_.getFrameId(frame_name)].rotation();
-    
+
     Eigen::Quaternion<casadi::Matrix<AD>> qR;
     pinocchio::quaternion::assignQuaternion(qR, R);
     // Convert rotation matrix to quaternion representation
     xe.bottomRows(4) << qR.w(), qR.vec();
-    
+
     eigen::toCasadi(xe, x);
 
     // Get jacobian of this site with respect to the configuration of the
@@ -154,8 +158,6 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
 
     casadi::Matrix<AD> J;
     eigen::toCasadi(Je, J);
-
-    std::cout << J << std::endl;
 
     // Add full constraint subspace unless otherwise stated
     ee_constraint_subspace_.push_back(Eigen::Vector<double, 6>::Ones());
