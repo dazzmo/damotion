@@ -55,16 +55,10 @@ class System {
      */
     casadi::Function dynamics() { return fd_; };
 
+    
+    void setDynamics(const casadi::Function &f) { fd_ = f; }
+
    protected:
-    /**
-     * @brief Implementation of the forward dynamics of the system, set function
-     * through setDynamics()
-     *
-     */
-    virtual void dynamicsImpl() = 0;
-
-    void setDynamics(casadi::Function &f) { fd_ = f; }
-
    private:
     // Dimension of state
     int nx_;

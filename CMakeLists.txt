@@ -18,6 +18,7 @@ find_package(qpOASES REQUIRED)
 
 # Collect source files
 file (GLOB_RECURSE SOURCE_FILES 
+"system/*.cc"
 "utils/*.cc"
 )
 
@@ -54,6 +55,7 @@ install(
 )
 # Copy header files
 install(DIRECTORY 
+        "${CMAKE_SOURCE_DIR}/system"
         "${CMAKE_SOURCE_DIR}/utils"
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME} # target directory
         FILES_MATCHING # install only matched files

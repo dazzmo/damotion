@@ -7,10 +7,9 @@
 #include <pinocchio/algorithm/joint-configuration.hpp>
 #include <pinocchio/algorithm/rnea.hpp>
 #include <pinocchio/autodiff/casadi.hpp>
+#include <pinocchio/autodiff/casadi/math/quaternion.hpp>
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/multibody/model.hpp>
-
-#include <pinocchio/autodiff/casadi/math/quaternion.hpp>
 
 #include "utils/eigen_wrapper.h"
 
@@ -49,9 +48,9 @@ class PinocchioModelWrapper {
      * @param i
      * @param S
      */
-    void setEndEffectorConstraintSubspace(int i,
-                                          const Eigen::Matrix<double, 6, -1> &S);
-                                          
+    void setEndEffectorConstraintSubspace(
+        int i, const Eigen::Matrix<double, 6, -1> &S);
+
     void addEndEffector(const std::string &frame_name);
 
     casadi::Function &end_effector(int i) { return ee_[i]; }

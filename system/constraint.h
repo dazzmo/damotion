@@ -21,15 +21,20 @@ class Constraint {
 
     ~Constraint() = default;
 
-    casadi::Function vec() { return vecImpl(); }
-    casadi::Function jac() { return jacImpl(); }
+    casadi::Function vec() { return f_; }
+    casadi::Function jac() { return df_; }
 
    protected:
-    virtual casadi::Function vecImpl() = 0;
-    virtual casadi::Function jacImpl() = 0;
+    void setVec(casadi::Function &f) { f_ = f; }
+    void setJac(casadi::Function &f) { df_ = f; }
 
    private:
     int nc_;
+
+    // Constraint evaluation function
+    casadi::Function f_;
+    // Constraint jacobian function
+    casadi::Function df_;
 };
 
 /**
@@ -62,20 +67,18 @@ class HolonomicConstraint : public Constraint {
      *
      * @return casadi::Function
      */
-    casadi::Function secondTimeDerivative() {
-        return secondTimeDerivativeImpl();
-    }
+    casadi::Function secondTimeDerivative() { return ddf_; }
 
    protected:
-    virtual casadi::Function vecImpl() = 0;
-    virtual casadi::Function jacImpl() = 0;
-    virtual casadi::Function secondTimeDerivativeImpl() = 0;
+    void setSecondTimeDerivative(casadi::Function &f) { ddf_ = f; }
 
    private:
     // Dimension of configuration space
     int nq_;
     // Dimension of the tangent space
     int nv_;
+
+    casadi::Function ddf_;
 };
 
 }  // namespace system
