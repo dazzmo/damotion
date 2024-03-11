@@ -3,6 +3,9 @@
 
 #include <casadi/casadi.hpp>
 
+#include "system/controlled.h"
+
+namespace damotion {
 namespace system {
 
 class Constraint {
@@ -21,6 +24,13 @@ class Constraint {
 
     ~Constraint() = default;
 
+    /**
+     * @brief Dimension of the constraint
+     * 
+     * @return const int 
+     */
+    const int nc() const {return nc_;}
+
     casadi::Function vec() { return f_; }
     casadi::Function jac() { return df_; }
 
@@ -29,6 +39,7 @@ class Constraint {
     void setJac(casadi::Function &f) { df_ = f; }
 
    private:
+    // Dimension of the constraint
     int nc_;
 
     // Constraint evaluation function
@@ -81,5 +92,15 @@ class HolonomicConstraint : public Constraint {
     casadi::Function ddf_;
 };
 
+casadi::Function constrainedDynamics(
+    SecondOrderControlledSystem &system,
+    std::vector<HolonomicConstraint> &constraints);
+
+casadi::Function constrainedInverseDynamics(
+    SecondOrderControlledSystem &system,
+    std::vector<HolonomicConstraint> &constraints);
+
+}
 }  // namespace system
+
 #endif /* SYSTEM_CONSTRAINT_H */
