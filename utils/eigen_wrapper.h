@@ -21,7 +21,11 @@ namespace eigen {
 template <typename T, int rows, int cols>
 void toEigen(const casadi::Matrix<T> &C, Eigen::Matrix<T, rows, cols> &E) {
     E.setZero(C.rows(), C.columns());
-    std::memcpy(E.data(), C.ptr(), sizeof(T) * C.rows() * C.columns());
+    for (int i = 0; i < C.rows(); ++i) {
+        for (int j = 0; j < C.columns(); ++j) {
+            E(i, j) = T(C(i, j));
+        }
+    }
 }
 
 /**

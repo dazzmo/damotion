@@ -1,4 +1,4 @@
-#include "utils/log3.h"
+#include "utils/log.h"
 
 template <>
 Eigen::Matrix<casadi::SX, 3, -1> damotion::log3(
@@ -56,6 +56,13 @@ Eigen::Matrix<casadi::SX, 3, -1> damotion::log3(
     theta = angle;
 
     return res;
+}
+
+template <>
+Eigen::Matrix<casadi::SX, 3, -1> damotion::log3(
+    const Eigen::Matrix<casadi::SX, 3, 3> &R) {
+    casadi::SX theta;
+    return log3(R, theta);
 }
 
 template <>
@@ -147,7 +154,7 @@ void damotion::Jlog6(const Eigen::Matrix<casadi::SX, 3, 3> &R,
                 -2.0 * tinv2 * tinv2 + (1.0 + st * tinv) * tinv2 * inv_2_2ct);
 
     casadi::SX wTp = w.dot(p);
-    Eigen::Matrix3<casadi::SX> v3_tmp(
+    Eigen::Vector3<casadi::SX> v3_tmp(
         (beta_dot_over_theta * wTp) * w -
         (theta2 * beta_dot_over_theta + 2.0 * beta) * p);
 

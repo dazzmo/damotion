@@ -13,7 +13,7 @@
 #include <pinocchio/multibody/model.hpp>
 
 #include "utils/eigen_wrapper.h"
-#include "utils/log3.h"
+#include "utils/log.h"
 
 namespace casadi_utils {
 
@@ -139,4 +139,4 @@ Eigen::Vector<T, 6> poseError(const pinocchio::SE3Tpl<T> &p0,
 
 }  // namespace casadi_utils
 
-#endif /* UTILS_PINOCCHIO_MODEL_H */
+#endif/* UTILS_PINOCCHIO_MODEL_H */
