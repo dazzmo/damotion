@@ -7,6 +7,7 @@
 #include <pinocchio/algorithm/joint-configuration.hpp>
 #include <pinocchio/algorithm/rnea.hpp>
 #include <pinocchio/autodiff/casadi.hpp>
+#include <pinocchio/autodiff/casadi/utils/static-if.hpp>
 #include <pinocchio/autodiff/casadi/math/quaternion.hpp>
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/multibody/model.hpp>
@@ -42,21 +43,60 @@ class PinocchioModelWrapper {
     casadi::Function rnea();
 
     /**
-     * @brief Sets the constraint subspace for the end-effector such that
-     * constraint forces will be applied in the dimensions indicated by S
+     * @brief End-effector data for a given point on the system, includes data
+     * such as its Jacobian, constraint-subspace and acceleration
+     *
+     */
+    struct EndEffector {
+        /**
+         * @brief Pose of the end-effector in SE3 space, useful for converting
+         * to se3 for error computation
+         *
+         */
+        pinocchio::SE3Tpl<casadi::Matrix<AD>> pose;
+
+        /**
+         * @brief Function that computes the end-effector position/orientation
+         * (x), velocity and acceleration. A function with inputs (q, v, a) and
+         * output (x, dx, ddx)
+         *
+         */
+        casadi::Function x;
+
+        /**
+         * @brief End-effector Jacobian \f$ J(q) \f$
+         *
+         */
+        casadi::Function J;
+
+        /**
+         * @brief Constraint motion subspace (i.e. basis for the constraint
+         * forces that act on the end-effector in the operational frame)
+         *
+         */
+        Eigen::Matrix<double, 6, -1> S;
+    };
+
+    /**
+     * @brief End-effector at index i in the end-effector vector
      *
      * @param i
-     * @param S
+     * @return EndEffector&
      */
-    void setEndEffectorConstraintSubspace(
-        int i, const Eigen::Matrix<double, 6, -1> &S);
+    EndEffector &end_effector(int i) { return ee_[i]; }
+
+    /**
+     * @brief The index of the end-effector given by name in the end-effector
+     * vector
+     *
+     * @param name Name of the end effector
+     * @return const int&
+     */
+    const int &end_effector_idx(const std::string &name) {
+        return ee_idx_[name];
+    }
 
     void addEndEffector(const std::string &frame_name);
-
-    casadi::Function &end_effector(int i) { return ee_[i]; }
-    casadi::Function &end_effector_jac(int i) { return ee_jac_[i]; }
-
-    // Add end-effector
 
     pinocchio::ModelTpl<casadi::Matrix<AD>> &model() { return model_; }
     pinocchio::DataTpl<casadi::Matrix<AD>> &data() { return data_; }
@@ -65,11 +105,8 @@ class PinocchioModelWrapper {
     pinocchio::ModelTpl<casadi::Matrix<AD>> model_;
     pinocchio::DataTpl<casadi::Matrix<AD>> data_;
 
-    // Vector of end effectors to consider for force distibution in rigid-body
-    // algorithms
-    std::vector<casadi::Function> ee_;
-    std::vector<casadi::Function> ee_jac_;
-    std::vector<Eigen::Matrix<double, 6, -1>> ee_constraint_subspace_;
+    std::vector<EndEffector> ee_;
+    std::unordered_map<std::string, int> ee_idx_;
 };
 
 }  // namespace casadi_utils

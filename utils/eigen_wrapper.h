@@ -9,12 +9,30 @@
 namespace casadi_utils {
 namespace eigen {
 
+/**
+ * @brief Convert a casadi::Matrix<T> matric to an Eigen::Matrix<T>
+ *
+ * @tparam T
+ * @tparam rows
+ * @tparam cols
+ * @param C
+ * @param E
+ */
 template <typename T, int rows, int cols>
 void toEigen(const casadi::Matrix<T> &C, Eigen::Matrix<T, rows, cols> &E) {
     E.setZero(C.rows(), C.columns());
     std::memcpy(E.data(), C.ptr(), sizeof(T) * C.rows() * C.columns());
 }
 
+/**
+ * @brief Convert an Eigen::Matrix<T> object to a casadi::Matrix<T> object
+ *
+ * @tparam T
+ * @tparam rows
+ * @tparam cols
+ * @param E
+ * @param C
+ */
 template <typename T, int rows, int cols>
 void toCasadi(const Eigen::Matrix<T, rows, cols> &E, casadi::Matrix<T> &C) {
     C.resize(E.rows(), E.cols());
@@ -28,6 +46,17 @@ void toCasadi(const Eigen::Matrix<T, rows, cols> &E, casadi::Matrix<T> &C) {
     }
 }
 
+/**
+ * @brief Convert a casadi::Matrix<T> object to an
+ * Eigen::Matrix<casadi::Matrix<T>> object (e.g. convert a casadi::SX to an
+ * Eigen::Matrix<casadi::SX>)
+ *
+ * @tparam T
+ * @tparam rows
+ * @tparam cols
+ * @param C
+ * @param E
+ */
 template <typename T, int rows, int cols>
 void toEigen(const casadi::Matrix<T> &C,
              Eigen::Matrix<casadi::Matrix<T>, rows, cols> &E) {

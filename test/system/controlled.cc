@@ -1,14 +1,14 @@
 #include "system/controlled.h"
-#include "pinocchio/parsers/urdf.hpp"
 
 #include <gtest/gtest.h>
+
+#include "pinocchio/parsers/urdf.hpp"
 
 TEST(ControlledSystem, Instantiation) { EXPECT_TRUE(false); }
 
 TEST(ControlledSystem, DerivedClass) { EXPECT_TRUE(false); }
 
-TEST(ControlledSystem, FromPinocchioModelWrapper) { 
-    
+TEST(ControlledSystem, FromPinocchioModelWrapper) {
     pinocchio::Model model;
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, true);
     pinocchio::Data data(model);
@@ -18,5 +18,4 @@ TEST(ControlledSystem, FromPinocchioModelWrapper) {
     damotion::system::SecondOrderControlledSystem system(wrapper);
 
     EXPECT_TRUE(true);
-    
-    }
+}
