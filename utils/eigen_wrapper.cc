@@ -85,6 +85,14 @@ void FunctionWrapper::setInput(int i, Eigen::Ref<const Eigen::VectorXd> x) {
     in_data_ptr_[i] = x.data();
 }
 
+void FunctionWrapper::setInput(
+    const std::vector<int>& idx,
+    const std::vector<Eigen::Ref<const Eigen::VectorXd>>& x) {
+    for (int i = 0; i < idx.size(); ++i) {
+        setInput(idx[i], x[i]);
+    }
+}
+
 void FunctionWrapper::call() {
     // Call the function
     f_(in_data_ptr_.data(), out_data_ptr_.data(), iw_.data(), dw_.data(), mem_);

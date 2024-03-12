@@ -110,6 +110,15 @@ class FunctionWrapper {
     void setInput(int i, Eigen::Ref<const Eigen::VectorXd> x);
 
     /**
+     * @brief Sets a set of inputs for the function
+     *
+     * @param idx Vector of input indices
+     * @param x Vector of inputs
+     */
+    void setInput(const std::vector<int> &idx,
+                  const std::vector<Eigen::Ref<const Eigen::VectorXd>> &x);
+
+    /**
      * @brief Calls the function with the current inputs
      *
      */

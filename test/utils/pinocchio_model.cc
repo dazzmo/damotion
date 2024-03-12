@@ -152,25 +152,18 @@ TEST(PinocchioModelWrapper, EndEffector) {
     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
     Eigen::VectorXd v = Eigen::VectorXd::Zero(model.nv);
     Eigen::VectorXd a = Eigen::VectorXd::Zero(model.nv);
-    
+
     // Create function wrapper for end-effector function
     casadi_utils::eigen::FunctionWrapper ee(wrapper.end_effector(0).x);
     ee.setInput(0, q);
     ee.setInput(1, v);
     ee.setInput(2, a);
-    
+
     ee.call();
-    
+
     std::cout << ee.getOutput(0) << std::endl;
     std::cout << ee.getOutput(1) << std::endl;
     std::cout << ee.getOutput(2) << std::endl;
-    
-    // Evaluate Jacobian at nominal configuration
-    ee_jac.setSparseOutput(0);
-    ee_jac.setInput(0, q);
-
-    ee_jac.call();
-    std::cout << ee_jac.getOutputSparse(0) << std::endl;
 
     EXPECT_TRUE(true);
 }
@@ -194,4 +187,46 @@ TEST(PinocchioModelWrapper, RNEAWithEndEffector) {
     std::cout << rnea << std::endl;
 
     EXPECT_TRUE(true);
+}
+
+TEST(PinocchioModelWrapper, PoseError) {
+    pinocchio::Model model;
+    pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
+    pinocchio::Data data(model);
+
+    casadi_utils::PinocchioModelWrapper wrapper(model);
+
+    wrapper.addEndEffector("tool0");
+
+    casadi_utils::eigen::FunctionWrapper fee(
+        casadi_utils::codegen(wrapper.end_effector(0).x, "./tmp")),
+        f_err(
+            casadi_utils::codegen(wrapper.end_effector(0).pose_error, "./tmp"));
+
+    // Get two random configurations and compute transforms
+    Eigen::VectorXd q0 = pinocchio::randomConfiguration(model),
+                    q1 = pinocchio::randomConfiguration(model);
+
+    pinocchio::forwardKinematics(model, data, q0);
+    pinocchio::framesForwardKinematics(model, data, q0);
+    pinocchio::SE3 se3_0 = data.oMf[model.getFrameId("tool0")];
+
+    pinocchio::forwardKinematics(model, data, q1);
+    pinocchio::framesForwardKinematics(model, data, q1);
+    pinocchio::SE3 se3_1 = data.oMf[model.getFrameId("tool0")];
+
+    // Compute log of the difference
+    Eigen::Vector<double, 6> e_true =
+        pinocchio::log6(se3_0.actInv(se3_1)).toVector();
+
+    // Determine code-generated error
+    Eigen::Quaterniond q(se3_1.rotation());
+    Eigen::Vector3d x(se3_1.translation());
+
+    f_err.setInput({0, 1, 2}, {q0, x, q.coeffs()});
+    f_err.call();
+
+    Eigen::Vector<double, 6> e = f_err.getOutput(0);
+
+    EXPECT_TRUE(e.isApprox(e_true));
 }

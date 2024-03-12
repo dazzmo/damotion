@@ -71,39 +71,42 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
     pinocchio::forwardKinematics(model_, data_, qpos_e, qvel_e, qacc_e);
     // Perform forward kinematics and compute frames
     pinocchio::framesForwardKinematics(model_, data_, qpos_e);
+    // Get SE3 data for the target frame
+    pinocchio::SE3Tpl<casadi::Matrix<AD>> se3_frame =
+        data_.oMf[model_.getFrameId(frame_name)];
 
-    Eigen::VectorX<casadi::Matrix<AD>> xpos_e(7), xvel_e(6), xacc_e(6);
+    Eigen::VectorX<casadi::Matrix<AD>> pos_e(7), vel_e(6), acc_e(6);
 
     // Translational component
-    xpos_e.topRows(3) = data_.oMf[model_.getFrameId(frame_name)].translation();
+    pos_e.topRows(3) = se3_frame.translation();
     // Rotational component
     Eigen::Matrix3<casadi::Matrix<AD>> R =
-        data_.oMf[model_.getFrameId(frame_name)].rotation();
+        se3_frame.rotation();
     Eigen::Quaternion<casadi::Matrix<AD>> qR;
     pinocchio::quaternion::assignQuaternion(qR, R);
 
     // Convert rotation matrix to quaternion representation
-    xpos_e.bottomRows(4) << qR.w(), qR.vec();
+    pos_e.bottomRows(4) << qR.w(), qR.vec();
 
     // Compute velocity of the point at the end-effector frame with respect to
     // the chosen reference frame
-    xvel_e = pinocchio::getFrameVelocity(model_, data_,
-                                         model_.getFrameId(frame_name),
-                                         pinocchio::LOCAL_WORLD_ALIGNED)
-                 .toVector();
+    vel_e = pinocchio::getFrameVelocity(model_, data_,
+                                        model_.getFrameId(frame_name),
+                                        pinocchio::LOCAL_WORLD_ALIGNED)
+                .toVector();
 
     // Compute acceleration of the point at the end-effector frame with respect
     // to the chosen reference frame
-    xacc_e = pinocchio::getFrameAcceleration(model_, data_,
-                                             model_.getFrameId(frame_name),
-                                             pinocchio::LOCAL_WORLD_ALIGNED)
-                 .toVector();
+    acc_e = pinocchio::getFrameAcceleration(model_, data_,
+                                            model_.getFrameId(frame_name),
+                                            pinocchio::LOCAL_WORLD_ALIGNED)
+                .toVector();
 
     // Convert to casadi matrices
-    casadi::Matrix<AD> xpos, xvel, xacc;
-    eigen::toCasadi(xpos_e, xpos);
-    eigen::toCasadi(xvel_e, xvel);
-    eigen::toCasadi(xacc_e, xacc);
+    casadi::Matrix<AD> pos, vel, acc;
+    eigen::toCasadi(pos_e, pos);
+    eigen::toCasadi(vel_e, vel);
+    eigen::toCasadi(acc_e, acc);
 
     // Get jacobian of this site with respect to the configuration of the
     // Compute Jacobian
@@ -122,11 +125,32 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
     ee.S = Eigen::Matrix<double, 6, 6>::Identity();
 
     ee.x = casadi::Function(model_.name + "_" + frame_name + "_ee",
-                            {qpos, qvel, qacc}, {xpos, xvel, xacc},
-                            {"qpos", "qvel", "qacc"}, {"xpos", "xvel", "xacc"});
+                            {qpos, qvel, qacc}, {pos, vel, acc},
+                            {"qpos", "qvel", "qacc"}, {"pos", "vel", "acc"});
 
     ee.J = casadi::Function(model_.name + "_" + frame_name + "_ee_jac", {qpos},
                             {J}, {"qpos"}, {"J"});
+
+    // Also create a function that indicates the error between a target
+    // reference pose and the pose of the end-effector
+    casadi::Matrix<AD> q_ref = casadi::Matrix<AD>::sym("qr", 4),
+                       x_ref = casadi::Matrix<AD>::sym("qr", 3);
+    Eigen::Quaternion<casadi::Matrix<AD>> q;
+    Eigen::Vector3<casadi::Matrix<AD>> x;
+    eigen::toEigen(q_ref, q.coeffs());
+    eigen::toEigen(x_ref, x);
+
+    // Create pose
+    pinocchio::SE3Tpl<casadi::Matrix<AD>> se3_ref(q, x);
+
+    // Determine error
+    casadi::Matrix<AD> err;
+    eigen::toCasadi(poseError(se3_frame, se3_ref), err);
+
+    // Create function
+    ee.pose_error = casadi::Function(
+        model_.name + "_" + frame_name + "_ee_pose_err", {qpos, x_ref, q_ref},
+        {err}, {"qpos", "x_ref", "q_ref"}, {"err"});
 
     // Add to vector
     ee_idx_[frame_name] = ee_.size();

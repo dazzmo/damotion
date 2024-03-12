@@ -1,48 +1,27 @@
 #include "system/constraint.h"
 
+damotion::system::Constraint::Constraint(const std::string &name,
+                                         const casadi::Function &constraint,
+                                         const casadi::Function &jacobian)
+    : name_(name), f_(constraint), df_(jacobian) {
+    nc_ = constraint.size1_out(0);
+}
+
 damotion::system::HolonomicConstraint::HolonomicConstraint(
-    const std::string &name,
-    casadi_utils::PinocchioModelWrapper::EndEffector &ee)
-    : Constraint(name, ee.S.cols()),
-      nq_(ee.x.size1_in(ee.x.index_in("qpos"))),
-      nv_(ee.x.size1_in(ee.x.index_in("qvel"))) {
-    // Create inputs
-    casadi::SX q = casadi::SX::sym("qpos", ee.x.size1_in(0));
-    casadi::SX v = casadi::SX::sym("qvel", ee.x.size1_in(1));
-    casadi::SX a = casadi::SX::sym("qacc", ee.x.size1_in(2));
-    casadi::SXVector in, out;
-
-    // Evaluate end-effector kinematics
-    in = {q, v, a};
-    out = ee.x(in);
-    
-    // Compute constrained outputs
-    casadi::DM Sd;
-    casadi_utils::eigen::toCasadi(ee.S, Sd);
-    casadi::SX S = Sd;
-    casadi::SX xc = mtimes(S.T(), out[0]);
-    casadi::SX xvc = mtimes(S.T(), out[1]);
-    casadi::SX xac = mtimes(S.T(), out[2]);
-
-    // Also compute jacobian in constrained directions
-    in = {q};
-    out = ee.J(in);
-    casadi::SX Jc = mtimes(S.T(), Jc);
-
-    // Compute constraint, Jacobian and second time derivative
-    setConstraint(casadi::Function(name + "_c", {q}, {xc}, {"qpos"}, {"c"}));
-    setJacobian(casadi::Function(name + "_jac", {q}, {Jc}, {"qpos"}, {"J"}));
-    setFirstTimeDerivative(casadi::Function(name + "_dcdt", {q, v}, {xvc},
-                                            {"qpos", "qvel"}, {"dcdt"}));
-    setSecondTimeDerivative(casadi::Function(name + "_d2cdt2", {q, v, a}, {xac},
-                                             {"qpos", "qvel", "qacc"},
-                                             {"d2cdt2"}));
+    const std::string &name, const casadi::Function &constraint,
+    const casadi::Function &jacobian,
+    const casadi::Function &first_time_derivative,
+    const casadi::Function &second_time_derivative)
+    : Constraint(name, constraint, jacobian),
+      df_(first_time_derivative),
+      ddf_(second_time_derivative) {
+    nq_ = constraint.size1_in("qpos");
+    nv_ = first_time_derivative.size1_in("qvel");
 }
 
 casadi::Function damotion::system::constrainedDynamics(
     SecondOrderControlledSystem &system,
     std::vector<HolonomicConstraint> &constraints) {
-
     // Create symbolic vectors
     casadi::SX q = casadi::SX::sym("q", system.nq());
     casadi::SX v = casadi::SX::sym("v", system.nv());
@@ -82,7 +61,6 @@ casadi::Function damotion::system::constrainedDynamics(
 casadi::Function damotion::system::constrainedInverseDynamics(
     SecondOrderControlledSystem &system,
     std::vector<HolonomicConstraint> &constraints) {
-
     // Create symbolic vectors
     casadi::SX q = casadi::SX::sym("q", system.nq());
     casadi::SX v = casadi::SX::sym("v", system.nv());

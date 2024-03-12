@@ -7,12 +7,13 @@
 #include <pinocchio/algorithm/joint-configuration.hpp>
 #include <pinocchio/algorithm/rnea.hpp>
 #include <pinocchio/autodiff/casadi.hpp>
-#include <pinocchio/autodiff/casadi/utils/static-if.hpp>
 #include <pinocchio/autodiff/casadi/math/quaternion.hpp>
+#include <pinocchio/autodiff/casadi/utils/static-if.hpp>
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/multibody/model.hpp>
 
 #include "utils/eigen_wrapper.h"
+#include "utils/log3.h"
 
 namespace casadi_utils {
 
@@ -49,11 +50,12 @@ class PinocchioModelWrapper {
      */
     struct EndEffector {
         /**
-         * @brief Pose of the end-effector in SE3 space, useful for converting
-         * to se3 for error computation
+         * @brief Function that computes the pose error between a target
+         * configuration and the current configuration of the end-effector. Maps
+         * from the space of SE3 to that of se3.
          *
          */
-        pinocchio::SE3Tpl<casadi::Matrix<AD>> pose;
+        casadi::Function pose_error;
 
         /**
          * @brief Function that computes the end-effector position/orientation
@@ -108,6 +110,32 @@ class PinocchioModelWrapper {
     std::vector<EndEffector> ee_;
     std::unordered_map<std::string, int> ee_idx_;
 };
+
+/**
+ * @brief Computes the error of two points in SE3 through use of the Lie algebra
+ * se3 to provide a 6-dimensional vector indicative of the pose error. The
+ * translational error uses the typicall Euclidean distance, whereas the
+ * rotational component makes use of the log3() function to determine the
+ * rotational difference.
+ *
+ * @param p0 The first pose
+ * @param p1 The second pose
+ * @return Eigen::Vector<T, 6>
+ */
+template <typename T>
+Eigen::Vector<T, 6> poseError(const pinocchio::SE3Tpl<T> &p0,
+                              const pinocchio::SE3Tpl<T> &p1) {
+    // Create error vector in se3
+    Eigen::Vector<T, 6> err;
+    // Translational error
+    err.topRows(3) = p0.translation() - p1.translation();
+    // Compute difference in pose rotation
+    Eigen::Matrix3<T> Rd = p0.rotation().transpose() * p1.rotation();
+    // Compute difference in so3 by logarithm map
+    err.bottomRows(3) = damotion::log3(Rd);
+
+    return err;
+}
 
 }  // namespace casadi_utils
 

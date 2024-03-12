@@ -24,6 +24,9 @@ class Constraint {
      */
     Constraint(const std::string &name, int nc) : name_(name), nc_(nc) {}
 
+    Constraint(const std::string &name, const casadi::Function &constraint,
+               const casadi::Function &jacobian);
+
     ~Constraint() = default;
 
     /**
@@ -95,13 +98,21 @@ class HolonomicConstraint : public Constraint {
         : Constraint(name, nc), nq_(nq), nv_(nv) {}
 
     /**
-     * @brief Construct a new holonomic constraint for an end-effector
+     * @brief Construct a new holonomic constraint by providing the functions
+     * that evaluate the constraint, jacobian and first and second time
+     * derivatives.
      *
-     * @param name Name of the constraint
-     * @param ee End-effector struct to create constraint from
+     * @param name
+     * @param constraint
+     * @param jacobian
+     * @param first_time_derivative
+     * @param second_time_derivative
      */
     HolonomicConstraint(const std::string &name,
-                        casadi_utils::PinocchioModelWrapper::EndEffector &ee);
+                        const casadi::Function &constraint,
+                        const casadi::Function &jacobian,
+                        const casadi::Function &first_time_derivative,
+                        const casadi::Function &second_time_derivative);
 
     ~HolonomicConstraint() = default;
 
