@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(casadi_project VERSION 0.0.1)
+project(damotion VERSION 0.0.1)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -10,6 +10,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/)
 include_directories(/usr/local/include)
 link_directories(/usr/local/lib)
 
+find_package(Boost)
+
+message(WARNING ${Boost_INCLUDE_DIRS})
+
 find_package(Eigen3 3.3 REQUIRED)
 find_package(glog REQUIRED)
 find_package(casadi REQUIRED)
@@ -18,6 +22,8 @@ find_package(qpOASES REQUIRED)
 
 # Collect source files
 file (GLOB_RECURSE SOURCE_FILES 
+"common/*.cc"
+"planning/*.cc"
 "system/*.cc"
 "utils/*.cc"
 )
@@ -26,12 +32,13 @@ add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} PUBLIC 
 Eigen3::Eigen 
 pinocchio::pinocchio 
-casadi 
+casadi
 glog 
 ipopt 
 qpOASES
 )
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+
 
 target_include_directories(${PROJECT_NAME} 
   PUBLIC
@@ -55,6 +62,8 @@ install(
 )
 # Copy header files
 install(DIRECTORY 
+        "${CMAKE_SOURCE_DIR}/common"
+        "${CMAKE_SOURCE_DIR}/planning"
         "${CMAKE_SOURCE_DIR}/system"
         "${CMAKE_SOURCE_DIR}/utils"
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME} # target directory
