@@ -31,6 +31,7 @@ class Profiler {
      *
      */
     Profiler() {
+#ifdef DAMOTION_USE_PROFILING
         printf("%20s Calls\tMean (secs)\tStdDev\tMin (sec)\tMax (secs)\n",
                "Scope");
         for (std::map<std::string, acc_t>::iterator p = map_.begin();
@@ -42,6 +43,7 @@ class Profiler {
             printf("%20s %ld\t%f\t%f\t%f\t%f\n", p->first.c_str(),
                    boost::accumulators::count(p->second), av, stdev, min, max);
         }
+#endif
     }
 
     /**
@@ -50,10 +52,13 @@ class Profiler {
      * @param name
      */
     Profiler(const char* name) : name_(name) {
+#ifdef DAMOTION_USE_PROFILING
         // Record start time
         start_ = Clock::now();
+#endif
     }
     ~Profiler() {
+#ifdef DAMOTION_USE_PROFILING
         auto dur = Clock::now() - start_;
 
         std::map<std::string, acc_t>::iterator p = map_.find(name_);
@@ -63,7 +68,9 @@ class Profiler {
             std::pair<std::string, acc_t> pr(name_, acc);
             p = map_.insert(pr).first;
         }
-        (p->second)(dur.count());
+        // TODO Check what the real time is (make it in seconds)
+        (p->second)(dur.count() * 1e-9);
+#endif
     }
 
    private:

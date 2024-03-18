@@ -7,6 +7,16 @@ damotion::system::Constraint::Constraint(const std::string &name,
     nc_ = constraint.size1_out(0);
 }
 
+void damotion::system::Constraint::setConstraint(
+    const casadi::SX &c, const casadi::SXVector &in,
+    const casadi::StringVector &name_in, const casadi::StringVector &name_out) {
+    // Create function based on inputs
+    setConstraint(casadi::Function(name(), in, {c}, name_in, name_out));
+}
+
+void damotion::system::Constraint::setJacobian(const casadi::SX &J,
+                                               const casadi::SXVector &in) {}
+
 damotion::system::HolonomicConstraint::HolonomicConstraint(
     const std::string &name, const casadi::Function &constraint,
     const casadi::Function &jacobian,
@@ -18,6 +28,12 @@ damotion::system::HolonomicConstraint::HolonomicConstraint(
     nq_ = constraint.size1_in("qpos");
     nv_ = first_time_derivative.size1_in("qvel");
 }
+
+damotion::system::HolonomicConstraint::HolonomicConstraint(
+    const std::string &name, const casadi::SX &c, const casadi::SX &dc,
+    const casadi::SX &ddc, const casadi::SX &J, const casadi::SX &qpos,
+    const casadi::SX &qvel, const casadi::SX &qacc,
+    const casadi::SXVector &par) {}
 
 casadi::Function damotion::system::constrainedDynamics(
     SecondOrderControlledSystem &system,

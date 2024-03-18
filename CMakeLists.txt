@@ -10,19 +10,18 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/)
 include_directories(/usr/local/include)
 link_directories(/usr/local/lib)
 
-find_package(Boost)
 
-message(WARNING ${Boost_INCLUDE_DIRS})
-
+find_package(Boost REQUIRED)
+find_package(casadi REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
 find_package(glog REQUIRED)
-find_package(casadi REQUIRED)
 find_package(pinocchio REQUIRED)
 find_package(qpOASES REQUIRED)
 
 # Collect source files
 file (GLOB_RECURSE SOURCE_FILES 
 "common/*.cc"
+"control/*.cc"
 "planning/*.cc"
 "system/*.cc"
 "utils/*.cc"
@@ -63,6 +62,7 @@ install(
 # Copy header files
 install(DIRECTORY 
         "${CMAKE_SOURCE_DIR}/common"
+        "${CMAKE_SOURCE_DIR}/control"
         "${CMAKE_SOURCE_DIR}/planning"
         "${CMAKE_SOURCE_DIR}/system"
         "${CMAKE_SOURCE_DIR}/utils"

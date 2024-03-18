@@ -13,8 +13,7 @@ SecondOrderControlledSystem &SecondOrderControlledSystem::operator=(
     casadi::SX q = casadi::SX::sym("q", model.model().nq);
     casadi::SX v = casadi::SX::sym("v", model.model().nv);
     casadi::SX tau = casadi::SX::sym("tau", model.model().nv);
-    casadi::SX a;
-    // aba.call({q, v, tau}, {a});
+    casadi::SX a = aba(casadi::SXVector({q, v, tau}))[0];
 
     // Create forward dynamics function
     casadi::SX x = casadi::SX::vertcat({q, v});

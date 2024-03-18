@@ -38,38 +38,22 @@ TEST(HolonomicConstraint, ConstraintCreationEndEffector) {
     // Add an end-effector
     wrapper.addEndEffector("tool0");
 
-    std::cout << "End effector added\n";
-    Eigen::Matrix<double, 6, 3> S;
-    S.setZero();
-    S.topRows(3).setIdentity();
-    // Create holonomic constraint for 3D position
-    wrapper.end_effector(wrapper.end_effector_idx("tool0")).S = S;
+    // Get function for pose error
+    // TODO: Look at how parameters should be passed
+    casadi::SX q = casadi::SX::sym("qpos", wrapper.model().nq),
+               v = casadi::SX::sym("qvel", wrapper.model().nv),
+               a = casadi::SX::sym("qvel", wrapper.model().nv);
 
-    std::cout << "Making constraint\n";
-    damotion::system::HolonomicConstraint c(
-        model.name + "tool0_constraint",
-        wrapper.end_effector(wrapper.end_effector_idx("tool0")));
+    casadi::SX qR = casadi::SX::sym("qref", 4), pR = casadi::SX::sym("pref", 3);
 
-    // Create target pose
-    Eigen::Vector<casadi::SX, 3> tR;
-    tR.x() = casadi::SX::sym("x.x");
-    tR.y() = casadi::SX::sym("x.y");
-    tR.z() = casadi::SX::sym("x.z");
-    Eigen::Quaternion<casadi::SX> qR;
-    qR.w() = casadi::SX::sym("q.w");
-    qR.x() = casadi::SX::sym("q.x");
-    qR.y() = casadi::SX::sym("q.y");
-    qR.z() = casadi::SX::sym("q.z");
-    // Create SE3
-    pinocchio::SE3Tpl<casadi::SX> Tr(qR, tR);
-    pinocchio::SE3Tpl<casadi::SX> err = Tr.actInv(wrapper.end_effector(0).pose);
-    Eigen::Vector<casadi::SX, 6> err_se3 = pinocchio::log6(err.toHomogeneousMatrix());
+    // Compute functions for end-effector velocity and acceleration
+    casadi::SX c = wrapper.end_effector(0).pose_error(
+                   casadi::SXVector({q, qR, pR}))[0],
+               dc = wrapper.end_effector(0).x(casadi::SXVector({q, v, a}))[1],
+               ddc = wrapper.end_effector(0).x(casadi::SXVector({q, v, a}))[2],
+               J = wrapper.end_effector(0).J(casadi::SXVector({q}))[0];
 
-    std::cout << "Printing\n";
-    std::cout << c.constraint() << std::endl;
-    std::cout << c.firstTimeDerivative() << std::endl;
-    std::cout << c.secondTimeDerivative() << std::endl;
-    std::cout << c.jacobian() << std::endl;
-
+    // Create holonomic constraint
+ 
     EXPECT_TRUE(true);
 }

@@ -57,6 +57,11 @@ class Constraint {
      */
     casadi::Function jacobian() { return df_; }
 
+    void setConstraint(const casadi::SX &c, const casadi::SXVector &in,
+    const casadi::StringVector &name_in = {},
+    const casadi::StringVector &name_out = {});
+    void setJacobian(const casadi::SX &J, const casadi::SXVector &in);
+
    protected:
     void setConstraint(const casadi::Function &f) { f_ = f; }
     void setJacobian(const casadi::Function &f) { df_ = f; }
@@ -113,6 +118,25 @@ class HolonomicConstraint : public Constraint {
                         const casadi::Function &jacobian,
                         const casadi::Function &first_time_derivative,
                         const casadi::Function &second_time_derivative);
+
+    /**
+     * @brief Construct a new Holonomic Constraint object based on the
+     * expressions created for the constraint, derivatives and Jacobians
+     *
+     * @param name
+     * @param c
+     * @param dc
+     * @param ddc
+     * @param J
+     * @param qpos
+     * @param qvel
+     * @param qacc
+     */
+    HolonomicConstraint(const std::string &name, const casadi::SX &c,
+                        const casadi::SX &dc, const casadi::SX &ddc,
+                        const casadi::SX &J, const casadi::SX &qpos,
+                        const casadi::SX &qvel, const casadi::SX &qacc,
+                        const casadi::SXVector &par = {});
 
     ~HolonomicConstraint() = default;
 

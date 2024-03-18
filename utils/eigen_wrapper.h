@@ -152,6 +152,13 @@ class FunctionWrapper {
      */
     const Eigen::SparseMatrix<double> &getOutputSparse(int i);
 
+    /**
+     * @brief The casadi::Function that is wrapped.
+     *
+     * @return casadi::Function&
+     */
+    casadi::Function &f() { return f_; }
+
    private:
     // Data input vector for casadi function
     std::vector<const double *> in_data_ptr_;
