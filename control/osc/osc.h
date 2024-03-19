@@ -2,10 +2,12 @@
 #define OSC_OSC_H
 
 #include <Eigen/Core>
+#include <algorithm>
 #include <casadi/casadi.hpp>
 #include <map>
 #include <string>
 
+#include "control/quad_prog.h"
 #include "utils/codegen.h"
 #include "utils/eigen_wrapper.h"
 
@@ -24,24 +26,44 @@ class OSCController {
     OSCController() = default;
     ~OSCController() = default;
 
-    // Add constraints
-
-    void AddHolonomicConstraint(damotion::system::HolonomicConstraint &c) {
-        // Throw warning if variable inputs are not correct
-
-        // Add parameters to map
+    OSCController(int nq, int nv, int nu) {
+        // Add variables to map
+        AddVariables("qacc", nv);
+        AddVariables("ctrl", nu);
+        AddVariables("lam", 0);
     }
 
-    // Task
-    class Task {
+    // Holonomic Constraint
+    class HolonomicConstraint {
        public:
-        Task() = default;
-        ~Task() = default;
+        HolonomicConstraint() = default;
+        ~HolonomicConstraint() = default;
 
-        // Evaluates the task and its first and second time derivatives
-        eigen::FunctionWrapper x;
-        // Parameters
-        casadi::SXVector p;
+        // Name of the constraint
+        std::string name = "";
+
+        // Inputs
+        casadi::SXVector in;
+
+        // Dimension of the constraint
+        int dim = 0;
+
+        // Constraint forces if using lagrangian principles
+        int lam_idx = 0;
+
+        // Constraint
+        casadi::SX c;
+        // Constraint first derivative
+        casadi::SX dc_dt;
+        // Constraint second derivative
+        casadi::SX d2c_dt2;
+        // Constraint jacobian
+        casadi::SX J;
+
+        // Function to compute constraint and rates of change
+        eigen::FunctionWrapper f;
+        // Function to compute constraint jacobian
+        eigen::FunctionWrapper jac;
 
         // Input names
         std::vector<std::string> inames;
@@ -53,12 +75,12 @@ class OSCController {
     class Cost {
        public:
         // Relative cost weighting matrix
-        Eigen::DiagonalMatrix<double, Eigen::Dynamic> W;
+        double w;
 
         Cost() = default;
         ~Cost() = default;
 
-        Cost(casadi::Function &f);
+        Cost(casadi::Function &f, const casadi::SX &x);
 
         // Cost
         eigen::FunctionWrapper c;
@@ -73,8 +95,31 @@ class OSCController {
         std::vector<std::string> onames;
     };
 
+    class Constraint {
+       public:
+        Constraint() = default;
+        ~Constraint() = default;
+
+        Constraint(casadi::Function &f, const casadi::SX &x);
+
+        int dim = 0;
+
+        // Constraint
+        eigen::FunctionWrapper c;
+        // Jacobian
+        eigen::FunctionWrapper jac;
+
+        Eigen::VectorXd lb;
+        Eigen::VectorXd ub;
+
+        // Input names
+        std::vector<std::string> inames;
+        // Output names
+        std::vector<std::string> onames;
+    };
+
     // Associated with tracking a given point in SE(3)
-    class TrackingTask : public Task {
+    class TrackingTask : public HolonomicConstraint {
        public:
         enum class Type { kTranslational, kRotational, kFull };
 
@@ -96,16 +141,16 @@ class OSCController {
         // Desired pose rotational component
         Eigen::Quaterniond qr;
 
-        /**
-         * @brief Updates the tracking error e and de using the current state of
-         * the systema and the reference pose xr and/or qr
-         *
-         */
-        void UpdateTrackingError();
+        // Desired pose velocity translational component
+        Eigen::Vector3d vr = Eigen::Vector3d::Zero();
+        // Desired pose velocity rotational component
+        Eigen::Vector3d wr = Eigen::Vector3d::Zero();
+
+        Eigen::VectorXd ComputeDesiredAcceleration();
     };
 
     // Associated with point-contact with a given surface
-    class ContactTask : public Task {
+    class ContactTask : public HolonomicConstraint {
        public:
         ContactTask() = default;
         ~ContactTask() = default;
@@ -122,147 +167,131 @@ class OSCController {
         Eigen::Vector3d xr;
     };
 
-    struct Variables {
-        // Number of distinct variable types
-        const int sz = 3;
-        // Generalised acceleration
-        casadi::SX qacc;
-        // Control inputs
-        casadi::SX ctrl;
-        // Contact wrenches
-        casadi::SX lambda;
-    };
-
-    Variables &GetVariables() {
-        if (var_) {
-            return *var_;
-        } else {
-            std::runtime_error(
-                "Program has not been initialised, no variables created");
+    void CreateHolonomicConstraint(const std::string &name, casadi::Function &c,
+                                   HolonomicConstraint &constraint) {
+        // Add any parameters to the parameter map
+        for (int i = 0; i < c.n_in(); ++i) {
+            // Add input
+            constraint.in.push_back(
+                casadi::SX::sym(c.name_in(i), c.size1_in(i)));
+            constraint.inames.push_back(c.name_in(i));
+            // Add to parameter map
+            if (!IsVariable(c.name_in(i))) {
+                AddParameters(c.name_in(i), c.size1_in(i));
+            }
         }
+
+        // Determine dimension
+        constraint.dim = c.size1_out(0);
+
+        // Compute symbolic outputs
+        casadi::SXVector out = c(constraint.in);
+        constraint.c = out[0];
+        constraint.dc_dt = out[1];
+        constraint.d2c_dt2 = out[2];
+        constraint.J =
+            jacobian(constraint.dc_dt,
+                     casadi::SX::sym("qvel", c.size1_in(c.index_in("qvel"))));
+
+        // Wrap function and add to map
+        constraint.f = eigen::FunctionWrapper(c);
     }
 
-    void AddCost(casadi::Function &c) {
-        // Generate cost function and derivatives
-    }
-
-    void AddTrackingTask(const std::string &name, casadi::Function &x) {
+    void AddTrackingTask(const std::string &name, casadi::Function &x,
+                         const TrackingTask::Type &type) {
         // Create new task
         TrackingTask task;
-        // Add any parameters to the parameter map
-        for (int i = 0; i < x.n_in(); ++i) {
-            AddParameters(x.name_in(i), x.size1_in(i));
+        CreateHolonomicConstraint(name, x, task);
+
+        // Determine task type and dimension
+        task.type = type;
+        if (type == TrackingTask::Type::kRotational ||
+            type == TrackingTask::Type::kTranslational) {
+            task.dim = 3;
+        } else {
+            task.dim = 6;
         }
 
-        // Create translational task
-        task.type = TrackingTask::Type::kTranslational;
-        // Temporarily add function x to be wrapped
-        task.x = eigen::FunctionWrapper(x);
-        // Add to map
+        // Add tracking task to map
         tracking_tasks_[name] = task;
     }
 
-    void SetUpTrackingTask() {
+    void AddHolonomicConstraint(const std::string &name, casadi::Function &c) {
+        // Create new constraint
+        HolonomicConstraint constraint;
+        CreateHolonomicConstraint(name, c, constraint);
+        // Add to map
+        holonomic_constraints_[name] = constraint;
+    }
+
+    void AddDynamics(casadi::Function &f) { fdyn_ = f; }
+
+    void SetUpTrackingTask(TrackingTask &task) {
         damotion::common::Profiler("osc:setup_tracking_task");
 
-        std::string name;
-        TrackingTask &task = tracking_tasks_[name];
+        // Add new parameter for program
+        AddParameters(task.name + "_xacc_d", task.dim);
 
-        // Determine dimension of the tracking task
-        int ndim = 3;
-        if (task.type == TrackingTask::Type::kFull) {
-            ndim = 6;
-        }
-
-        // Get original function
-        casadi::Function f = task.x.f();
-
-        // Create inputs
-        casadi::SXVector in;
-        for (int i = 0; i < f.n_in(); ++i) {
-            in.push_back(casadi::SX::sym(f.name_in()[i], f.size1_in(i)));
-        }
-        // Evaluate function with symbolic inputs
-        casadi::SXVector out = f(in);
         // Task Error and PD gains
-        Eigen::VectorX<casadi::SX> e, de, xacc;
-        Eigen::DiagonalMatrix<casadi::SX, Eigen::Dynamic> Kp(ndim), Kd(ndim);
-        eigen::toEigen(out[2], xacc);
-        eigen::toEigen(casadi::SX::sym("e", ndim), e);
-        eigen::toEigen(casadi::SX::sym("de", ndim), de);
-        eigen::toEigen(casadi::SX::sym("Kp", ndim), Kp.diagonal());
-        eigen::toEigen(casadi::SX::sym("Kd", ndim), Kd.diagonal());
+        casadi::SX xacc_d = casadi::SX::sym(task.name + "_xacc_d");
+        Eigen::VectorX<casadi::SX> xacc_e, xacc_d_e;
+        eigen::toEigen(task.d2c_dt2, xacc_e);
+        eigen::toEigen(xacc_d, xacc_d_e);
 
         // Get necessary components of task acceleration
         if (task.type == TrackingTask::Type::kTranslational) {
-            xacc = xacc.topRows(3);
+            xacc_e = xacc_e.topRows(3);
         } else if (task.type == TrackingTask::Type::kRotational) {
-            xacc = xacc.bottomRows(3);
+            xacc_e = xacc_e.bottomRows(3);
         }
 
         // Create tracking cost
-        casadi::SX c = (xacc - (Kp * e + Kd * de)).squaredNorm();
+        casadi::SX obj = (xacc_e - xacc_d_e).squaredNorm();
 
-        // Create foramtted input expression
-        CreateDefaultFunctionInputs(in, task.inames);
-        // Add all parameters
-        for (int i = 0; i < task.p.size(); ++i) {
-            in.push_back(task.p[i]);
-            task.inames.push_back(task.p[i].name());
-        }
+        casadi::SXVector in = task.in, out;
+        std::vector<std::string> inames = task.inames;
 
-        // Update function with re-arranged input
-        task.onames = {"xpos", "xvel", "xacc"};
-        task.x = eigen::FunctionWrapper(
-            casadi::Function(f.name(), in, out, task.inames, task.onames));
+        in.push_back(xacc_d);
+        inames.push_back(task.name + "_xacc_d");
+
+        // Create tracking objective
+        casadi::Function tracking_cost(task.name + "_tracking_cost", in, {obj},
+                                       inames, {"obj"});
+                                       
+        // Create cost and derivatives given the optimisation vector x
+        Cost cost(tracking_cost, x_);
+
+        // Assign vector data to inputs
+        SetFunctionData(task.f);
+
+        SetFunctionData(cost.c);
+        SetFunctionData(cost.g);
+        SetFunctionData(cost.H);
+
+        // Add associated cost to cost map
+        costs_[task.name + "_tracking_cost"] = cost;
+    }
+
+    void SetUpHolonomicConstraint(HolonomicConstraint &con) {
+        damotion::common::Profiler("OSCController::SetUpHolonomicConstraint");
 
         // Add tracking-specific parameters that don't need to be added to the
         // parameter map
-        std::vector<std::string> name_in = task.inames;
-        in.push_back(casadi::SX::sym("e", ndim));
-        name_in.push_back("e");
-        in.push_back(casadi::SX::sym("de", ndim));
-        name_in.push_back("de");
-        in.push_back(casadi::SX::sym("Kp", ndim));
-        name_in.push_back("Kp");
-        in.push_back(casadi::SX::sym("Kd", ndim));
-        name_in.push_back("Kd");
+        casadi::SXVector in = con.in, out;
+        std::vector<std::string> inames = con.inames;
 
-        // Create tracking task objective
-        out = {c};
-        casadi::Function tracking_cost(f.name() + "_tracking_cost", in, out,
-                                       name_in, {"c"});
-        // Create cost (generates the gradients and Jacobians automatically)
-        Cost cost(tracking_cost);
+        // Set second rate of change of constraint to zero to ensure no change
+        casadi::Function constraint(con.name + "_constraint", in, {con.d2c_dt2},
+                                    inames, {con.name + "_d2c_dt2"});
+        // Create cost based
+        Constraint c(constraint, x_);
 
         // Assign vector data to inputs
-        task.x.setInput(task.x.f().index_in("qacc"), qacc_);
-        task.x.setInput(task.x.f().index_in("ctrl"), qacc_);
-        task.x.setInput(task.x.f().index_in("lam"), lambda_);
-        for (int i = 0; i < task.p.size(); i++) {
-            task.x.setInput(task.x.f().index_in(task.p[i].name()),
-                            parameter_map_[task.p[i].name()]);
-        }
+        SetFunctionData(c.c);
+        SetFunctionData(c.jac);
 
-        // Set inputs for cost function and derivatives
-        for (eigen::FunctionWrapper f : {cost.c, cost.g, cost.H}) {
-            f.setInput(f.f().index_in("qacc"), qacc_);
-            f.setInput(f.f().index_in("ctrl"), qacc_);
-            f.setInput(f.f().index_in("lam"), lambda_);
-            // Parameters
-            for (int i = 0; i < task.p.size(); i++) {
-                task.x.setInput(task.x.f().index_in(task.p[i].name()),
-                                parameter_map_[task.p[i].name()]);
-            }
-            // Set tracking inputs
-            f.setInput(f.f().index_in("e"), task.e);
-            f.setInput(f.f().index_in("de"), task.de);
-            f.setInput(f.f().index_in("Kp"), task.Kp.diagonal());
-            f.setInput(f.f().index_in("Kd"), task.Kd.diagonal());
-        }
-
-        // Add cost to cost map
-        // costs_["TEST"] = cost; // ! Fix
+        // Add associated cost to cost map
+        constraints_[con.name + "_constraint"] = c;
     }
 
     // Functions for setting new weightings?
@@ -284,23 +313,28 @@ class OSCController {
             p->second = val;
         } else {
             // ! Throw error that parameter is not included
+            std::cout << "Parameter " << name
+                      << "is not in the parameter map!\n";
         }
     }
 
     void AddParameters(const std::string &name, int sz) {
-        damotion::common::Profiler("osc:add_parameters");
-        // If its a variable name, ignore it
-        if (name == "qacc" || name == "ctrl" || name == "lam") {
-            return;
-        }
-
+        damotion::common::Profiler("OSCController::AddParameters");
         // Look up parameters in parameter map and set values
         auto p = parameter_map_.find(name);
         // If doesn't exist, add parameter
         if (p == parameter_map_.end()) {
             parameter_map_[name] = Eigen::VectorXd::Zero(sz);
-        } else {
-            // ! Throw warning that it already exists?
+        }
+    }
+
+    void AddVariables(const std::string &name, int sz) {
+        damotion::common::Profiler("OSCController::AddVariables");
+        // Look up parameters in parameter map and set values
+        auto p = variables_.find(name);
+        // If doesn't exist, add parameter
+        if (p == variables_.end()) {
+            variables_[name] = casadi::SX::sym(name, sz);
         }
     }
 
@@ -316,57 +350,265 @@ class OSCController {
         }
     }
 
+    /**
+     * @brief Prints the current set of parameters for the controller to the
+     * screen
+     *
+     */
+    void ListVariables() {
+        std::cout << "Variable\tSize\n";
+        for (auto v : variables_) {
+            std::cout << v.first << "\t" << v.second.size() << " x 1\n";
+        }
+    }
+
     // Given all information for the problem, initialise the program
     void Initialise() {
         // Determine how many contact wrenches need to be considered
-        int n = 0;
+        int nc = 0;
         for (auto &task : contact_tasks_) {
-            n += task.second.xr.size();  // ! Fix this
+            // Assign index to task
+            task.second.lam_idx = nc;
+            nc += task.second.xr.size();  // ! Fix this
+        }
+        // Add any holonomic constraints
+        // TODO - Make projection a possibility
+        for (auto &con : holonomic_constraints_) {
+            // Assign index
+            con.second.lam_idx = nc;
+            nc += con.second.dim;  // ! Fix this
         }
 
-        var_ = std::make_unique<Variables>();
-        var_->qacc = casadi::SX::sym("qacc");
-        var_->ctrl = casadi::SX::sym("ctrl");
-        var_->lambda = casadi::SX::sym("lam");
+        // Resize lambda
+        variables_["lam"].resize(nc, 1);
+
+        // Create optimisation vector with given ordering
+        CreateOptimisationVector({"qacc", "ctrl", "lam"});
+
+        // Create contact constraints
+        for (auto &task : contact_tasks_) {
+            // Get contact forces from force vector
+            casadi::SX lam = var_->lam(casadi::Slice(task.second.lam_idx, 3));
+            constraints_[task.first + "_friction"] =
+                FrictionConeConstraint(task.first, lam);
+        }
+
+        // Add any tracking tasks
+        for (auto &task : tracking_tasks_) {
+            SetUpTrackingTask(task.second);
+        }
+
+        // Add any holonomic constraints
+        for (auto &con : holonomic_constraints_) {
+            SetUpHolonomicConstraint(con.second);
+        }
+
+        // Create dynamics subject to holonomic constraints
+        ComputeConstrainedDynamics();
+    }
+
+    /**
+     * @brief Create a linearised friction cone with tuneable parameter mu to
+     * adjust the friction cone constraints
+     *
+     * @param lambda
+     */
+    Constraint FrictionConeConstraint(const std::string &name,
+                                      casadi::SX &lambda) {
+        // Square pyramid approximation
+        casadi::SX l_x = lambda(0), l_y = lambda(1), l_z = lambda(2);
+
+        casadi::SX mu = casadi::SX::sym(name + "mu");
+
+        AddParameters(name + "_friction_mu", 1);
+
+        // Friction cone constraint with square pyramid approximation
+        casadi::SX cone(4);
+        cone(0) = sqrt(2.0) * l_x + mu * l_z;
+        cone(1) = -sqrt(2.0) * l_x - mu * l_z;
+        cone(2) = sqrt(2.0) * l_y + mu * l_z;
+        cone(3) = -sqrt(2.0) * l_y - mu * l_z;
+
+        // Create function
+        casadi::Function fcone(
+            name + "_friction",
+            {variables_["qacc"], variables_["ctrl"], variables_["lam"], mu},
+            {cone}, {"qacc", "ctrl", "lam", "mu"}, {"friction"});
+
+        Constraint c_cone(fcone, x_);
+        // Set constraint to be positive
+        c_cone.lb.setZero();
+        c_cone.ub.setConstant(1e8);
+
+        return c_cone;
+    }
+
+    void UpdateContactFrictionCoefficient(std::string &name, const double &mu) {
+        // ! Throw error if name is not in lookup
+        Eigen::VectorXd val(1);
+        val[0] = mu;
+        SetParameter(name + "_friction_mu", val);
+    }
+
+    void ComputeConstrainedDynamics() {
+        // Get unconstrained dynamics M qacc + C qvel + G - B u = 0
+
+        // Get inputs for function
+        casadi::SXVector in;
+        for (int i = 0; i < fdyn_.n_in(); ++i) {
+            in.push_back(
+                casadi::SX::sym(fdyn_.name_in()[i], fdyn_.size1_in(i)));
+        }
+        // Evaluate dynamics
+        casadi::SX dyn = fdyn_(in)[0];
+
+        std::vector<std::string> inames = {};
+
+        // Any contact-tasks
+        for (auto &p : contact_tasks_) {
+            // Get contact task
+            ContactTask &task = p.second;
+
+            // Add any parameters for this task to the dynamics
+            for (std::string &p : task.inames) {
+                // Add any parameters that aren't in the function
+                if (std::find(inames.begin(), inames.end(), p) ==
+                    inames.end()) {
+                    /* v does not contain x */
+                    inames.push_back(p);
+                    in.push_back(casadi::SX::sym(p, task.f.f().size1_in(p)));
+                }
+            }
+
+            casadi::SX &J = task.J;
+            casadi::SX lam =
+                variables_["lam"](casadi::Slice(task.lam_idx, task.dim));
+            // Add joint-space forces from lambda
+            dyn -= mtimes(J.T(), lam);
+        }
+
+        // Any holonomic constraints
+        for (auto &p : holonomic_constraints_) {
+            // Get contact task
+            HolonomicConstraint &constraint = p.second;
+
+            // Add any parameters for this task to the dynamics
+            for (std::string &p : constraint.inames) {
+                // Add any parameters that aren't in the function
+                if (std::find(inames.begin(), inames.end(), p) ==
+                    inames.end()) {
+                    /* v does not contain x */
+                    inames.push_back(p);
+                    // ! in.push_back(casadi::SX::sym(p,
+                    // constraint.c.f().size1_in(p)));
+                }
+            }
+
+            casadi::SX &J = constraint.J;
+            casadi::SX lam = variables_["lam"](
+                casadi::Slice(constraint.lam_idx, constraint.dim));
+            // Add joint-space forces from lambda
+            dyn -= mtimes(J.T(), lam);
+        }
+
+        // Create function for dynamics
+        fdyn_ = casadi::Function("dynamics", in, {dyn}, inames, {"dyn"});
+
+        // Create constraint for problem
+        Constraint c(fdyn_, x_);
+
+        // Add constraints to map
+        constraints_["dynamics"] = c;
+
+        // ? If projected dynamics, compute null-space dynamics independently
+        // ? (i.e. using Eigen)
     }
 
     // Creates the program for the given conditions
     void CreateProgram();
 
-    // Return program data that can then be solved
+    void CreateOptimisationVector(const std::vector<std::string> &variables) {
+        casadi::SXVector x;
+        int idx = 0;
+        for (int i = 0; i < variables.size(); ++i) {
+            x.push_back(variables_[variables[i]]);
+            variable_idx_[variables[i]] = idx;
+            idx += variables_[variables[i]].size1();
+        }
 
-   private:
-    // std::vector<> Cost expressions/functions?
-    // std::vector<> Constraint expressions/functions?
-
-    void CreateDefaultFunctionInputs(casadi::SXVector &in,
-                                     casadi::StringVector &name_in) {
-        in = {};
-        name_in = {};
-        in.push_back(GetVariables().qacc);
-        name_in.push_back("qacc");
-        in.push_back(GetVariables().ctrl);
-        name_in.push_back("ctrl");
-        in.push_back(GetVariables().lambda);
-        name_in.push_back("lambda");
+        // Create optimisation vector
+        x_ = casadi::SX::vertcat(x);
     }
 
-    std::unique_ptr<Variables> var_ = nullptr;
+    // Return program data that can then be solved
 
-    struct TaskPriority {
-        // Relative weighting
-        Eigen::DiagonalMatrix<double, Eigen::Dynamic> w;
-    };
+    /**
+     * @brief Indicates whether the provided variable is associated with the
+     * optimisation variables for the problem
+     *
+     * @param name
+     * @return true
+     * @return false
+     */
+    inline bool IsVariable(const std::string &name) {
+        // Check if it hits in the variable map
+        auto p = variables_.find(name);
+        // Indicate if it is present in the variable map
+        return p != variables_.end();
+    }
 
-    Eigen::VectorXd qacc_;
-    Eigen::VectorXd ctrl_;
-    Eigen::VectorXd lambda_;
+    /**
+     * @brief Indicates whether the provided variable is associated with the
+     * optimisation variables for the problem
+     *
+     * @param name
+     * @return true
+     * @return false
+     */
+    inline bool IsParameter(const std::string &name) {
+        // Check if it hits in the variable map
+        auto p = parameter_map_.find(name);
+        // Indicate if it is present in the variable map
+        return p != parameter_map_.end();
+    }
+
+    void SetFunctionData(eigen::FunctionWrapper &f) {
+        // Go through all function inputs and set both variable and parameter
+        // locations
+        for (int i = 0; i < f.f().n_in(); ++i) {
+            std::string name = f.f().name_in(i);
+            if (!IsVariable(name)) {
+                f.setInput(f.f().index_in(name), parameter_map_[name]);
+            } else {
+                f.setInput(f.f().index_in(name), variable_map_[name]);
+            }
+        }
+    }
+
+   private:
+    casadi::Function fdyn_;
+
+    // Optimisation vector
+    casadi::SX x_;
 
     std::unordered_map<std::string, TrackingTask> tracking_tasks_;
     std::unordered_map<std::string, ContactTask> contact_tasks_;
+    std::unordered_map<std::string, HolonomicConstraint> holonomic_constraints_;
+
+    // Program data
+
+    // Variables
+    std::unordered_map<std::string, casadi::SX> variables_;
+    // Variable indices
+    std::unordered_map<std::string, int> variable_idx_;
+
+    // Constraints
+    std::unordered_map<std::string, Constraint> constraints_;
+    // Costs
     std::unordered_map<std::string, Cost> costs_;
 
-    // Parameter map
+    std::unordered_map<std::string, Eigen::VectorXd> variable_map_;
+    // Parameters
     std::unordered_map<std::string, Eigen::VectorXd> parameter_map_;
 };
 
