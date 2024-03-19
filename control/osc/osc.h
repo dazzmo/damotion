@@ -6,12 +6,13 @@
 #include <map>
 #include <string>
 
-#include "casadi_utils/codegen.h"
-#include "casadi_utils/eigen_wrapper.h"
+#include "utils/codegen.h"
+#include "utils/eigen_wrapper.h"
 
 // ? create functions that compute the necessary constraints and stuff for a
 // ? problem, then pass it to a given solver?
 
+#include "common/profiler.h"
 #include "system/constraint.h"
 
 // Variables at play: qacc, u, lambda
@@ -34,23 +35,42 @@ class OSCController {
     // Task
     class Task {
        public:
-        eigen::FunctionWrapper x;
-        eigen::FunctionWrapper J;
+        Task() = default;
+        ~Task() = default;
 
+        // Evaluates the task and its first and second time derivatives
+        eigen::FunctionWrapper x;
         // Parameters
-        casadi::SXVector px;
-        casadi::SXVector pJ;
+        casadi::SXVector p;
+
+        // Input names
+        std::vector<std::string> inames;
+        // Output names
+        std::vector<std::string> onames;
     };
 
     // Cost
     class Cost {
        public:
+        // Relative cost weighting matrix
+        Eigen::DiagonalMatrix<double, Eigen::Dynamic> W;
+
+        Cost() = default;
+        ~Cost() = default;
+
+        Cost(casadi::Function &f);
+
         // Cost
         eigen::FunctionWrapper c;
         // Gradient
         eigen::FunctionWrapper g;
         // Hessian
         eigen::FunctionWrapper H;
+
+        // Input names
+        std::vector<std::string> inames;
+        // Output names
+        std::vector<std::string> onames;
     };
 
     // Associated with tracking a given point in SE(3)
@@ -58,41 +78,45 @@ class OSCController {
        public:
         enum class Type { kTranslational, kRotational, kFull };
 
-        // Task
-        eigen::FunctionWrapper x;
-        // Task tracking cost
-        eigen::FunctionWrapper c;
-
-        eigen::FunctionWrapper J;
-
-        void ComputeError();
+        TrackingTask() = default;
+        ~TrackingTask() = default;
 
         Type type;
         // Tracking gains
-        Eigen::DiagonalMatrix<double> Kp;
+        Eigen::DiagonalMatrix<double, Eigen::Dynamic> Kp;
         // Tracking gains
-        Eigen::DiagonalMatrix<double> Kd;
+        Eigen::DiagonalMatrix<double, Eigen::Dynamic> Kd;
 
         // Error in pose
         Eigen::VectorXd e;
         Eigen::VectorXd de;
 
-        // Desired pose
+        // Desired pose translational component
         Eigen::Vector3d xr;
+        // Desired pose rotational component
         Eigen::Quaterniond qr;
 
-        // Expressions for the tracking task x
-        casadi::SX xpos;
-        casadi::SX xvel;
-        casadi::SX xacc;
-        casadi::SX J;
+        /**
+         * @brief Updates the tracking error e and de using the current state of
+         * the systema and the reference pose xr and/or qr
+         *
+         */
+        void UpdateTrackingError();
     };
 
     // Associated with point-contact with a given surface
     class ContactTask : public Task {
        public:
+        ContactTask() = default;
+        ~ContactTask() = default;
+
+        // Whether the point is in contact or not
         bool inContact = false;
+        // Contact surface normal
         Eigen::Vector3d normal = Eigen::Vector3d::UnitZ();
+
+        // Friction coefficient
+        double mu = 1.0;
 
         // Point to keep in contact with
         Eigen::Vector3d xr;
@@ -122,129 +146,149 @@ class OSCController {
         // Generate cost function and derivatives
     }
 
-    void AddTrackingTask(const std::string &name, casadi::Function &x,
-                         casadi::Function &J) {
+    void AddTrackingTask(const std::string &name, casadi::Function &x) {
         // Create new task
         TrackingTask task;
         // Add any parameters to the parameter map
         for (int i = 0; i < x.n_in(); ++i) {
             AddParameters(x.name_in(i), x.size1_in(i));
         }
-        // Create inputs
-        casadi::SXVector in;
-        for (int i = 0; i < x.n_in(); ++i) {
-            in.push_back(casadi::SX::sym(x.name_in[i], x.size1_in[i]));
-        }
-        // Evaluate and store expressions
-        casadi::SXVector out = x(in);
-        task.xpos = out[0];
-        task.xvel = out[1];
-        task.xacc = out[2];
-
-        // Evaluate Jacobian
-        in = {};
-        for (int i = 0; i < x.n_in(); ++i) {
-            in.push_back(casadi::SX::sym(J.name_in[i], J.size1_in[i]));
-        }
-        // Evaluate and store expressions
-        out = J(in);
-        task.J = out[0];
 
         // Create translational task
         task.type = TrackingTask::Type::kTranslational;
+        // Temporarily add function x to be wrapped
+        task.x = eigen::FunctionWrapper(x);
         // Add to map
         tracking_tasks_[name] = task;
     }
 
     void SetUpTrackingTask() {
+        damotion::common::Profiler("osc:setup_tracking_task");
+
         std::string name;
         TrackingTask &task = tracking_tasks_[name];
 
+        // Determine dimension of the tracking task
         int ndim = 3;
         if (task.type == TrackingTask::Type::kFull) {
             ndim = 6;
         }
 
-        // Evaluate constraints
-        Eigen::VectorX<casadi::SX> e, de;
-        // Task PD gains
-        Eigen::Vector3<casadi::SX> Kp, Kd;
-        eigen::toEigen(casadi::SX::sym("Kp", ndim), Kp.diagonal());
-        eigen::toEigen(casadi::SX::sym("Kd", ndim), Kd.diagonal());
+        // Get original function
+        casadi::Function f = task.x.f();
+
+        // Create inputs
+        casadi::SXVector in;
+        for (int i = 0; i < f.n_in(); ++i) {
+            in.push_back(casadi::SX::sym(f.name_in()[i], f.size1_in(i)));
+        }
+        // Evaluate function with symbolic inputs
+        casadi::SXVector out = f(in);
+        // Task Error and PD gains
+        Eigen::VectorX<casadi::SX> e, de, xacc;
+        Eigen::DiagonalMatrix<casadi::SX, Eigen::Dynamic> Kp(ndim), Kd(ndim);
+        eigen::toEigen(out[2], xacc);
         eigen::toEigen(casadi::SX::sym("e", ndim), e);
         eigen::toEigen(casadi::SX::sym("de", ndim), de);
+        eigen::toEigen(casadi::SX::sym("Kp", ndim), Kp.diagonal());
+        eigen::toEigen(casadi::SX::sym("Kd", ndim), Kd.diagonal());
 
-        // Create function for tracking task
+        // Get necessary components of task acceleration
+        if (task.type == TrackingTask::Type::kTranslational) {
+            xacc = xacc.topRows(3);
+        } else if (task.type == TrackingTask::Type::kRotational) {
+            xacc = xacc.bottomRows(3);
+        }
+
+        // Create tracking cost
         casadi::SX c = (xacc - (Kp * e + Kd * de)).squaredNorm();
 
-        // ! Create cost from this expression
-
-        // Create functions and set destinations
-        casadi::Function xx("", in, out, name_in, name_out);
-
-        // Function inputs and outputs
-        casadi::SXVector in, out;
-        casadi::StringVector name_in, name_out;
-        // Create formatted function inputs
-        CreateDefaultFunctionInputs(in, name_in);
-        // Add any additional parameters
-        for (int i = 0; i < task.px.size(); ++i) {
+        // Create foramtted input expression
+        CreateDefaultFunctionInputs(in, task.inames);
+        // Add all parameters
+        for (int i = 0; i < task.p.size(); ++i) {
             in.push_back(task.p[i]);
-            name_in.push_back(task.p[i].name());
+            task.inames.push_back(task.p[i].name());
         }
-        // Create parameters and set them
+
+        // Update function with re-arranged input
+        task.onames = {"xpos", "xvel", "xacc"};
+        task.x = eigen::FunctionWrapper(
+            casadi::Function(f.name(), in, out, task.inames, task.onames));
+
+        // Add tracking-specific parameters that don't need to be added to the
+        // parameter map
+        std::vector<std::string> name_in = task.inames;
         in.push_back(casadi::SX::sym("e", ndim));
+        name_in.push_back("e");
         in.push_back(casadi::SX::sym("de", ndim));
+        name_in.push_back("de");
         in.push_back(casadi::SX::sym("Kp", ndim));
+        name_in.push_back("Kp");
         in.push_back(casadi::SX::sym("Kd", ndim));
+        name_in.push_back("Kd");
 
-        // ! Determine if codegen is required
-        task.x = eigen::FunctionWrapper(casadi_utils::codegen(xx));
+        // Create tracking task objective
+        out = {c};
+        casadi::Function tracking_cost(f.name() + "_tracking_cost", in, out,
+                                       name_in, {"c"});
+        // Create cost (generates the gradients and Jacobians automatically)
+        Cost cost(tracking_cost);
 
-        // Setup inputs to function
-        task.x.setInput(0, qacc_);
-        task.x.setInput(1, ctrl_);
-        task.x.setInput(2, lambda_);
-        for (int i = 0; i < task.px.size(); i++) {
-            task.x.setInput(3 + i, parameter_map_[task.p[i].name()]);
+        // Assign vector data to inputs
+        task.x.setInput(task.x.f().index_in("qacc"), qacc_);
+        task.x.setInput(task.x.f().index_in("ctrl"), qacc_);
+        task.x.setInput(task.x.f().index_in("lam"), lambda_);
+        for (int i = 0; i < task.p.size(); i++) {
+            task.x.setInput(task.x.f().index_in(task.p[i].name()),
+                            parameter_map_[task.p[i].name()]);
         }
-        // Set tracking inputs
-        int n = 3 + task.px.size();
-        task.x.setInput(n, task.e);
-        task.x.setInput(n + 1, task.de);
-        task.x.setInput(n + 2, task.Kp.diagonal());
-        task.x.setInput(n + 3, task.Kd.diagonal());
+
+        // Set inputs for cost function and derivatives
+        for (eigen::FunctionWrapper f : {cost.c, cost.g, cost.H}) {
+            f.setInput(f.f().index_in("qacc"), qacc_);
+            f.setInput(f.f().index_in("ctrl"), qacc_);
+            f.setInput(f.f().index_in("lam"), lambda_);
+            // Parameters
+            for (int i = 0; i < task.p.size(); i++) {
+                task.x.setInput(task.x.f().index_in(task.p[i].name()),
+                                parameter_map_[task.p[i].name()]);
+            }
+            // Set tracking inputs
+            f.setInput(f.f().index_in("e"), task.e);
+            f.setInput(f.f().index_in("de"), task.de);
+            f.setInput(f.f().index_in("Kp"), task.Kp.diagonal());
+            f.setInput(f.f().index_in("Kd"), task.Kd.diagonal());
+        }
+
+        // Add cost to cost map
+        // costs_["TEST"] = cost; // ! Fix
     }
-
-    class HolonomicConstraint {};
-
-    // Generic cost that can be added
-    class Cost {};
 
     // Functions for setting new weightings?
     // Access through the map?
-    void UpdateTrackingCostGains(std::string &name,
-                                 const Eigen::DiagonalMatrix<double> &Kp,
-                                 const Eigen::DiagonalMatrix<double> &Kd) {
-        ee_[name].Kp = Kp;
-        ee_[name].Kd = Kd;
+    void UpdateTrackingCostGains(
+        std::string &name,
+        const Eigen::DiagonalMatrix<double, Eigen::Dynamic> &Kp,
+        const Eigen::DiagonalMatrix<double, Eigen::Dynamic> &Kd) {
+        // ! Throw error if name is not in lookup
+        tracking_tasks_[name].Kp = Kp;
+        tracking_tasks_[name].Kd = Kd;
     }
 
-    void UpdateParameters(eigen::FunctionWrapper &f) {
-        // Ignore variable inputs (qacc, ctrl, lambda)
-        for (int i = 3; i < f.f().n_in(); ++i) {
-            // Look up parameters in parameter map and set values
-            auto p = parameter_map_.find(f.f().name_in(i));
-            // If it exists, update parameter
-            if (p != parameter_map_.end()) {
-                f.setInput(i, p->second);
-            } else {
-                // ! Throw error that parameter is not included
-            }
+    void SetParameter(const std::string &name, const Eigen::VectorXd &val) {
+        // Look up parameters in parameter map and set values
+        auto p = parameter_map_.find(name);
+        // If it exists, update parameter
+        if (p != parameter_map_.end()) {
+            p->second = val;
+        } else {
+            // ! Throw error that parameter is not included
         }
     }
 
     void AddParameters(const std::string &name, int sz) {
+        damotion::common::Profiler("osc:add_parameters");
         // If its a variable name, ignore it
         if (name == "qacc" || name == "ctrl" || name == "lam") {
             return;
@@ -252,9 +296,23 @@ class OSCController {
 
         // Look up parameters in parameter map and set values
         auto p = parameter_map_.find(name);
-        // If it exists, update parameter
-        if (p != parameter_map_.end()) {
-            parameter_map_[name] = Eigen::VectorXd::Zeros(sz);
+        // If doesn't exist, add parameter
+        if (p == parameter_map_.end()) {
+            parameter_map_[name] = Eigen::VectorXd::Zero(sz);
+        } else {
+            // ! Throw warning that it already exists?
+        }
+    }
+
+    /**
+     * @brief Prints the current set of parameters for the controller to the
+     * screen
+     *
+     */
+    void ListParameters() {
+        std::cout << "Parameter\tSize\n";
+        for (auto p : parameter_map_) {
+            std::cout << p.first << "\t" << p.second.size() << " x 1\n";
         }
     }
 
@@ -262,8 +320,8 @@ class OSCController {
     void Initialise() {
         // Determine how many contact wrenches need to be considered
         int n = 0;
-        for (auto &ee : ee_) {
-            n += ee.second.xr.size()  // ! Fix this
+        for (auto &task : contact_tasks_) {
+            n += task.second.xr.size();  // ! Fix this
         }
 
         var_ = std::make_unique<Variables>();
@@ -297,7 +355,7 @@ class OSCController {
 
     struct TaskPriority {
         // Relative weighting
-        Eigen::DiagonalMatrix<double> w;
+        Eigen::DiagonalMatrix<double, Eigen::Dynamic> w;
     };
 
     Eigen::VectorXd qacc_;

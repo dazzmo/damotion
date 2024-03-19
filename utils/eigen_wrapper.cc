@@ -15,7 +15,9 @@ FunctionWrapper& FunctionWrapper::operator=(const FunctionWrapper& other) {
 
 FunctionWrapper::~FunctionWrapper() {
     // Release memory for casadi function
-    f_.release(mem_);
+    if (!f_.is_null()) {
+        f_.release(mem_);
+    }
 }
 
 FunctionWrapper& FunctionWrapper::operator=(casadi::Function f) {
