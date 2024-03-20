@@ -7,7 +7,7 @@
 #include "utils/pinocchio_model.h"
 
 TEST(OSC, Parameters) {
-    OSCController osc;
+    damotion::control::OSCController osc;
 
     osc.AddParameters("a", 5);
     osc.AddParameters("b", 3);
@@ -37,12 +37,7 @@ TEST(OSC, Cost) {
                        casadi::SXVector({J}), {"qacc", "ctrl", "lam", "a", "b"},
                        {"c"});
 
-    OSCController::Cost cost(f, x);
-
-    std::cout << cost.g.f()(casadi::SXVector({qacc, ctrl, lam, a, b}))
-              << std::endl;
-    std::cout << cost.H.f()(casadi::SXVector({qacc, ctrl, lam, a, b}))
-              << std::endl;
+    damotion::control::OSCController::Cost cost(f.name(), f, x);
 
     EXPECT_TRUE(true);
 }
@@ -55,23 +50,39 @@ TEST(OSC, AddEndEffector) {
 
     casadi_utils::PinocchioModelWrapper wrapper(model);
 
+    // Create actuation map
+    casadi::SX B(6, 6);
+    for (int i = 0; i < 6; i++) {
+        B(i, i) = 1.0;
+    }
+
+    casadi::SX qpos = casadi::SX::sym("qpos", model.nq),
+               qvel = casadi::SX::sym("qvel", model.nv),
+               qacc = casadi::SX::sym("qacc", model.nv),
+               u = casadi::SX::sym("ctrl", model.nv);
+
+    casadi::SX dyn = wrapper.rnea()(casadi::SXVector({qpos, qvel, qacc}))[0];
+    dyn -= mtimes(B, u);
+    // Create new function with actuation included
+    casadi::Function controlled_dynamics =
+        casadi::Function("dynamics", {qpos, qvel, qacc, u}, {dyn},
+                         {"qpos", "qvel", "qacc", "ctrl"}, {"dyn"});
+
     // Create data for end-effector
     wrapper.addEndEffector("tool0");
 
-    OSCController osc(model.nq, model.nv, model.nv);
+    damotion::control::OSCController osc(model.nq, model.nv, model.nv);
 
-    // Add system dynamics
-    casadi::Function f = wrapper.rnea();
-    
-    osc.AddDynamics(f);
-    osc.AddTrackingTask("tool0", wrapper.end_effector(0).x,
-                        OSCController::TrackingTask::Type::kFull);
-
-    osc.Initialise();
+    osc.AddDynamics(controlled_dynamics);
+    osc.AddTrackingTask(
+        "tool0", wrapper.end_effector(0).x,
+        damotion::control::OSCController::TrackingTask::Type::kFull);
 
     // Observe parameters and cost
     osc.ListVariables();
     osc.ListParameters();
+
+    osc.Initialise();
 
     EXPECT_TRUE(true);
 }
