@@ -4,6 +4,7 @@
 #include <casadi/casadi.hpp>
 
 #include "common/profiler.h"
+#include "utils/casadi.h"
 #include "utils/codegen.h"
 #include "utils/eigen_wrapper.h"
 
@@ -29,10 +30,13 @@ class Program {
          * optimisation variables x
          *
          * @param name Name of the cost
-         * @param f Expression for objective
+         * @param f Expression for the cost
+         * @param in Input variables
+         * @param inames Input variable names
          * @param x Optimisation variables
          */
-        Cost(const std::string &name, casadi::Function &c, const casadi::SX &x);
+        Cost(const std::string &name, casadi::SX &f, const casadi::SXVector &in,
+             const casadi::StringVector &inames, const casadi::SX &x);
 
         /**
          * @brief Objective function
@@ -51,6 +55,12 @@ class Program {
          *
          */
         eigen::FunctionWrapper hes;
+
+        /**
+         * @brief Input variables for the expression
+         *
+         */
+        std::vector<casadi::SX> in;
 
         /**
          * @brief Input variable names
@@ -93,11 +103,14 @@ class Program {
          * optimisation variables x
          *
          * @param name Constraint name
-         * @param f Constraint
-         * @param x
+         * @param c Constraint
+         * @param in Constraint inputs
+         * @param inames Constraint input names
+         * @param x Decision variable to compute derivatives with respect to
          */
-        Constraint(const std::string &name, casadi::Function &c,
-                   const casadi::SX &x);
+        Constraint(const std::string &name, casadi::SX &f,
+                   const casadi::SXVector &in,
+                   const casadi::StringVector &inames, const casadi::SX &x);
 
         /**
          * @brief Name of the constraint
@@ -200,6 +213,7 @@ class Program {
     void AddVariables(const std::string &name, const int sz) {
         if (variables_.find(name) == variables_.end()) {
             variables_[name] = casadi::SX::sym(name, sz);
+            variable_map_[name] = Eigen::VectorXd::Zero(sz);
         } else {
             // ! Make this more sophisticated
             std::cout << "Variables with name " << name << " already added!\n";
@@ -211,6 +225,14 @@ class Program {
             // return casadi::SX(0);
         } else {
             return variables_[name];
+        }
+    }
+
+    casadi::SX &GetParameters(const std::string &name) {
+        if (parameters_.find(name) == parameters_.end()) {
+            // return casadi::SX(0);
+        } else {
+            return parameters_[name];
         }
     }
 
@@ -403,9 +425,10 @@ class Program {
     void AddParameters(const std::string &name, int sz) {
         damotion::common::Profiler("Program::AddParameters");
         // Look up parameters in parameter map and set values
-        auto p = parameter_map_.find(name);
+        auto p = parameters_.find(name);
         // If doesn't exist, add parameter
-        if (p == parameter_map_.end()) {
+        if (p == parameters_.end()) {
+            parameters_[name] = casadi::SX::sym(name, sz);
             parameter_map_[name] = Eigen::VectorXd::Zero(sz);
         }
     }
@@ -425,6 +448,26 @@ class Program {
 
     Eigen::VectorXd &ConstraintsLowerBound() { return lbg_; }
     Eigen::VectorXd &ConstraintsUpperBound() { return ubg_; }
+
+    casadi::SXVector GetSymbolicFunctionInput(
+        const std::vector<std::string> &inames) {
+        casadi::SXVector in = {};
+        // Gather symbols for each input
+        for (int i = 0; i < inames.size(); ++i) {
+            std::string name = inames[i];
+            if (IsVariable(name)) {
+                in.push_back(GetVariables(name));
+            } else if (IsParameter(name)) {
+                in.push_back(GetParameters(name));
+            } else {
+                std::cout << "Input " << name
+                          << " is not a listed variable or parameter!\n";
+            }
+        }
+
+        // Return inputs
+        return in;
+    }
 
    private:
     std::string name_;
@@ -447,6 +490,8 @@ class Program {
 
     // Variables
     std::unordered_map<std::string, casadi::SX> variables_;
+    std::unordered_map<std::string, casadi::SX> parameters_;
+
     // Variable indices
     std::unordered_map<std::string, int> variable_idx_;
 

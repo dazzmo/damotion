@@ -17,15 +17,18 @@ void OSCController::UpdateProgramParameters() {
     for (auto &p : contact_tasks_) {
         ContactTask &task = p.second;
         // Get index of contact forces in optimisation variable
-        int idx = GetVariableIndex("lam") + task.lam_idx;
+        int idx = GetVariableIndex("lam") + task.ConstraintForceIndex();
         // Update conditions on end-effectors
         if (task.inContact) {
             // Update bounds for lambda
-            DecisionVariablesUpperBound().middleRows(idx, task.dim()) << 1e8,
+            DecisionVariablesUpperBound().middleRows(idx, task.Dimension())
+                << 1e8,
                 1e8, 1e8;
         } else {
             // No contact forces
-            DecisionVariablesUpperBound().middleRows(idx, task.dim()).setZero();
+            DecisionVariablesUpperBound()
+                .middleRows(idx, task.Dimension())
+                .setZero();
         }
     }
 
@@ -41,10 +44,10 @@ void OSCController::UpdateProgramParameters() {
 
 Eigen::VectorXd OSCController::TrackingTask::ComputeDesiredAcceleration() {
     // Evaluate the task with current parameters for the functions
-    con.call();
+    Function().call();
     // Get task position and velocity
-    Eigen::VectorXd xpos = con.getOutput(0);
-    Eigen::VectorXd xvel = con.getOutput(1);
+    Eigen::VectorXd xpos = Function().getOutput(0);
+    Eigen::VectorXd xvel = Function().getOutput(1);
 
     if (type == Type::kTranslational) {
         e = xpos - xr;

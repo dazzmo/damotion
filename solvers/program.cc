@@ -1,66 +1,54 @@
 #include "solvers/program.h"
 
-using namespace damotion::solvers;
+namespace damotion {
 
-Program::Cost::Cost(const std::string &name, casadi::Function &c,
-                    const casadi::SX &x) {
-    // Create name vector
-    casadi::SXVector in, out;
-    inames = {};
-    for (int i = 0; i < c.n_in(); ++i) {
-        inames.push_back(c.name_in(i));
-        in.push_back(casadi::SX::sym(c.name_in(i), c.size1_in(i)));
-    }
+namespace solvers {
 
-    // Evaluate objective with given inputs
-    casadi::SX obj = c(in)[0];
-
+Program::Cost::Cost(const std::string &name, casadi::SX &f,
+                    const casadi::SXVector &in,
+                    const casadi::StringVector &inames, const casadi::SX &x) {
     // Create functions to compute the necessary gradients and hessians
-    
     /* Objective */
-    casadi::Function co =
-        casadi::Function(name + "_obj", in, {obj}, inames, {name + "_obj"});
-    this->obj = eigen::FunctionWrapper(c);
+    casadi::Function obj =
+        casadi::Function(name + "_obj", in, {f}, inames, {name + "_obj"});
+    this->obj = eigen::FunctionWrapper(obj);
 
     /* Objective Gradient */
-    casadi::Function cg = casadi::Function(
-        name + "_grad", in, {gradient(obj, x)}, inames, {name + "_grad"});
-    this->grad = eigen::FunctionWrapper(cg);
+    casadi::Function grad = casadi::Function(
+        name + "_grad", in, {gradient(f, x)}, inames, {name + "_grad"});
+    this->grad = eigen::FunctionWrapper(grad);
 
     /* Objective Hessian */
-    casadi::Function ch = casadi::Function(name + "_hes", in, {hessian(obj, x)},
-                                           inames, {name + "_hes"});
-    this->hes = eigen::FunctionWrapper(ch);
+    casadi::Function hes = casadi::Function(name + "_hes", in, {hessian(f, x)},
+                                            inames, {name + "_hes"});
+    this->hes = eigen::FunctionWrapper(hes);
 }
 
-Program::Constraint::Constraint(const std::string &name, casadi::Function &c,
-                                const casadi::SX &x) : name_(name) {
-    // Create name vector
-    casadi::SXVector in, out;
-    inames = {};
-    for (int i = 0; i < c.n_in(); ++i) {
-        inames.push_back(c.name_in(i));
-        in.push_back(casadi::SX::sym(c.name_in(i), c.size1_in(i)));
-    }
-
-    // Evaluate constraints
-    casadi::SX constraint = c(in)[0];
-
+Program::Constraint::Constraint(const std::string &name, casadi::SX &c,
+                                const casadi::SXVector &in,
+                                const casadi::StringVector &inames,
+                                const casadi::SX &x)
+    : name_(name) {
     // Create functions to compute the necessary gradients and hessians
-    casadi::Function co = casadi::Function(name + "_con", in, {constraint},
-                                           inames, {name + "_con"});
-    this->con = eigen::FunctionWrapper(co);
 
-    /* Constraint Gradient */
-    casadi::Function cjac = casadi::Function(
-        name + "_jac", in, {jacobian(constraint, x)}, inames, {name + "_jac"});
-    this->jac = eigen::FunctionWrapper(cjac);
+    /* Objective */
+    casadi::Function con =
+        casadi::Function(name + "_con", in, {c}, inames, {name + "_con"});
+    this->con = eigen::FunctionWrapper(con);
+
+    /* Objective Gradient */
+    casadi::Function jac = casadi::Function(name + "_jac", in, {jacobian(c, x)},
+                                            inames, {name + "_jac"});
+    this->jac = eigen::FunctionWrapper(jac);
 
     // Set dimension of constraint
-    dim_ = constraint.size1();
+    dim_ = c.size1();
 
     // Create generic bounds
     double inf = std::numeric_limits<double>::infinity();
     ub_ = inf * Eigen::VectorXd::Ones(dim_);
     lb_ = -inf * Eigen::VectorXd::Ones(dim_);
 }
+
+}  // namespace solvers
+}  // namespace damotion

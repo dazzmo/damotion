@@ -8,6 +8,7 @@
 #include <string>
 
 #include "solvers/program.h"
+#include "utils/casadi.h"
 #include "utils/codegen.h"
 #include "utils/eigen_wrapper.h"
 
@@ -40,22 +41,30 @@ class OSCController : public solvers::Program {
     }
 
     // Holonomic Constraint
-    class HolonomicConstraint : public Constraint {
+    class HolonomicConstraint {
        public:
         HolonomicConstraint() = default;
         ~HolonomicConstraint() = default;
 
-        // Constraint forces if using lagrangian principles
-        int lam_idx = 0;
+        void SetName(const std::string &name) { name_ = name; }
+        const std::string &name() const { return name_; }
 
-        // Constraint
-        casadi::SX c;
-        // Constraint first derivative
-        casadi::SX dc_dt;
-        // Constraint second derivative
-        casadi::SX d2c_dt2;
-        // Constraint jacobian
-        casadi::SX J;
+        void SetDimension(const int &dim) { dim_ = dim; }
+        const int &Dimension() const { return dim_; }
+
+        void SetConstraintForceIndex(const int &idx) { lam_idx_ = idx; }
+        const int ConstraintForceIndex() const { return lam_idx_; }
+
+        void SetFunction(const casadi::Function &f) {
+            f_ = eigen::FunctionWrapper(f);
+        }
+        eigen::FunctionWrapper &Function() { return f_; }
+
+       private:
+        int dim_ = 0;
+        int lam_idx_ = -1;
+        std::string name_;
+        eigen::FunctionWrapper f_;
     };
 
     // Associated with tracking a given point in SE(3)
@@ -109,26 +118,17 @@ class OSCController : public solvers::Program {
 
     void CreateHolonomicConstraint(const std::string &name, casadi::Function &c,
                                    HolonomicConstraint &constraint) {
-        for (int i = 0; i < c.n_in(); ++i) {
-            // Add inputs to constraint
-            constraint.in.push_back(
-                casadi::SX::sym(c.name_in(i), c.size1_in(i)));
-            constraint.inames.push_back(c.name_in(i));
+        constraint.SetName(name);
 
-            // Add any parameters to the parameter map
+        // Add any parameters to the parameter map
+        for (int i = 0; i < c.n_in(); ++i) {
             if (!IsVariable(c.name_in(i))) {
                 AddParameters(c.name_in(i), c.size1_in(i));
             }
         }
 
-        // Evaluate symbolic outputs
-        casadi::SXVector out = c(constraint.in);
-        constraint.c = out[0];
-        constraint.dc_dt = out[1];
-        constraint.d2c_dt2 = out[2];
-        constraint.J =
-            jacobian(constraint.dc_dt,
-                     casadi::SX::sym("qvel", c.size1_in(c.index_in("qvel"))));
+        // Wrap function
+        constraint.SetFunction(c);
     }
 
     void AddTrackingTask(const std::string &name, casadi::Function &x,
@@ -136,6 +136,13 @@ class OSCController : public solvers::Program {
         // Create new task
         TrackingTask task;
         CreateHolonomicConstraint(name, x, task);
+
+        if (task.type == TrackingTask::Type::kRotational ||
+            task.type == TrackingTask::Type::kTranslational) {
+            task.SetDimension(3);
+        } else {
+            task.SetDimension(6);
+        }
         // Add tracking task to map
         tracking_tasks_[name] = task;
     }
@@ -153,48 +160,45 @@ class OSCController : public solvers::Program {
     void RegisterTrackingTask(TrackingTask &task) {
         damotion::common::Profiler("OSCController::RegisterTrackingTask");
 
-        // Add new parameter for program
-        int dim = 6;
-        if (task.type == TrackingTask::Type::kRotational ||
-            task.type == TrackingTask::Type::kTranslational) {
-            dim = 3;
-        }
+        // Get necessary inputs
+        casadi::StringVector inames =
+            utils::casadi::CreateInputNames(task.Function().f());
+        casadi::SXVector in = GetSymbolicFunctionInput(inames);
+
+        // Get second time derivative of constraint
+        casadi::SX d2cdt2 = task.Function().f()(in)[2];
+
         // Add tracking acceleration as a parameter to the program
-        AddParameters(task.name() + "_xacc_d", dim);
+        AddParameters(task.name() + "_xacc_d", task.Dimension());
 
-        // Task Error and PD gains
-        casadi::SX xacc_d = casadi::SX::sym(task.name() + "_xacc_d");
+        // Create tracking error against desired task acceleration
         Eigen::VectorX<casadi::SX> xacc_e, xacc_d_e;
-        eigen::toEigen(task.d2c_dt2, xacc_e);
-        eigen::toEigen(xacc_d, xacc_d_e);
-
-        // Get necessary components of task acceleration
-        if (task.type == TrackingTask::Type::kTranslational) {
-            xacc_e = xacc_e.topRows(3);
-        } else if (task.type == TrackingTask::Type::kRotational) {
-            xacc_e = xacc_e.bottomRows(3);
-        }
+        eigen::toEigen(d2cdt2, xacc_e);
+        eigen::toEigen(GetParameters(task.name() + "_xacc_d"), xacc_d_e);
 
         // Create tracking cost
-        casadi::SX obj = (xacc_e - xacc_d_e).squaredNorm();
+        casadi::SX obj = 0;
+        // Get necessary components of task acceleration
+        if (task.type == TrackingTask::Type::kTranslational) {
+            obj = (xacc_e.topRows(3) - xacc_d_e).squaredNorm();
+        } else if (task.type == TrackingTask::Type::kRotational) {
+            obj = (xacc_e.bottomRows(3) - xacc_d_e).squaredNorm();
+        } else {
+            obj = (xacc_e - xacc_d_e).squaredNorm();
+        }
 
-        casadi::SXVector in = task.in, out;
-        std::vector<std::string> inames = task.inames;
-
-        in.push_back(xacc_d);
+        in.push_back(GetParameters(task.name() + "_xacc_d"));
         inames.push_back(task.name() + "_xacc_d");
 
-        // Create tracking objective
-        casadi::Function tracking_cost(task.name() + "_tracking_cost", in,
-                                       {obj}, inames, {"obj"});
-
+        std::cout << "Function\n";
         // Create cost and derivatives given the optimisation vector x
-        Program::Cost cost(task.name() + "_tracking_cost", tracking_cost,
+        Program::Cost cost(task.name() + "_tracking_cost", obj, in, inames,
                            DecisionVariableVector());
+        std::cout << "Function\n";
 
         // Register function data to task
-        SetFunctionData(task.con);
-
+        SetFunctionData(task.Function());
+        std::cout << "Adding Cost\n";
         // Add tracking cost to program
         AddCost(task.name() + "_tracking_cost", cost);
     }
@@ -203,14 +207,14 @@ class OSCController : public solvers::Program {
         damotion::common::Profiler(
             "OSCController::RegisterHolonomicConstraint");
 
-        casadi::SXVector in = con.in;
-        std::vector<std::string> inames = con.inames;
+        casadi::StringVector inames =
+            utils::casadi::CreateInputNames(con.Function().f());
+        casadi::SXVector in = GetSymbolicFunctionInput(inames);
 
+        // Get second time derivative of constraint
+        casadi::SX d2cdt2 = con.Function().f()(in)[2];
         // Set second rate of change of constraint to zero to ensure no change
-        casadi::Function constraint(con.name(), in, {con.d2c_dt2}, inames,
-                                    {con.name() + "_d2c_dt2"});
-        // Create cost based
-        Constraint c(con.name(), constraint, DecisionVariableVector());
+        Constraint c(con.name(), d2cdt2, in, inames, DecisionVariableVector());
         // Add constraint to program
         AddConstraint(con.name(), c);
     }
@@ -232,15 +236,15 @@ class OSCController : public solvers::Program {
         int nc = 0;
         for (auto &task : contact_tasks_) {
             // Assign index to task
-            task.second.lam_idx = nc;
-            nc += task.second.dim();  // ! Fix this
+            task.second.SetConstraintForceIndex(nc);
+            nc += task.second.Dimension();
         }
         // Add any holonomic constraints
         // TODO - Make projection a possibility
         for (auto &con : holonomic_constraints_) {
             // Assign index
-            con.second.lam_idx = nc;
-            nc += con.second.dim();  // ! Fix this
+            con.second.SetConstraintForceIndex(nc);
+            nc += con.second.Dimension();
         }
 
         // Resize lambda to account for all constraint forces
@@ -257,20 +261,22 @@ class OSCController : public solvers::Program {
             RegisterHolonomicConstraint(task);
 
             // Get contact forces from force vector
-            casadi::SX lam =
-                GetVariables("lam")(casadi::Slice(task.lam_idx, 3));
+            casadi::SX lam = GetVariables("lam")(
+                casadi::Slice(task.ConstraintForceIndex(), 3));
 
             // Add friction constraint
             Constraint friction =
                 FrictionConeConstraint(task.name() + "_friction", lam);
             AddConstraint(task.name() + "_friction", friction);
         }
+        std::cout << "Tracking\n";
 
         // Add any tracking tasks
         for (auto &task : tracking_tasks_) {
             RegisterTrackingTask(task.second);
         }
 
+        std::cout << "Holonomic\n";
         // Add any other holonomic constraints
         for (auto &con : holonomic_constraints_) {
             RegisterHolonomicConstraint(con.second);
@@ -302,14 +308,12 @@ class OSCController : public solvers::Program {
         cone(2) = sqrt(2.0) * l_y + mu * l_z;
         cone(3) = -sqrt(2.0) * l_y - mu * l_z;
 
-        // Create function
-        casadi::Function fcone(name + "_friction",
-                               {GetVariables("qacc"), GetVariables("ctrl"),
-                                GetVariables("lam"), mu},
-                               {cone}, {"qacc", "ctrl", "lam", "mu"},
-                               {"friction"});
-
-        Constraint c_cone(name, fcone, DecisionVariableVector());
+        Constraint c_cone(
+            name, cone,
+            {GetVariables("qacc"), GetVariables("ctrl"), GetVariables("lam"),
+             GetParameters(name + "_friction_mu")},
+            {"qacc", "ctrl", "lam", name + "_friction_mu"},
+            DecisionVariableVector());
         // Set constraint to be positive
         c_cone.lb().setZero();
         c_cone.ub().setConstant(1e8);
@@ -324,70 +328,94 @@ class OSCController : public solvers::Program {
         SetParameter(name + "_friction_mu", val);
     }
 
+    casadi::SX ComputeJointSpaceForces(HolonomicConstraint &c,
+                                       casadi::SX &lam) {
+        // Get task Jacobian
+        casadi::StringVector names =
+            utils::casadi::CreateInputNames(c.Function().f());
+        casadi::SXVector in = GetSymbolicFunctionInput(names);
+
+        // Evaluate Jacobian
+        casadi::SX dc = c.Function().f()(in)[2];
+        casadi::SX J = jacobian(dc, GetParameters("qvel"));
+
+        // Add joint-space forces from lambda
+        return mtimes(J.T(), lam);
+    }
+
+    /**
+     * @brief Adds any unique inputs from a new function into the inputs names
+     * and in
+     *
+     * @param names
+     * @param in
+     * @param names_new
+     * @param in_new
+     */
+    void AppendFunctionInputs(std::vector<std::string> &names,
+                              casadi::SXVector &in,
+                              std::vector<std::string> &names_new,
+                              casadi::SXVector &in_new) {
+        for (int i = 0; i < in_new.size(); ++i) {
+            // Add any parameters that aren't in the function
+            if (std::find(names.begin(), names.end(), names_new[i]) ==
+                names.end()) {
+                // Add variable/parameter to the function input
+                names.push_back(names_new[i]);
+                in.push_back(in_new[i]);
+            }
+        }
+    }
+
     void ComputeConstrainedDynamics() {
         // Get inputs for function
-        casadi::SXVector in;
-        for (int i = 0; i < fdyn_.n_in(); ++i) {
-            in.push_back(
-                casadi::SX::sym(fdyn_.name_in()[i], fdyn_.size1_in(i)));
-        }
-        // Evaluate dynamics
-        casadi::SX dyn = fdyn_(in)[0];
 
-        std::vector<std::string> inames = {};
+        casadi::StringVector inames = utils::casadi::CreateInputNames(fdyn_);
+        casadi::SXVector in = GetSymbolicFunctionInput(inames);
+
+        // Evaluate dynamics with optimisation variables/parameters
+        casadi::SX dyn = fdyn_(in)[0];
 
         // Any contact-tasks
         for (auto &p : contact_tasks_) {
-            // Get contact task
-            ContactTask &task = p.second;
+            int idx = p.second.ConstraintForceIndex();
+            int dim = p.second.Dimension();
+            // Get constraint forces associate with constraint
+            casadi::SX lam = GetVariables("lam")(casadi::Slice(idx, idx + dim));
+
+            // Add joint-space forces associated with the task
+            dyn -= ComputeJointSpaceForces(p.second, lam);
 
             // Add any parameters from this task to the dynamics
-            for (std::string &p : task.inames) {
-                // Add any parameters that aren't in the function
-                if (std::find(inames.begin(), inames.end(), p) ==
-                    inames.end()) {
-                    /* v does not contain x */
-                    inames.push_back(p);
-                    in.push_back(casadi::SX::sym(p, task.con.f().size1_in(p)));
-                }
-            }
+            casadi::StringVector names =
+                utils::casadi::CreateInputNames(p.second.Function().f());
+            casadi::SXVector task_in = GetSymbolicFunctionInput(names);
 
-            casadi::SX &J = task.J;
-            casadi::SX lam =
-                GetVariables("lam")(casadi::Slice(task.lam_idx, task.dim()));
-            // Add joint-space forces from lambda
-            dyn -= mtimes(J.T(), lam);
+            // Add any unique inputs to the function input
+            AppendFunctionInputs(inames, in, names, task_in);
         }
 
         // Any holonomic constraints
         for (auto &p : holonomic_constraints_) {
-            // Get contact task
-            HolonomicConstraint &constraint = p.second;
+            int idx = p.second.ConstraintForceIndex();
+            int dim = p.second.Dimension();
+            // Get constraint forces associate with constraint
+            casadi::SX lam = GetVariables("lam")(casadi::Slice(idx, idx + dim));
 
-            // Add any parameters for this task to the dynamics
-            for (std::string &p : constraint.inames) {
-                // Add any parameters that aren't in the function
-                if (std::find(inames.begin(), inames.end(), p) ==
-                    inames.end()) {
-                    /* v does not contain x */
-                    inames.push_back(p);
-                    // ! in.push_back(casadi::SX::sym(p,
-                    // constraint.c.f().size1_in(p)));
-                }
-            }
+            // Add joint-space forces associated with the task
+            dyn -= ComputeJointSpaceForces(p.second, lam);
 
-            casadi::SX &J = constraint.J;
-            casadi::SX lam = GetVariables("lam")(
-                casadi::Slice(constraint.lam_idx, constraint.dim()));
-            // Add joint-space forces from lambda
-            dyn -= mtimes(J.T(), lam);
+            // Add any parameters from this task to the dynamics
+            casadi::StringVector names =
+                utils::casadi::CreateInputNames(p.second.Function().f());
+            casadi::SXVector con_in = GetSymbolicFunctionInput(names);
+
+            // Add any unique inputs to the function input
+            AppendFunctionInputs(inames, in, names, con_in);
         }
 
-        // Create function for dynamics
-        fdyn_ = casadi::Function("dynamics", in, {dyn}, inames, {"dyn"});
-
         // Create constraint from the function and add it to the program
-        Constraint c("dynamics", fdyn_, DecisionVariableVector());
+        Constraint c("dynamics", dyn, in, inames, DecisionVariableVector());
         AddConstraint("dynamics", c);
 
         // ? If projected dynamics, compute null-space dynamics independently
@@ -397,7 +425,13 @@ class OSCController : public solvers::Program {
     // Creates the program for the given conditions
     void UpdateProgramParameters();
 
+    const int &nq() const { return nq_; }
+    const int &nv() const { return nv_; }
+
    private:
+    int nq_ = 0;
+    int nv_ = 0;
+
     casadi::Function fdyn_;
 
     std::unordered_map<std::string, TrackingTask> tracking_tasks_;
