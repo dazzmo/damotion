@@ -295,6 +295,30 @@ class Program {
 
     Constraint &GetConstraint(std::string &name) { return constraints_[name]; }
 
+    void ConstructConstraintVector() {
+        // TODO - Make custom ordering possible
+        nc_ = 0;
+        for (auto &p : constraints_) {
+            Constraint &c = p.second;
+            c.SetIndex(nc_);
+            nc_ += c.dim();
+        }
+
+        // Create constraint bounds
+        lbg_.resize(nc_);
+        ubg_.resize(nc_);
+
+        lbg_.setConstant(-std::numeric_limits<double>::infinity());
+        ubg_.setConstant(std::numeric_limits<double>::infinity());
+
+        // Set default bounds
+        for (auto &p : constraints_) {
+            Constraint &c = p.second;
+            lbg_.middleRows(c.idx(), c.dim()) = c.lb();
+            ubg_.middleRows(c.idx(), c.dim()) = c.ub();
+        }
+    }
+
     void SetFunctionData(eigen::FunctionWrapper &f) {
         // Go through all function inputs and set both variable and parameter
         // locations
@@ -354,6 +378,16 @@ class Program {
 
         // Create optimisation vector
         x_ = casadi::SX::vertcat(x);
+
+        // Set number of decision variables
+        nx_ = x_.size1();
+
+        // Create bounds for the variables
+        lbx_.resize(nx_);
+        ubx_.resize(nx_);
+
+        lbx_.setConstant(-std::numeric_limits<double>::infinity());
+        ubx_.setConstant(std::numeric_limits<double>::infinity());
     }
 
     /**
@@ -370,10 +404,13 @@ class Program {
      *
      */
     void ListParameters() {
-        std::cout << "Program " << name() << '\n';
-        std::cout << "Parameter\tSize\n";
+        std::cout << "----------------------\n";
+        std::cout << "Parameter\tCurrent Value\n";
+        std::cout << "----------------------\n";
         for (auto p : parameter_map_) {
-            std::cout << p.first << "\t" << p.second.size() << " x 1\n";
+            for (int i = 0; i < p.second.size(); i++) {
+                std::cout << p.first << "_" << i << '\t' << p.second(i) << '\n';
+            }
         }
     }
 
@@ -383,23 +420,28 @@ class Program {
      *
      */
     void ListVariables() {
-        std::cout << "Program " << name() << '\n';
+        std::cout << "----------------------\n";
         std::cout << "Variable\tSize\n";
+        std::cout << "----------------------\n";
         for (auto v : variables_) {
-            std::cout << v.first << "\t" << v.second.size() << " x 1\n";
+            std::cout << v.first << '\t' << v.second.size() << '\n';
         }
     }
 
     /**
-     * @brief Prints the current set of constriants for the program to the
+     * @brief Prints the current set of constraints for the program to the
      * screen
      *
      */
     void ListConstraints() {
-        std::cout << "Program " << name() << '\n';
-        std::cout << "Constraint\tSize\n";
+        std::cout << "----------------------\n";
+        std::cout << "Constraint\tLower Bound\tUpper Bound\n";
+        std::cout << "----------------------\n";
         for (auto c : constraints_) {
-            std::cout << c.first << "\t" << c.second.dim() << " x 1\n";
+            for (int i = 0; i < c.second.dim(); i++) {
+                std::cout << c.first << "_" << i << '\t' << c.second.lb()(i)
+                          << '\t' << c.second.ub()(i) << '\n';
+            }
         }
     }
 
@@ -409,11 +451,36 @@ class Program {
      *
      */
     void ListCosts() {
-        std::cout << "Program " << name() << '\n';
-        std::cout << "Cost\tWeighting\n";
+        std::cout << "----------------------\n";
+        std::cout << "Cost\tWeigting\n";
+        std::cout << "----------------------\n";
         for (auto c : costs_) {
-            std::cout << c.first << "\t" << c.second.weighting() << '\n';
+            std::cout << c.first << '\t' << c.second.weighting() << '\n';
         }
+    }
+
+    void PrintProgramSummary() {
+        // Print number of variables, what the variables are (only base names)
+        std::cout << "-----------------------\n";
+        std::cout << "Program Name: " << name() << '\n';
+        std::cout << "Number of Decision Variables: "
+                  << NumberOfDecisionVariables() << '\n';
+        std::cout << "Variables\tSize\n";
+        for (auto v : variables_) {
+            std::cout << v.first << '\t' << v.second.size() << '\n';
+        }
+        std::cout << "Number of Constraints: " << NumberOfConstraints() << '\n';
+        std::cout << "Constraint\tSize\n";
+        for (auto c : constraints_) {
+            std::cout << c.first << "\t[" << c.second.dim() << ",1]\n";
+        }
+        // ! Fix the number of parameters
+        std::cout << "Number of Parameters: " << "TBD" << '\n';
+        std::cout << "Parameters\tSize\n";
+        for (auto p : parameters_) {
+            std::cout << p.first << '\t' << p.second.size() << '\n';
+        }
+        std::cout << "-----------------------\n";
     }
 
     /**

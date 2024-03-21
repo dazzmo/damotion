@@ -48,17 +48,26 @@ TEST(OSC, AddEndEffector) {
 
     casadi_utils::PinocchioModelWrapper wrapper(model);
 
+    // Create OSC with system dimensions
     damotion::control::OSCController osc(model.nq, model.nv, model.nv);
 
-    // Create actuation map
+    // Create data for end-effector
+    wrapper.addEndEffector("tool0");
+
+    // Create actuation map (use model if needed)
     casadi::SX B(6, 6);
     for (int i = 0; i < 6; i++) {
-        B(i, i) = 1.0;
+        B(i, i) = model.rotorGearRatio(i);
     }
 
+    // Compute symbolic expression for system dynamics
     casadi::SX dyn = wrapper.rnea()(
         casadi::SXVector({osc.GetParameters("qpos"), osc.GetParameters("qvel"),
                           osc.GetVariables("qacc")}))[0];
+
+    // Add any additional nonlinearities (e.g. spring/damping of joints)
+
+    // Add generalised inputs
     dyn -= mtimes(B, osc.GetVariables("ctrl"));
 
     // Create new function with actuation included
@@ -68,24 +77,39 @@ TEST(OSC, AddEndEffector) {
                           osc.GetVariables("qacc"), osc.GetVariables("ctrl")},
                          {dyn}, {"qpos", "qvel", "qacc", "ctrl"}, {"dyn"});
 
-    // Create data for end-effector
-    wrapper.addEndEffector("tool0");
-
     osc.AddDynamics(controlled_dynamics);
+    // Add tracking tasks
     osc.AddTrackingTask(
         "tool0", wrapper.end_effector(0).x,
         damotion::control::OSCController::TrackingTask::Type::kFull);
 
+    // Add a contact task
     osc.AddContactTask("tool0", wrapper.end_effector(0).x);
-
-    // Observe parameters and cost
-    osc.ListVariables();
-    osc.ListParameters();
 
     osc.Initialise();
 
     osc.ListParameters();
     osc.ListVariables();
+    osc.ListCosts();
+    osc.ListConstraints();
+
+    // Set a desired pose
+    osc.UpdateTrackingReference("tool0", Eigen::Vector3d(0, 1.0, 0.0),
+                                damotion::control::RPYToQuaterion(0, 0, 0));
+    Eigen::DiagonalMatrix<double, 6> Kp, Kd;
+    Kp.diagonal().setConstant(1e1);
+    Kd.diagonal().setConstant(1e0);
+    osc.UpdateTrackingCostGains("tool0", Kp, Kd);
+
+    osc.UpdateContactFrictionCoefficient("tool0", 1.0);
+
+    // Generate program
+    osc.UpdateProgramParameters();
+
+    osc.ListParameters();
+
+    osc.PrintProgramSummary();
+    // Solve by passing the program to the solver
 
     EXPECT_TRUE(true);
 }

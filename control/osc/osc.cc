@@ -12,8 +12,16 @@ Eigen::Quaterniond RPYToQuaterion(const double roll, const double pitch,
 }
 
 void OSCController::UpdateProgramParameters() {
-    damotion::common::Profiler profiler("OSCController::CreateProgram");
+    damotion::common::Profiler profiler(
+        "OSCController::UpdateProgramParameters");
+    std::cout << "Updating\n";
 
+    std::cout << ConstraintsLowerBound().transpose() << std::endl;
+    std::cout << ConstraintsUpperBound().transpose() << std::endl;
+    std::cout << DecisionVariablesLowerBound().transpose() << std::endl;
+    std::cout << DecisionVariablesUpperBound().transpose() << std::endl;
+
+    // Adjust bounds on contact forces depending on contact states
     for (auto &p : contact_tasks_) {
         ContactTask &task = p.second;
         // Get index of contact forces in optimisation variable
@@ -43,11 +51,16 @@ void OSCController::UpdateProgramParameters() {
 }
 
 Eigen::VectorXd OSCController::TrackingTask::ComputeDesiredAcceleration() {
+    damotion::common::Profiler profiler(
+        "OSCController::TrackingTask::ComputeDesiredAcceleration");
     // Evaluate the task with current parameters for the functions
     Function().call();
     // Get task position and velocity
     Eigen::VectorXd xpos = Function().getOutput(0);
     Eigen::VectorXd xvel = Function().getOutput(1);
+
+    std::cout << xpos.transpose() << std::endl;
+    std::cout << xvel.transpose() << std::endl;
 
     if (type == Type::kTranslational) {
         e = xpos - xr;

@@ -201,15 +201,12 @@ class OSCController : public solvers::Program {
         in.push_back(GetParameters(task.name() + "_xacc_d"));
         inames.push_back(task.name() + "_xacc_d");
 
-        std::cout << "Function\n";
         // Create cost and derivatives given the optimisation vector x
         Program::Cost cost(task.name() + "_tracking_cost", obj, in, inames,
                            DecisionVariableVector());
-        std::cout << "Function\n";
 
         // Register function data to task
         SetFunctionData(task.Function());
-        std::cout << "Adding Cost\n";
         // Add tracking cost to program
         AddCost(task.name() + "_tracking_cost", cost);
     }
@@ -226,30 +223,22 @@ class OSCController : public solvers::Program {
         casadi::SX d2cdt2 = task.Function().f()(in)[2];
 
         // Get translational component
-        std::cout << d2cdt2.size() << std::endl;
+        casadi::SX xacc = d2cdt2(casadi::Slice(0, 3));
 
-        casadi::SX xacc = d2cdt2(casadi::Slice(0, 2));
-
-        // No-slip condition constraint
+        /* No-slip constraint */
         Constraint c(task.name() + "_no_slip", xacc, in, inames,
                      DecisionVariableVector());
         // Add constraint to program
         AddConstraint(task.name() + "_no_slip", c);
 
-        // Friction cone constraint
-
+        /* Friction cone constraint */
         // Get contact forces from force vector
         int idx = task.ConstraintForceIndex();
         casadi::SX lam = GetVariables("lam")(casadi::Slice(idx, idx + 3));
-        std::cout << lam << std::endl;
 
-        // Add friction constraint
-        Constraint friction =
-            FrictionConeConstraint(task.name() + "_friction", lam);
-        std::cout << "Friction cone constraint made\n";
+        Constraint friction = FrictionConeConstraint(task.name(), lam);
+        // Add constraint to program
         AddConstraint(task.name() + "_friction", friction);
-
-        std::cout << "Constraint added!\n";
 
         // Register function data to task
         SetFunctionData(task.Function());
@@ -274,12 +263,20 @@ class OSCController : public solvers::Program {
     // Functions for setting new weightings?
     // Access through the map?
     void UpdateTrackingCostGains(
-        std::string &name,
+        const std::string &name,
         const Eigen::DiagonalMatrix<double, Eigen::Dynamic> &Kp,
         const Eigen::DiagonalMatrix<double, Eigen::Dynamic> &Kd) {
         // ! Throw error if name is not in lookup
         tracking_tasks_[name].Kp = Kp;
         tracking_tasks_[name].Kd = Kd;
+    }
+
+    void UpdateTrackingReference(const std::string &name,
+                                 const Eigen::Vector3d &xr,
+                                 const Eigen::Quaterniond &qr) {
+        // ! Throw error if name is not in lookup
+        tracking_tasks_[name].xr = xr;
+        tracking_tasks_[name].qr = qr;
     }
 
     // Given all information for the problem, initialise the program
@@ -302,33 +299,30 @@ class OSCController : public solvers::Program {
         // Resize lambda to account for all constraint forces
         ResizeDecisionVariables("lam", nc);
 
-        ListParameters();
-        ListVariables();
-
         // Create optimisation vector with given ordering
         ConstructDecisionVariableVector({"qacc", "ctrl", "lam"});
 
-        // Create contact constraints
+        // Register contact constraints to program
         for (auto &p : contact_tasks_) {
             ContactTask &task = p.second;
             RegisterContactTask(task);
         }
 
-        std::cout << "Tracking\n";
-
-        // Add any tracking tasks
+        // Register tracking tasks to program
         for (auto &task : tracking_tasks_) {
             RegisterTrackingTask(task.second);
         }
 
-        std::cout << "Holonomic\n";
-        // Add any other holonomic constraints
+        // Register holonomic constraints to program
         for (auto &con : holonomic_constraints_) {
             RegisterHolonomicConstraint(con.second);
         }
 
-        // Create constrained dynamics constraint
+        // Compute constrained dynamics constraint and add to program
         ComputeConstrainedDynamics();
+
+        // Construct the final constraint vector
+        ConstructConstraintVector();
     }
 
     /**
@@ -366,7 +360,8 @@ class OSCController : public solvers::Program {
         return c_cone;
     }
 
-    void UpdateContactFrictionCoefficient(std::string &name, const double &mu) {
+    void UpdateContactFrictionCoefficient(const std::string &name,
+                                          const double &mu) {
         // ! Throw error if name is not in lookup
         Eigen::VectorXd val(1);
         val[0] = mu;
@@ -429,8 +424,6 @@ class OSCController : public solvers::Program {
 
             // Get translational component of Jacobian
             casadi::SX Jt = J(casadi::Slice(0, 3), (casadi::Slice(0, nv())));
-
-            std::cout << Jt.size() << std::endl;
 
             // Add joint-space forces associated with the task
             dyn -= mtimes(Jt.T(), lam);
