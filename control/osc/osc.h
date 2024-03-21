@@ -30,7 +30,7 @@ class OSCController : public solvers::Program {
     OSCController() = default;
     ~OSCController() = default;
 
-    OSCController(int nq, int nv, int nu) {
+    OSCController(int nq, int nv, int nu) : nq_(nq), nv_(nv) {
         // Add default variables and parameters to map
         AddVariables("qacc", nv);
         AddVariables("ctrl", nu);
@@ -147,6 +147,17 @@ class OSCController : public solvers::Program {
         tracking_tasks_[name] = task;
     }
 
+    void AddContactTask(const std::string &name, casadi::Function &x) {
+        // Create new task
+        ContactTask task;
+        CreateHolonomicConstraint(name, x, task);
+
+        task.SetDimension(3);
+
+        // Add tracking task to map
+        contact_tasks_[name] = task;
+    }
+
     void AddHolonomicConstraint(const std::string &name, casadi::Function &c) {
         // Create new constraint
         HolonomicConstraint constraint;
@@ -203,6 +214,47 @@ class OSCController : public solvers::Program {
         AddCost(task.name() + "_tracking_cost", cost);
     }
 
+    void RegisterContactTask(ContactTask &task) {
+        damotion::common::Profiler("OSCController::RegisterContactTask");
+
+        // Get necessary inputs
+        casadi::StringVector inames =
+            utils::casadi::CreateInputNames(task.Function().f());
+        casadi::SXVector in = GetSymbolicFunctionInput(inames);
+
+        // Get second time derivative of constraint
+        casadi::SX d2cdt2 = task.Function().f()(in)[2];
+
+        // Get translational component
+        std::cout << d2cdt2.size() << std::endl;
+
+        casadi::SX xacc = d2cdt2(casadi::Slice(0, 2));
+
+        // No-slip condition constraint
+        Constraint c(task.name() + "_no_slip", xacc, in, inames,
+                     DecisionVariableVector());
+        // Add constraint to program
+        AddConstraint(task.name() + "_no_slip", c);
+
+        // Friction cone constraint
+
+        // Get contact forces from force vector
+        int idx = task.ConstraintForceIndex();
+        casadi::SX lam = GetVariables("lam")(casadi::Slice(idx, idx + 3));
+        std::cout << lam << std::endl;
+
+        // Add friction constraint
+        Constraint friction =
+            FrictionConeConstraint(task.name() + "_friction", lam);
+        std::cout << "Friction cone constraint made\n";
+        AddConstraint(task.name() + "_friction", friction);
+
+        std::cout << "Constraint added!\n";
+
+        // Register function data to task
+        SetFunctionData(task.Function());
+    }
+
     void RegisterHolonomicConstraint(HolonomicConstraint &con) {
         damotion::common::Profiler(
             "OSCController::RegisterHolonomicConstraint");
@@ -248,27 +300,20 @@ class OSCController : public solvers::Program {
         }
 
         // Resize lambda to account for all constraint forces
-        GetVariables("lam") = casadi::SX::sym("lam", nc);
+        ResizeDecisionVariables("lam", nc);
+
+        ListParameters();
+        ListVariables();
 
         // Create optimisation vector with given ordering
         ConstructDecisionVariableVector({"qacc", "ctrl", "lam"});
 
         // Create contact constraints
         for (auto &p : contact_tasks_) {
-            HolonomicConstraint &task = p.second;
-
-            // No-slip condition
-            RegisterHolonomicConstraint(task);
-
-            // Get contact forces from force vector
-            casadi::SX lam = GetVariables("lam")(
-                casadi::Slice(task.ConstraintForceIndex(), 3));
-
-            // Add friction constraint
-            Constraint friction =
-                FrictionConeConstraint(task.name() + "_friction", lam);
-            AddConstraint(task.name() + "_friction", friction);
+            ContactTask &task = p.second;
+            RegisterContactTask(task);
         }
+
         std::cout << "Tracking\n";
 
         // Add any tracking tasks
@@ -297,12 +342,11 @@ class OSCController : public solvers::Program {
         // Square pyramid approximation
         casadi::SX l_x = lambda(0), l_y = lambda(1), l_z = lambda(2);
 
-        casadi::SX mu = casadi::SX::sym(name + "mu");
-
         AddParameters(name + "_friction_mu", 1);
+        casadi::SX mu = GetParameters(name + "_friction_mu");
 
         // Friction cone constraint with square pyramid approximation
-        casadi::SX cone(4);
+        casadi::SX cone(4, 1);
         cone(0) = sqrt(2.0) * l_x + mu * l_z;
         cone(1) = -sqrt(2.0) * l_x - mu * l_z;
         cone(2) = sqrt(2.0) * l_y + mu * l_z;
@@ -314,6 +358,7 @@ class OSCController : public solvers::Program {
              GetParameters(name + "_friction_mu")},
             {"qacc", "ctrl", "lam", name + "_friction_mu"},
             DecisionVariableVector());
+
         // Set constraint to be positive
         c_cone.lb().setZero();
         c_cone.ub().setConstant(1e8);
@@ -326,21 +371,6 @@ class OSCController : public solvers::Program {
         Eigen::VectorXd val(1);
         val[0] = mu;
         SetParameter(name + "_friction_mu", val);
-    }
-
-    casadi::SX ComputeJointSpaceForces(HolonomicConstraint &c,
-                                       casadi::SX &lam) {
-        // Get task Jacobian
-        casadi::StringVector names =
-            utils::casadi::CreateInputNames(c.Function().f());
-        casadi::SXVector in = GetSymbolicFunctionInput(names);
-
-        // Evaluate Jacobian
-        casadi::SX dc = c.Function().f()(in)[2];
-        casadi::SX J = jacobian(dc, GetParameters("qvel"));
-
-        // Add joint-space forces from lambda
-        return mtimes(J.T(), lam);
     }
 
     /**
@@ -378,41 +408,61 @@ class OSCController : public solvers::Program {
 
         // Any contact-tasks
         for (auto &p : contact_tasks_) {
-            int idx = p.second.ConstraintForceIndex();
-            int dim = p.second.Dimension();
+            ContactTask &task = p.second;
+
+            int idx = task.ConstraintForceIndex();
+            int dim = task.Dimension();
             // Get constraint forces associate with constraint
             casadi::SX lam = GetVariables("lam")(casadi::Slice(idx, idx + dim));
 
-            // Add joint-space forces associated with the task
-            dyn -= ComputeJointSpaceForces(p.second, lam);
-
             // Add any parameters from this task to the dynamics
             casadi::StringVector names =
-                utils::casadi::CreateInputNames(p.second.Function().f());
+                utils::casadi::CreateInputNames(task.Function().f());
             casadi::SXVector task_in = GetSymbolicFunctionInput(names);
 
             // Add any unique inputs to the function input
             AppendFunctionInputs(inames, in, names, task_in);
+
+            // Evaluate Jacobian
+            casadi::SX dc = task.Function().f()(task_in)[1];
+            casadi::SX J = jacobian(dc, GetParameters("qvel"));
+
+            // Get translational component of Jacobian
+            casadi::SX Jt = J(casadi::Slice(0, 3), (casadi::Slice(0, nv())));
+
+            std::cout << Jt.size() << std::endl;
+
+            // Add joint-space forces associated with the task
+            dyn -= mtimes(Jt.T(), lam);
         }
 
         // Any holonomic constraints
         for (auto &p : holonomic_constraints_) {
-            int idx = p.second.ConstraintForceIndex();
-            int dim = p.second.Dimension();
+            HolonomicConstraint &c = p.second;
+            int idx = c.ConstraintForceIndex();
+            int dim = c.Dimension();
             // Get constraint forces associate with constraint
             casadi::SX lam = GetVariables("lam")(casadi::Slice(idx, idx + dim));
 
-            // Add joint-space forces associated with the task
-            dyn -= ComputeJointSpaceForces(p.second, lam);
-
             // Add any parameters from this task to the dynamics
             casadi::StringVector names =
-                utils::casadi::CreateInputNames(p.second.Function().f());
-            casadi::SXVector con_in = GetSymbolicFunctionInput(names);
+                utils::casadi::CreateInputNames(c.Function().f());
+            casadi::SXVector c_in = GetSymbolicFunctionInput(names);
 
             // Add any unique inputs to the function input
-            AppendFunctionInputs(inames, in, names, con_in);
+            AppendFunctionInputs(inames, in, names, c_in);
+
+            // Evaluate Jacobian
+            casadi::SX dc = c.Function().f()(c_in)[1];
+            casadi::SX J = jacobian(dc, GetParameters("qvel"));
+
+            // Add joint-space forces associated with the task
+            dyn -= mtimes(J.T(), lam);
         }
+
+        // Add contact forces as inputs
+        in.push_back(GetVariables("lam"));
+        inames.push_back("lam");
 
         // Create constraint from the function and add it to the program
         Constraint c("dynamics", dyn, in, inames, DecisionVariableVector());
@@ -425,7 +475,20 @@ class OSCController : public solvers::Program {
     // Creates the program for the given conditions
     void UpdateProgramParameters();
 
+    /**
+     * @brief Dimension of the configuration variables \f$ q(t) \f$ for the
+     * dynamic system.
+     *
+     * @return const int&
+     */
     const int &nq() const { return nq_; }
+
+    /**
+     * @brief Dimension of the configuration variables \f$ \dot{q}(t) \f$ for
+     * the dynamic system.
+     *
+     * @return const int&
+     */
     const int &nv() const { return nv_; }
 
    private:

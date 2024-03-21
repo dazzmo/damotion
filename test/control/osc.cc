@@ -76,6 +76,7 @@ TEST(OSC, AddEndEffector) {
         "tool0", wrapper.end_effector(0).x,
         damotion::control::OSCController::TrackingTask::Type::kFull);
 
+    osc.AddContactTask("tool0", wrapper.end_effector(0).x);
 
     // Observe parameters and cost
     osc.ListVariables();

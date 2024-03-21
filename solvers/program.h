@@ -1,5 +1,5 @@
-#ifndef CONTROL_PROGRAM_H
-#define CONTROL_PROGRAM_H
+#ifndef SOLVERS_PROGRAM_H
+#define SOLVERS_PROGRAM_H
 
 #include <casadi/casadi.hpp>
 
@@ -320,6 +320,20 @@ class Program {
         }
     }
 
+    void ResizeDecisionVariables(const std::string &name, const int &sz) {
+        auto p = variables_.find(name);
+        // If it exists, update parameter
+        if (p != variables_.end()) {
+            // Create new symbolic expression and data vector
+            variables_[name] = casadi::SX::sym(name, sz);
+            variable_map_[name] = Eigen::VectorXd::Zero(sz);
+        } else {
+            // ! Throw error that parameter is not included
+            std::cout << "Variable " << name
+                      << "is not in the parameter map!\n";
+        }
+    }
+
     /**
      * @brief Sets the optimisation vector for the program to a vector with
      * ordering of variables provided by order
@@ -508,4 +522,4 @@ class Program {
 }  // namespace solvers
 }  // namespace damotion
 
-#endif /* CONTROL_PROGRAM_H */
+#endif /* SOLVERS_PROGRAM_H */
