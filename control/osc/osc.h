@@ -225,8 +225,7 @@ class OSCController : public optimisation::Program {
         // Create tracking error against desired task acceleration
         Eigen::VectorX<casadi::SX> xacc_e, xacc_d_e;
         utils::casadi::toEigen(d2cdt2, xacc_e);
-        utils::casadi::toEigen(GetParameters(task.name() + "_xacc_d"),
-                               xacc_d_e);
+        utils::casadi::toEigen(GetParameter(task.name() + "_xacc_d"), xacc_d_e);
 
         // Create tracking cost
         casadi::SX obj = 0;
@@ -239,7 +238,7 @@ class OSCController : public optimisation::Program {
             obj = (xacc_e - xacc_d_e).squaredNorm();
         }
 
-        in.push_back(GetParameters(task.name() + "_xacc_d"));
+        in.push_back(GetParameter(task.name() + "_xacc_d"));
 
         // Add cost to the program
         AddCost(task.name() + "_tracking_cost", obj, in);
@@ -269,7 +268,7 @@ class OSCController : public optimisation::Program {
         /* Friction cone constraint */
         // Get contact forces from force vector
         int idx = task.ConstraintForceIndex();
-        casadi::SX lam = GetVariables("lam")(casadi::Slice(idx, idx + 3));
+        casadi::SX lam = GetVariable("lam")(casadi::Slice(idx, idx + 3));
 
         AddFrictionConeConstraint(task.name(), lam);
 
@@ -351,7 +350,7 @@ class OSCController : public optimisation::Program {
         casadi::SX l_x = lambda(0), l_y = lambda(1), l_z = lambda(2);
 
         AddParameters(name + "_friction_mu", 1);
-        casadi::SX mu = GetParameters(name + "_friction_mu");
+        casadi::SX mu = GetParameter(name + "_friction_mu");
 
         // Friction cone constraint with square pyramid approximation
         casadi::SX cone(4, 1);
@@ -360,9 +359,9 @@ class OSCController : public optimisation::Program {
         cone(2) = sqrt(2.0) * l_y + mu * l_z;
         cone(3) = -sqrt(2.0) * l_y - mu * l_z;
 
-        casadi::SXVector in = {GetVariables("qacc"), GetVariables("ctrl"),
-                               GetVariables("lam"),
-                               GetParameters(name + "_friction_mu")};
+        casadi::SXVector in = {GetVariable("qacc"), GetVariable("ctrl"),
+                               GetVariable("lam"),
+                               GetParameter(name + "_friction_mu")};
 
         AddConstraint(name + "_friction", cone, in,
                       optimisation::BoundsType::kPositive);
@@ -418,7 +417,7 @@ class OSCController : public optimisation::Program {
             int idx = task.ConstraintForceIndex();
             int dim = task.Dimension();
             // Get constraint forces associate with constraint
-            casadi::SX lam = GetVariables("lam")(casadi::Slice(idx, idx + dim));
+            casadi::SX lam = GetVariable("lam")(casadi::Slice(idx, idx + dim));
 
             // Add any parameters from this task to the dynamics
             casadi::StringVector names =
@@ -430,7 +429,7 @@ class OSCController : public optimisation::Program {
 
             // Evaluate Jacobian
             casadi::SX dc = task.Function().f()(task_in)[1];
-            casadi::SX J = jacobian(dc, GetParameters("qvel"));
+            casadi::SX J = jacobian(dc, GetParameter("qvel"));
 
             // Get translational component of Jacobian
             casadi::SX Jt = J(casadi::Slice(0, 3), (casadi::Slice(0, nv())));
@@ -445,7 +444,7 @@ class OSCController : public optimisation::Program {
             int idx = c.ConstraintForceIndex();
             int dim = c.Dimension();
             // Get constraint forces associate with constraint
-            casadi::SX lam = GetVariables("lam")(casadi::Slice(idx, idx + dim));
+            casadi::SX lam = GetVariable("lam")(casadi::Slice(idx, idx + dim));
 
             // Add any parameters from this task to the dynamics
             casadi::StringVector names =
@@ -457,14 +456,14 @@ class OSCController : public optimisation::Program {
 
             // Evaluate Jacobian
             casadi::SX dc = c.Function().f()(c_in)[1];
-            casadi::SX J = jacobian(dc, GetParameters("qvel"));
+            casadi::SX J = jacobian(dc, GetParameter("qvel"));
 
             // Add joint-space forces associated with the task
             dyn -= mtimes(J.T(), lam);
         }
 
         // Add contact forces as inputs
-        in.push_back(GetVariables("lam"));
+        in.push_back(GetVariable("lam"));
         inames.push_back("lam");
 
         AddConstraint("dynamics", dyn, in, optimisation::BoundsType::kEquality);

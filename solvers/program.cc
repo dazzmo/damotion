@@ -3,126 +3,197 @@
 namespace damotion {
 namespace optimisation {
 
-void Program::VariableNotFoundError(const std::string &name) {
-    std::cout << "Variable with name " << name
-              << " is not included within this program!\n";
-}
-
-void Program::ParameterNotFoundError(const std::string &name) {
-    std::cout << "Parameter with name " << name
-              << " is not included within this program!\n";
-}
-
-void VariableAlreadyExistsError(const std::string &name) {
-    std::cout << "Variables with name " << name << " already added!\n";
-}
-void ParameterAlreadyExistsError(const std::string &name) {
-    std::cout << "Parameter with name " << name << " already added!\n";
-}
-
-inline bool Program::IsVariable(const std::string &name) {
+inline bool Program::IsDecisionVariable(const std::string &name) {
     // Indicate if it is present in the variable map
-    return variables_.find(name) != variables_.end();
+    return variables_id_.find(name) != variables_id_.end();
 }
 
-inline bool Program::IsParameter(const std::string &name) {
-    // Indicate if it is present in the parameter map
-    return parameter_map_.find(name) != parameter_map_.end();
-}
-
-void Program::AddVariables(const std::string &name, const int sz) {
-    if (!IsVariable(name)) {
-        variables_[name] = casadi::SX::sym(name, sz);
-        variable_map_[name] = Eigen::VectorXd::Zero(sz);
+void Program::AddDecisionVariables(const std::string &name, const int n,
+                                   const int m) {
+    if (!IsDecisionVariable(name)) {
+        variables_id_[name] = variables_.size();
+        variables_.push_back(Variable(name, n, m));
     } else {
-        VariableAlreadyExistsError(name);
-    }
-}
-
-casadi::SX &Program::GetVariables(const std::string &name) {
-    if (!IsVariable(name)) {
-        VariableNotFoundError(name);
-    } else {
-        return variables_[name];
-    }
-}
-
-int Program::GetVariableIndex(const std::string &name) {
-    if (!IsVariable(name)) {
-        VariableNotFoundError(name);
-        return -1;
-    } else {
-        return variable_idx_[name];
-    }
-}
-
-Eigen::Ref<Eigen::VectorXd> Program::GetVariableUpperBounds(
-    const std::string &name) {
-    if (IsVariable(name)) {
-        return ubx_.middleRows(variable_idx_[name], variable_map_[name].size());
-    } else {
-        throw std::runtime_error(name + "is not a variable in this program");
-    }
-}
-
-Eigen::Ref<Eigen::VectorXd> Program::GetVariableLowerBounds(
-    const std::string &name) {
-    if (IsVariable(name)) {
-        return lbx_.middleRows(variable_idx_[name], variable_map_[name].size());
-    } else {
-        throw std::runtime_error(name + "is not a variable in this program");
+        std::cout << "Variables with name " << name
+                  << " already exist in program!\n";
     }
 }
 
 void Program::SetDecisionVariablesFromVector(const Eigen::VectorXd &x) {
     damotion::common::Profiler profiler("Program::UpdateDecisionVariables");
     // Use current mapping to compute variables
-    for (auto &xi : variables_) {
-        variable_map_[xi.first] = x.middleRows(variable_idx_[xi.first],
-                                               variable_map_[xi.first].size());
+    for (auto &xi : variables_id_) {
+        int id = xi.second;
+        Variable &v = variables_[id];
+        v.val() << x.middleRows(variables_idx_[id], v.rows() * v.cols());
     }
 }
 
-void Program::ResizeDecisionVariables(const std::string &name, const int &sz) {
-    auto p = variables_.find(name);
-    // If it exists, update parameter
-    if (p != variables_.end()) {
-        // Create new symbolic expression and data vector
-        variables_[name] = casadi::SX::sym(name, sz);
-        variable_map_[name] = Eigen::VectorXd::Zero(sz);
+void Program::ResizeDecisionVariables(const std::string &name, const int n,
+                                      const int m) {
+    int id = GetDecisionVariablesId(name);
+    assert(id >= 0 && "Decision variable does not exist");
+    variables_[id] = Variable(name, n, m);
+}
+
+int Program::GetDecisionVariablesId(const std::string &name) {
+    auto p = variables_id_.find(name);
+    if (p != variables_id_.end()) {
+        return p->second;
     } else {
-        VariableNotFoundError(name);
+        return -1;
     }
 }
 
-casadi::SX &Program::GetParameters(const std::string &name) {
-    if (!IsParameter(name)) {
-        ParameterNotFoundError(name);
+Variable &Program::GetDecisionVariables(const std::string &name) {
+    int id = GetDecisionVariablesId(name);
+    assert(id >= 0 && "Variable not found in program!\n");
+    return variables_[id];
+}
+
+void Program::RemoveDecisionVariables(const std::string &name) {
+    // Delete the entry and re-id other variables
+    int id = GetDecisionVariablesId(name);
+    assert(id >= 0 && "Variable not found in program!\n");
+    // Delete variable
+    variables_id_.erase(name);
+    variables_.erase(std::next(variables_.begin() + id));
+    // Re-id remaining variables
+    for (int i = 0; i < variables_.size(); ++i) {
+        variables_id_[variables_[i].name()] = i;
+    }
+}
+
+inline bool Program::IsParameter(const std::string &name) {
+    // Indicate if it is present in the parameter map
+    return parameters_id_.find(name) != parameters_id_.end();
+}
+
+int Program::GetParametersId(const std::string &name) {
+    auto p = parameters_id_.find(name);
+    if (p != parameters_id_.end()) {
+        return p->second;
     } else {
-        return parameters_[name];
+        return -1;
     }
 }
 
-void Program::SetParameter(const std::string &name,
-                           const Eigen::VectorXd &val) {
-    // Look up parameters in parameter map and set values
-    auto p = parameter_map_.find(name);
-    // If it exists, update parameter
-    if (p != parameter_map_.end()) {
-        p->second = val;
+int Program::GetCostId(const std::string &name) {
+    auto p = costs_id_.find(name);
+    if (p != costs_id_.end()) {
+        return p->second;
     } else {
-        ParameterNotFoundError(name);
+        return -1;
     }
 }
 
-void Program::AddParameters(const std::string &name, int sz) {
+int Program::GetConstraintId(const std::string &name) {
+    auto p = constraints_id_.find(name);
+    if (p != constraints_id_.end()) {
+        return p->second;
+    } else {
+        return -1;
+    }
+}
+
+Variable &Program::GetParameters(const std::string &name) {
+    int id = GetParametersId(name);
+    assert(id >= 0 && "Parameter not found in program!\n");
+    return parameters_[id];
+}
+
+Constraint &Program::GetConstraint(const std::string &name) {
+    int id = GetConstraintId(name);
+    assert(id >= 0 && "Constraint not found in program!\n");
+    return constraints_[id];
+}
+
+Cost &Program::GetCost(const std::string &name) {
+    int id = GetCostId(name);
+    assert(id >= 0 && "Cost not found in program!\n");
+    return costs_[id];
+}
+
+void Program::RemoveParameters(const std::string &name) {
+    // Delete the entry and re-id other parameters
+    int id = GetParametersId(name);
+    assert(id >= 0 && "Parameter not found in program!\n");
+
+    // Delete parameter
+    parameters_id_.erase(name);
+    parameters_.erase(std::next(parameters_.begin() + id));
+
+    // Re-id remaining parameters
+    for (int i = 0; i < parameters_.size(); ++i) {
+        parameters_id_[parameters_[i].name()] = i;
+    }
+}
+
+void Program::RemoveConstraint(const std::string &name) {
+    // Delete the entry
+    int id = GetConstraintId(name);
+    assert(id >= 0 && "Constraint not found in program!\n");
+
+    // Delete constraint
+    constraints_id_.erase(name);
+    constraints_.erase(std::next(constraints_.begin() + id));
+
+    // Re-id remaining constraints
+    for (int i = 0; i < constraints_.size(); ++i) {
+        constraints_id_[constraints_[i].name()] = i;
+    }
+}
+
+void Program::RemoveCost(const std::string &name) {
+    int id = GetCostId(name);
+    assert(id >= 0 && "Cost not found in program!\n");
+
+    // Delete cost
+    costs_id_.erase(name);
+    costs_.erase(std::next(costs_.begin() + id));
+
+    // Re-id remaining costs
+    for (int i = 0; i < costs_.size(); ++i) {
+        costs_id_[costs_[i].name()] = i;
+    }
+}
+
+int Program::GetDecisionVariablesIndex(const std::string &name) {
+    int id = GetDecisionVariablesId(name);
+    if (id >= 0) {
+        return variables_idx_[variables_id_[name]];
+    } else {
+        std::cout << "Variable " << name << " is not within this program!\n";
+        return -1;
+    }
+}
+
+int Program::GetConstraintIndex(const std::string &name) {
+    int id = GetConstraintId(name);
+    if (id >= 0) {
+        return constraints_idx_[constraints_id_[name]];
+    } else {
+        std::cout << "Constraint " << name << " is not within this program!\n";
+        return -1;
+    }
+}
+
+void Program::AddParameters(const std::string &name, const int n, const int m) {
     damotion::common::Profiler("Program::AddParameters");
-    // If doesn't exist, add parameter
     if (!IsParameter(name)) {
-        parameters_[name] = casadi::SX::sym(name, sz);
-        parameter_map_[name] = Eigen::VectorXd::Zero(sz);
+        parameters_id_[name] = parameters_.size();
+        parameters_.push_back(Variable(name, n, m));
     } else {
-        ParameterAlreadyExistsError(name);
+        std::cout << "Parameter with name " << name
+                  << " already exist in program!\n";
+    }
+}
+
+void Program::SetParameters(const std::string &name,
+                           const Eigen::MatrixXd &val) {
+    int id = GetParametersId(name);
+    if (id >= 0) {
+        parameters_[id].val() << val;
     }
 }
 
@@ -131,10 +202,12 @@ void Program::SetFunctionInputData(utils::casadi::FunctionWrapper &f) {
     // locations
     for (int i = 0; i < f.f().n_in(); ++i) {
         std::string name = f.f().name_in(i);
-        if (IsVariable(name)) {
-            f.setInput(f.f().index_in(name), variable_map_[name]);
+        if (IsDecisionVariable(name)) {
+            f.setInput(f.f().index_in(name),
+                       variables_[variables_id_[name]].val());
         } else if (IsParameter(name)) {
-            f.setInput(f.f().index_in(name), parameter_map_[name]);
+            f.setInput(f.f().index_in(name),
+                       parameters_[parameters_id_[name]].val());
         } else {
             std::cout << "Input " << name << " is not registered in program!\n";
         }
@@ -148,9 +221,12 @@ void Program::ConstructDecisionVariableVector(
 
     int idx = 0;
     for (int i = 0; i < order.size(); ++i) {
-        x.push_back(GetVariables(order[i]));
-        variable_idx_[order[i]] = idx;
-        idx += GetVariables(order[i]).size1();
+        // Get id
+        int id = GetDecisionVariablesId(order[i]);
+        // Add to vector and set index
+        x.push_back(variables_[id].sym());
+        variables_idx_[id] = idx;
+        idx += variables_[id].sz();
     }
 
     // Create optimisation vector
@@ -170,8 +246,7 @@ void Program::ConstructDecisionVariableVector(
 void Program::ConstructConstraintVector() {
     // TODO - Make custom ordering possible
     nc_ = 0;
-    for (auto &p : constraints_) {
-        Constraint &c = p.second;
+    for (Constraint &c : constraints_) {
         c.SetIndex(nc_);
         nc_ += c.dim();
     }
@@ -184,8 +259,7 @@ void Program::ConstructConstraintVector() {
     ubg_.setConstant(std::numeric_limits<double>::infinity());
 
     // Set bounds
-    for (auto &p : constraints_) {
-        Constraint &c = p.second;
+    for (Constraint &c : constraints_) {
         lbg_.middleRows(c.idx(), c.dim()) = c.lb();
         ubg_.middleRows(c.idx(), c.dim()) = c.ub();
     }
@@ -197,10 +271,10 @@ casadi::SXVector Program::GetSymbolicFunctionInput(
     // Gather symbols for each input
     for (int i = 0; i < inames.size(); ++i) {
         std::string name = inames[i];
-        if (IsVariable(name)) {
-            in.push_back(GetVariables(name));
+        if (IsDecisionVariable(name)) {
+            in.push_back(GetDecisionVariables(name).sym());
         } else if (IsParameter(name)) {
-            in.push_back(GetParameters(name));
+            in.push_back(GetParameters(name).sym());
         } else {
             std::cout << "Input " << name
                       << " is not a listed variable or parameter!\n";
@@ -233,9 +307,10 @@ casadi::StringVector Program::GetSXVectorNames(const casadi::SXVector &x) {
 
 void Program::AddCost(const std::string &name, casadi::SX &cost,
                       casadi::SXVector &in) {
-    // Make sure it doesn't exist already
-    if (costs_.find(name) != costs_.end()) {
+    int id = GetCostId(name);
+    if (id >= 0) {
         std::cout << "Cost " << name << " already exists within the program!\n";
+        return;
     }
 
     // Create cost and establish symbolic inputs and value
@@ -244,15 +319,17 @@ void Program::AddCost(const std::string &name, casadi::SX &cost,
     c.SetSymbolicInputs(in);
 
     // Add to map
-    costs_[name] = c;
+    costs_id_[name] = costs_.size();
+    costs_.push_back(c);
 }
 
 void Program::AddConstraint(const std::string &name, casadi::SX &constraint,
                             casadi::SXVector &in, const BoundsType &bounds) {
-    // Make sure it doesn't exist already
-    if (constraints_.find(name) != constraints_.end()) {
+    int id = GetConstraintId(name);
+    if (id >= 0) {
         std::cout << "Constraint " << name
                   << " already exists within the program!\n";
+        return;
     }
 
     // Create cost and establish symbolic inputs and value
@@ -262,7 +339,8 @@ void Program::AddConstraint(const std::string &name, casadi::SX &constraint,
     c.SetBoundsType(bounds);
 
     // Add to map
-    constraints_[name] = c;
+    constraints_id_[name] = constraints_.size();
+    constraints_.push_back(c);
 }
 
 void Program::SetUpCost(Cost &cost) {
@@ -299,8 +377,8 @@ void Program::SetUpCost(Cost &cost) {
 }
 
 void Program::SetUpCosts() {
-    for (auto &c : costs_) {
-        SetUpCost(c.second);
+    for (Cost &c : costs_) {
+        SetUpCost(c);
     }
     // ! Delete data for the costs to free up space
 }
@@ -332,13 +410,21 @@ void Program::SetUpConstraint(Constraint &constraint) {
     SetFunctionInputData(constraint.JacobianFunction());
 }
 
+void Program::SetUpConstraints() {
+    for (Constraint &c : constraints_) {
+        SetUpConstraint(c);
+    }
+    // ! Delete data for the costs to free up space
+}
+
 void Program::ListParameters() {
     std::cout << "----------------------\n";
     std::cout << "Parameter\tCurrent Value\n";
     std::cout << "----------------------\n";
-    for (auto p : parameter_map_) {
-        for (int i = 0; i < p.second.size(); i++) {
-            std::cout << p.first << "_" << i << '\t' << p.second(i) << '\n';
+    for (auto p : parameters_id_) {
+        Eigen::VectorXd &par = parameters_data_[p.second];
+        for (int i = 0; i < par.size(); i++) {
+            std::cout << p.first << "_" << i << '\t' << par(i) << '\n';
         }
     }
 }
@@ -347,8 +433,9 @@ void Program::ListVariables() {
     std::cout << "----------------------\n";
     std::cout << "Variable\tSize\n";
     std::cout << "----------------------\n";
-    for (auto v : variables_) {
-        std::cout << v.first << '\t' << v.second.size() << '\n';
+    for (auto p : variables_id_) {
+        casadi::SX &v = variables_[p.second];
+        std::cout << p.first << '\t' << v.size() << '\n';
     }
 }
 
@@ -356,10 +443,11 @@ void Program::ListConstraints() {
     std::cout << "----------------------\n";
     std::cout << "Constraint\tLower Bound\tUpper Bound\n";
     std::cout << "----------------------\n";
-    for (auto c : constraints_) {
-        for (int i = 0; i < c.second.dim(); i++) {
-            std::cout << c.first << "_" << i << '\t' << c.second.lb()(i) << '\t'
-                      << c.second.ub()(i) << '\n';
+    for (auto p : constraints_id_) {
+        for (int i = 0; i < constraints_[p.second].dim(); i++) {
+            std::cout << p.first << "_" << i << '\t'
+                      << constraints_[p.second].lb()(i) << '\t'
+                      << constraints_[p.second].ub()(i) << '\n';
         }
     }
 }
@@ -368,8 +456,8 @@ void Program::ListCosts() {
     std::cout << "----------------------\n";
     std::cout << "Cost\tWeigting\n";
     std::cout << "----------------------\n";
-    for (auto c : costs_) {
-        std::cout << c.first << '\t' << c.second.weighting() << '\n';
+    for (auto p : costs_id_) {
+        std::cout << p.first << '\t' << costs_[p.second].weighting() << '\n';
     }
 }
 
@@ -379,20 +467,23 @@ void Program::PrintProgramSummary() {
     std::cout << "Number of Decision Variables: " << NumberOfDecisionVariables()
               << '\n';
     std::cout << "Variables\tSize\n";
-    for (auto v : variables_) {
-        std::cout << v.first << '\t' << v.second.size() << '\n';
+    for (auto p : variables_id_) {
+        casadi::SX &v = variables_[p.second];
+        std::cout << p.first << '\t' << v.size() << '\n';
     }
     std::cout << "Number of Constraints: " << NumberOfConstraints() << '\n';
     std::cout << "Constraint\tSize\n";
-    for (auto c : constraints_) {
-        std::cout << c.first << "\t[" << c.second.dim() << ",1]\n";
+    for (auto p : constraints_id_) {
+        std::cout << p.first << "\t[" << constraints_[p.second].dim()
+                  << ",1]\n";
     }
     // ! Fix the number of parameters
     std::cout << "Number of Parameters: "
               << "TBD" << '\n';
     std::cout << "Parameters\tSize\n";
-    for (auto p : parameters_) {
-        std::cout << p.first << '\t' << p.second.size() << '\n';
+    for (auto p : parameters_id_) {
+        casadi::SX &v = parameters_[p.second];
+        std::cout << p.first << '\t' << v.size() << '\n';
     }
     std::cout << "-----------------------\n";
 }

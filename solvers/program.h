@@ -10,6 +10,8 @@
 #include "utils/codegen.h"
 #include "utils/eigen_wrapper.h"
 
+#include "solvers/variable.h"
+
 namespace damotion {
 namespace optimisation {
 
@@ -18,7 +20,7 @@ class Program {
     Program() = default;
     ~Program() = default;
 
-    Program(const std::string &name) : name_(name) {}
+    Program(const std::string &name) : name_(name), nx_(0), nc_(0), np_(0) {}
 
     /**
      * @brief Name of the program
@@ -28,42 +30,61 @@ class Program {
     const std::string &name() const { return name_; }
 
     /**
+     * @brief Number of decision variables currently in the program
+     *
+     * @return const int&
+     */
+    const int &NumberOfDecisionVariables() const { return nx_; }
+
+    /**
+     * @brief Number of constraints currently in the program
+     *
+     * @return const int&
+     */
+    const int &NumberOfConstraints() const { return nc_; }
+
+    /**
+     * @brief Number of parameters currently in the program
+     *
+     * @return const int&
+     */
+    const int &NumberOfParameters() const { return np_; }
+
+    /**
      * @brief Adds symbolic variable vector to the list of variables within the
      * program. Duplicate names are not allowed.
      *
      * @param name
-     * @param sz
+     * @param n Number of rows
+     * @param m Number of columns
      */
-    void AddVariables(const std::string &name, const int sz);
+    void AddDecisionVariables(const std::string &name, const int n, const int m = 1);
 
     /**
-     * @brief Returns the symbolic vector for the variable given by name
+     * @brief Removes a variable currently considered by the program.
      *
      * @param name
-     * @return casadi::SX&
      */
-    casadi::SX &GetVariables(const std::string &name);
+    void RemoveDecisionVariables(const std::string &name);
+
+    Variable &GetDecisionVariables(const std::string &name);
 
     /**
-     * @brief The starting index of the variables given by name within the
-     * DecisionVaraibleVector() x
+     * @brief The index of the variables given by name within the decision
+     * variable vector given by DecisionVariableVector()
      *
      * @param name
      * @return int
      */
-    int GetVariableIndex(const std::string &name);
+    int GetDecisionVariablesIndex(const std::string &name);
 
     /**
-     * @brief Returns the symbolic vector for the parameter given by name
+     * @brief Resizes a decision variable to a new size sz.
      *
-     * @param name
-     * @return casadi::SX&
+     * @param name Name of the decision variables
+     * @param sz The new size
      */
-    casadi::SX &GetParameters(const std::string &name);
-
-    Eigen::Ref<Eigen::VectorXd> GetVariableUpperBounds(const std::string &name);
-
-    Eigen::Ref<Eigen::VectorXd> GetVariableLowerBounds(const std::string &name);
+    void ResizeDecisionVariables(const std::string &name, const int n, const int m = 1);
 
     /**
      * @brief Indicates whether the provided variable is present within the
@@ -73,7 +94,7 @@ class Program {
      * @return true
      * @return false
      */
-    inline bool IsVariable(const std::string &name);
+    inline bool IsDecisionVariable(const std::string &name);
 
     /**
      * @brief Given the decision variable vector x, set all variables within the
@@ -83,13 +104,10 @@ class Program {
      */
     void SetDecisionVariablesFromVector(const Eigen::VectorXd &x);
 
-    /**
-     * @brief Resizes a decision variable to a new size sz.
-     *
-     * @param name Name of the decision variables
-     * @param sz The new size
-     */
-    void ResizeDecisionVariables(const std::string &name, const int &sz);
+    void SetParameters(const std::string &name, const Eigen::MatrixXd &val);
+    void AddParameters(const std::string &name, const int n, const int m = 1);
+    void RemoveParameters(const std::string &name);
+    Variable &GetParameters(const std::string &name);
 
     /**
      * @brief Indicates whether the provided parameter is present within the
@@ -101,54 +119,38 @@ class Program {
      */
     inline bool IsParameter(const std::string &name);
 
-    void SetParameter(const std::string &name, const Eigen::VectorXd &val);
-    void AddParameters(const std::string &name, int sz);
-
     void AddCost(const std::string &name, casadi::SX &cost,
                  casadi::SXVector &in);
+    void RemoveCost(const std::string &name);
+    Cost &GetCost(const std::string &name);
 
     void AddConstraint(const std::string &name, casadi::SX &constraint,
-                       casadi::SXVector &in, const BoundsType &bounds = BoundsType::kUnbounded);
-
-    Cost &GetCost(const std::string &name) { return costs_[name]; }
-
-    Constraint &GetConstraint(const std::string &name) {
-        return constraints_[name];
-    }
-
-    void SetUpCost(Cost &cost);
-    void SetUpCosts();
-
-    void SetUpConstraint(Constraint &constraint);
-    void SetUpConstraints();
-
-    void ConstructConstraintVector();
+                       casadi::SXVector &in,
+                       const BoundsType &bounds = BoundsType::kUnbounded);
+    Constraint &GetConstraint(const std::string &name);
+    void RemoveConstraint(const std::string &name);
 
     /**
-     * @brief For a given FunctionWrapper f, sets the inputs of the function to
-     * the variable and parameter data vectors within the program so future
-     * calls to f will use the most recent values of the variables and
-     * parameters.
+     * @brief The index of the variables given by name within the decision
+     * variable vector given by DecisionVariableVector()
      *
-     * @param f
+     * @param name
+     * @return int
      */
-    void SetFunctionInputData(utils::casadi::FunctionWrapper &f);
+    int GetConstraintIndex(const std::string &name);
 
     /**
-     * @brief Sets the optimisation vector for the program to a vector with
-     * ordering of variables provided by order
+     * @brief Symbolic decision variable for the program.
      *
-     * @param order
+     * @return casadi::SX&
      */
-    void ConstructDecisionVariableVector(const std::vector<std::string> &order);
+    casadi::SX &DecisionVariableVector() { return x_; }
 
-    /**
-     * @brief Sets the optimisation vector for the program to the user-provided
-     * vector x
-     *
-     * @param x
-     */
-    void ConstructDecisionVariableVector(const casadi::SX &x) { x_ = x; }
+    Eigen::VectorXd &DecisionVariablesLowerBound() { return lbx_; }
+    Eigen::VectorXd &DecisionVariablesUpperBound() { return ubx_; }
+
+    Eigen::VectorXd &ConstraintsLowerBound() { return lbg_; }
+    Eigen::VectorXd &ConstraintsUpperBound() { return ubg_; }
 
     /**
      * @brief Prints the current set of parameters for the program to the
@@ -185,16 +187,48 @@ class Program {
      */
     void PrintProgramSummary();
 
-    casadi::SX &DecisionVariableVector() { return x_; }
+   protected:
+    /**
+     * @brief Returns the id of a variable within the variables vectors of the
+     * program. If the variable does not exist, returns -1.
+     *
+     * @param name
+     * @return  int
+     */
+    int GetDecisionVariablesId(const std::string &name);
 
-    const int &NumberOfDecisionVariables() const { return nx_; }
-    const int &NumberOfConstraints() const { return nc_; }
+    /**
+     * @brief Returns the id of a parameter within the parameters vectors of
+     * the program. If the parameter does not exist, returns -1.
+     *
+     * @param name
+     * @return  int
+     */
+    int GetParametersId(const std::string &name);
 
-    Eigen::VectorXd &DecisionVariablesLowerBound() { return lbx_; }
-    Eigen::VectorXd &DecisionVariablesUpperBound() { return ubx_; }
+    /**
+     * @brief Returns the id of a cost within the costs vector of the program.
+     * If the cost does not exist, returns -1.
+     *
+     * @param name
+     * @return  int
+     */
+    int GetCostId(const std::string &name);
 
-    Eigen::VectorXd &ConstraintsLowerBound() { return lbg_; }
-    Eigen::VectorXd &ConstraintsUpperBound() { return ubg_; }
+    /**
+     * @brief Returns the id of a constraint within the constraints vector of
+     * the program. If the constraint does not exist, returns -1.
+     *
+     * @param name
+     * @return  int
+     */
+    int GetConstraintId(const std::string &name);
+
+    void SetUpCosts();
+
+    void SetUpConstraints();
+
+    void ConstructConstraintVector();
 
     /**
      * @brief Given the list of input names, assembles a vector of symbolic
@@ -206,6 +240,24 @@ class Program {
     casadi::SXVector GetSymbolicFunctionInput(
         const std::vector<std::string> &inames);
 
+    /**
+     * @brief For a given FunctionWrapper f, sets the inputs of the function to
+     * the variable and parameter data vectors within the program so future
+     * calls to f will use the most recent values of the variables and
+     * parameters.
+     *
+     * @param f
+     */
+    void SetFunctionInputData(utils::casadi::FunctionWrapper &f);
+
+    /**
+     * @brief Sets the optimisation vector for the program to a vector with
+     * ordering of variables provided by order
+     *
+     * @param order
+     */
+    void ConstructDecisionVariableVector(const std::vector<std::string> &order);
+
    private:
     // Program name
     std::string name_;
@@ -214,6 +266,8 @@ class Program {
     int nx_ = 0;
     // Number of constraints
     int nc_ = 0;
+    // Number of parameters
+    int np_ = 0;
 
     // Decision variables lower bound
     Eigen::VectorXd lbx_;
@@ -228,32 +282,29 @@ class Program {
     // Symbolic decision variables vector
     casadi::SX x_;
 
-    // Symbolic variables map
-    std::unordered_map<std::string, casadi::SX> variables_;
-    // Symbolic parameters map
-    std::unordered_map<std::string, casadi::SX> parameters_;
+    // Variables
+    std::unordered_map<std::string, int> variables_id_;
+    std::vector<int> variables_idx_;
+    std::vector<Variable> variables_;
 
-    // Variable indices
-    std::unordered_map<std::string, int> variable_idx_;
+    // Parameters
+    std::unordered_map<std::string, int> parameters_id_;
+    std::vector<Variable> parameters_;
 
     // Constraints
-    std::unordered_map<std::string, Constraint> constraints_;
-    // Costs
-    std::unordered_map<std::string, Cost> costs_;
+    std::unordered_map<std::string, int> constraints_id_;
+    std::vector<int> constraints_idx_;
+    std::vector<Constraint> constraints_;
 
-    // Variable data map
-    std::unordered_map<std::string, Eigen::VectorXd> variable_map_;
-    // Parameter data map
-    std::unordered_map<std::string, Eigen::VectorXd> parameter_map_;
+    // Costs
+    std::unordered_map<std::string, int> costs_id_;
+    std::vector<Cost> costs_;
+
+    void SetUpCost(Cost &cost);
+    void SetUpConstraint(Constraint &constraint);
 
     // Utilities
     casadi::StringVector GetSXVectorNames(const casadi::SXVector &x);
-
-    void VariableNotFoundError(const std::string &name);
-    void ParameterNotFoundError(const std::string &name);
-
-    void VariableAlreadyExistsError(const std::string &name);
-    void ParameterAlreadyExistsError(const std::string &name);
 };
 
 }  // namespace optimisation
