@@ -6,8 +6,9 @@
 #include <casadi/casadi.hpp>
 #include <pinocchio/autodiff/casadi.hpp>
 
-namespace casadi_utils {
-namespace eigen {
+namespace damotion {
+namespace utils {
+namespace casadi {
 
 /**
  * @brief Convert a casadi::Matrix<T> matric to an Eigen::Matrix<T>
@@ -19,7 +20,7 @@ namespace eigen {
  * @param E
  */
 template <typename T, int rows, int cols>
-void toEigen(const casadi::Matrix<T> &C, Eigen::Matrix<T, rows, cols> &E) {
+void toEigen(const ::casadi::Matrix<T> &C, Eigen::Matrix<T, rows, cols> &E) {
     E.setZero(C.rows(), C.columns());
     for (int i = 0; i < C.rows(); ++i) {
         for (int j = 0; j < C.columns(); ++j) {
@@ -38,12 +39,12 @@ void toEigen(const casadi::Matrix<T> &C, Eigen::Matrix<T, rows, cols> &E) {
  * @param C
  */
 template <typename T, int rows, int cols>
-void toCasadi(const Eigen::Matrix<T, rows, cols> &E, casadi::Matrix<T> &C) {
+void toCasadi(const Eigen::Matrix<T, rows, cols> &E, ::casadi::Matrix<T> &C) {
     C.resize(E.rows(), E.cols());
     for (int i = 0; i < E.rows(); ++i) {
         for (int j = 0; j < E.cols(); ++j) {
             // Only fill in non-zero entries
-            if (!casadi::is_zero(E(i, j))) {
+            if (!::casadi::is_zero(E(i, j))) {
                 C(i, j) = E(i, j);
             }
         }
@@ -62,24 +63,24 @@ void toCasadi(const Eigen::Matrix<T, rows, cols> &E, casadi::Matrix<T> &C) {
  * @param E
  */
 template <typename T, int rows, int cols>
-void toEigen(const casadi::Matrix<T> &C,
-             Eigen::Matrix<casadi::Matrix<T>, rows, cols> &E) {
+void toEigen(const ::casadi::Matrix<T> &C,
+             Eigen::Matrix<::casadi::Matrix<T>, rows, cols> &E) {
     E.setZero(C.rows(), C.columns());
     for (int i = 0; i < C.rows(); ++i) {
         for (int j = 0; j < C.columns(); ++j) {
-            E(i, j) = casadi::Matrix<T>(C(i, j));
+            E(i, j) = ::casadi::Matrix<T>(C(i, j));
         }
     }
 }
 
 template <typename T, int rows, int cols>
-void toCasadi(const Eigen::Matrix<casadi::Matrix<T>, rows, cols> &E,
-              casadi::Matrix<T> &C) {
+void toCasadi(const Eigen::Matrix<::casadi::Matrix<T>, rows, cols> &E,
+              ::casadi::Matrix<T> &C) {
     C.resize(E.rows(), E.cols());
     for (int i = 0; i < E.rows(); ++i) {
         for (int j = 0; j < E.cols(); ++j) {
             // Only fill in non-zero entries
-            if (!casadi::is_zero(E(i, j)->at(0))) {
+            if (!::casadi::is_zero(E(i, j)->at(0))) {
                 C(i, j) = E(i, j)->at(0);
             }
         }
@@ -97,8 +98,8 @@ class SparseMatrixWrapper {};
 class FunctionWrapper {
    public:
     FunctionWrapper() = default;
-    FunctionWrapper(casadi::Function f);
-    FunctionWrapper &operator=(casadi::Function f);
+    FunctionWrapper(::casadi::Function f);
+    FunctionWrapper &operator=(::casadi::Function f);
 
     FunctionWrapper(const FunctionWrapper &other);
     FunctionWrapper &operator=(const FunctionWrapper &other);
@@ -157,7 +158,7 @@ class FunctionWrapper {
      *
      * @return casadi::Function&
      */
-    casadi::Function &f() { return f_; }
+    ::casadi::Function &f() { return f_; }
 
    private:
     // Data input vector for casadi function
@@ -190,14 +191,15 @@ class FunctionWrapper {
     std::vector<double> dw_;
 
     // Underlying function
-    casadi::Function f_;
+    ::casadi::Function f_;
 
     Eigen::SparseMatrix<double> createSparseMatrix(
-        const casadi::Sparsity &sparsity, std::vector<casadi_int> &rows,
+        const ::casadi::Sparsity &sparsity, std::vector<casadi_int> &rows,
         std::vector<casadi_int> &cols);
 };
 
-}  // namespace eigen
-}  // namespace casadi_utils
+}  // namespace casadi
+}  // namespace utils
+}  // namespace damotion
 
 #endif /* UTILS_EIGEN_WRAPPER_H */

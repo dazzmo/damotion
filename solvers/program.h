@@ -8,10 +8,13 @@
 #include "utils/codegen.h"
 #include "utils/eigen_wrapper.h"
 
+#include "solvers/cost.h"
+#include "solvers/constraint.h"
+
 using namespace casadi_utils;
 
 namespace damotion {
-namespace solvers {
+namespace optimisation {
 
 class Program {
    public:
@@ -20,196 +23,7 @@ class Program {
 
     Program(const std::string &name) : name_(name) {}
 
-    class Cost {
-       public:
-        Cost() = default;
-        ~Cost() = default;
-
-        /**
-         * @brief Create a new Cost object based on the expression f and
-         * optimisation variables x
-         *
-         * @param name Name of the cost
-         * @param f Expression for the cost
-         * @param in Input variables
-         * @param inames Input variable names
-         * @param x Optimisation variables
-         */
-        Cost(const std::string &name, casadi::SX &f, const casadi::SXVector &in,
-             const casadi::StringVector &inames, const casadi::SX &x);
-
-        /**
-         * @brief Objective function
-         *
-         */
-        eigen::FunctionWrapper obj;
-
-        /**
-         * @brief Gradient function
-         *
-         */
-        eigen::FunctionWrapper grad;
-
-        /**
-         * @brief Hessian function
-         *
-         */
-        eigen::FunctionWrapper hes;
-
-        /**
-         * @brief Input variables for the expression
-         *
-         */
-        std::vector<casadi::SX> in;
-
-        /**
-         * @brief Input variable names
-         *
-         */
-        std::vector<std::string> inames;
-
-        /**
-         * @brief Output names
-         *
-         */
-        std::vector<std::string> onames;
-
-        /**
-         * @brief Cost weighting
-         *
-         * @return const double
-         */
-        const double weighting() const { return w_; }
-
-        /**
-         * @brief Cost weighting
-         *
-         * @return double&
-         */
-        double &weighting() { return w_; }
-
-       private:
-        // Cost weighting
-        double w_;
-    };
-
-    class Constraint {
-       public:
-        Constraint() = default;
-        ~Constraint() = default;
-
-        /**
-         * @brief Construct a new Constraint object based on expression f and
-         * optimisation variables x
-         *
-         * @param name Constraint name
-         * @param c Constraint
-         * @param in Constraint inputs
-         * @param inames Constraint input names
-         * @param x Decision variable to compute derivatives with respect to
-         */
-        Constraint(const std::string &name, casadi::SX &f,
-                   const casadi::SXVector &in,
-                   const casadi::StringVector &inames, const casadi::SX &x);
-
-        /**
-         * @brief Name of the constraint
-         *
-         * @return const std::string&
-         */
-        const std::string &name() const { return name_; }
-
-        /**
-         * @brief Dimension of the constraint
-         *
-         * @return const int
-         */
-        const int dim() const { return dim_; }
-
-        /**
-         * @brief The index of the constraint within the constraint vector
-         *
-         * @return const int&
-         */
-        const int &idx() const { return idx_; }
-
-        /**
-         * @brief Set the index of this constraint within the program constraint
-         * vector
-         *
-         * @param idx
-         */
-        void SetIndex(const int idx) { idx_ = idx; }
-
-        /**
-         * @brief Symbolic input variables for the constraint
-         *
-         */
-        casadi::SXVector in;
-
-        // Constraint
-        eigen::FunctionWrapper con;
-        // Jacobian
-        eigen::FunctionWrapper jac;
-
-        /**
-         * @brief Constraint lower bound (dim x 1)
-         *
-         * @return const Eigen::VectorXd&
-         */
-        const Eigen::VectorXd &lb() const { return lb_; }
-        Eigen::VectorXd &lb() { return lb_; }
-
-        /**
-         * @brief Constraint upper bound (dim x 1)
-         *
-         * @return const Eigen::VectorXd&
-         */
-        const Eigen::VectorXd &ub() const { return ub_; }
-        Eigen::VectorXd &ub() { return ub_; }
-
-        // Input names
-        std::vector<std::string> inames;
-        // Output names
-        std::vector<std::string> onames;
-
-        /**
-         * @brief Tests whether the p-norm of the constraint is within
-         * the threshold eps.
-         *
-         * @param p The norm of the constraint (use Eigen::Infinity for the
-         * infinity norm)
-         * @param eps
-         * @return true
-         * @return false
-         */
-        bool CheckViolation(const int &p = 2, const double &eps = 1e-6) {
-            // Determine if constraint within threshold
-            double c_norm = 0.0;
-            if (p == 1) {
-                c_norm = con.getOutput(0).lpNorm<1>();
-            } else if (p == 2) {
-                c_norm = con.getOutput(0).lpNorm<2>();
-            } else if (p == Eigen::Infinity) {
-                c_norm = con.getOutput(0).lpNorm<Eigen::Infinity>();
-            }
-
-            return c_norm <= eps;
-        }
-
-       private:
-        int dim_ = 0;
-
-        int idx_ = 0;
-
-        std::string name_;
-
-        // Constraint lower bound
-        Eigen::VectorXd lb_;
-        // Constraint upper bound
-        Eigen::VectorXd ub_;
-    };
-
+    
     void AddVariables(const std::string &name, const int sz) {
         if (variables_.find(name) == variables_.end()) {
             variables_[name] = casadi::SX::sym(name, sz);
@@ -220,29 +34,72 @@ class Program {
         }
     }
 
+    /**
+     * @brief Returns the symbolic vector for the variable given by name
+     *
+     * @param name
+     * @return casadi::SX&
+     */
     casadi::SX &GetVariables(const std::string &name) {
-        if (variables_.find(name) == variables_.end()) {
-            // return casadi::SX(0);
+        if (!IsVariable(name)) {
+            throw std::runtime_error("Variable " + name +
+                                     "is not included in this program");
         } else {
             return variables_[name];
         }
     }
 
-    casadi::SX &GetParameters(const std::string &name) {
-        if (parameters_.find(name) == parameters_.end()) {
-            // return casadi::SX(0);
-        } else {
-            return parameters_[name];
-        }
-    }
-
+    /**
+     * @brief The starting index of the variables given by name within the
+     * DecisionVaraibleVector() x
+     *
+     * @param name
+     * @return int
+     */
     int GetVariableIndex(const std::string &name) {
-        if (variable_idx_.find(name) == variable_idx_.end()) {
+        if (!IsVariable(name)) {
             std::cout << "Variable " << name
                       << " is not within this program!\n";
             return -1;
         } else {
             return variable_idx_[name];
+        }
+    }
+
+    /**
+     * @brief Returns the symbolic vector for the parameter given by name
+     *
+     * @param name
+     * @return casadi::SX&
+     */
+    casadi::SX &GetParameters(const std::string &name) {
+        if (!IsParameter(name)) {
+            throw std::runtime_error("Parameter " + name +
+                                     "is not included in this program");
+        } else {
+            return parameters_[name];
+        }
+    }
+
+    Eigen::Ref<Eigen::VectorXd> GetVariableUpperBounds(
+        const std::string &name) {
+        if (IsVariable(name)) {
+            return ubx_.middleRows(variable_idx_[name],
+                                   variable_map_[name].size());
+        } else {
+            throw std::runtime_error(name +
+                                     "is not a variable in this program");
+        }
+    }
+
+    Eigen::Ref<Eigen::VectorXd> GetVariableLowerBounds(
+        const std::string &name) {
+        if (IsVariable(name)) {
+            return lbx_.middleRows(variable_idx_[name],
+                                   variable_map_[name].size());
+        } else {
+            throw std::runtime_error(name +
+                                     "is not a variable in this program");
         }
     }
 
@@ -272,28 +129,20 @@ class Program {
         return parameter_map_.find(name) != parameter_map_.end();
     }
 
-    void AddCost(const std::string &name, Cost &cost) {
-        // Register constraint inputs with variables and parameters
-        SetFunctionData(cost.obj);
-        SetFunctionData(cost.grad);
-        SetFunctionData(cost.hes);
+    void AddCost(const std::string &name, casadi::SX &cost,
+                 casadi::SXVector &in);
 
-        // Add to cost map
-        costs_[name] = cost;
+    void RegisterCost(const Cost &cost);
+    void RegisterCosts();
+    Cost &GetCost(const std::string &name) { return costs_[name]; }
+
+    void AddConstraint(const std::string &name, casadi::SX &constraint,
+                       casadi::SXVector &in);
+    void RegisterConstraint(const Constraint &constraint);
+    void RegisterConstraints();
+    Constraint &GetConstraint(const std::string &name) {
+        return constraints_[name];
     }
-
-    Cost &GetCost(std::string &name) { return costs_[name]; }
-
-    void AddConstraint(const std::string &name, Constraint &con) {
-        // Register constraint inputs with data
-        SetFunctionData(con.con);
-        SetFunctionData(con.jac);
-
-        // Add to constraint map
-        constraints_[name] = con;
-    }
-
-    Constraint &GetConstraint(std::string &name) { return constraints_[name]; }
 
     void ConstructConstraintVector() {
         // TODO - Make custom ordering possible
@@ -311,7 +160,7 @@ class Program {
         lbg_.setConstant(-std::numeric_limits<double>::infinity());
         ubg_.setConstant(std::numeric_limits<double>::infinity());
 
-        // Set default bounds
+        // Set bounds
         for (auto &p : constraints_) {
             Constraint &c = p.second;
             lbg_.middleRows(c.idx(), c.dim()) = c.lb();
@@ -319,7 +168,7 @@ class Program {
         }
     }
 
-    void SetFunctionData(eigen::FunctionWrapper &f) {
+    void SetFunctionData(utils::casadi::FunctionWrapper &f) {
         // Go through all function inputs and set both variable and parameter
         // locations
         for (int i = 0; i < f.f().n_in(); ++i) {
@@ -403,85 +252,35 @@ class Program {
      * screen
      *
      */
-    void ListParameters() {
-        std::cout << "----------------------\n";
-        std::cout << "Parameter\tCurrent Value\n";
-        std::cout << "----------------------\n";
-        for (auto p : parameter_map_) {
-            for (int i = 0; i < p.second.size(); i++) {
-                std::cout << p.first << "_" << i << '\t' << p.second(i) << '\n';
-            }
-        }
-    }
+    void ListParameters();
 
     /**
      * @brief Prints the current set of parameters for the program to the
      * screen
      *
      */
-    void ListVariables() {
-        std::cout << "----------------------\n";
-        std::cout << "Variable\tSize\n";
-        std::cout << "----------------------\n";
-        for (auto v : variables_) {
-            std::cout << v.first << '\t' << v.second.size() << '\n';
-        }
-    }
+    void ListVariables();
 
     /**
      * @brief Prints the current set of constraints for the program to the
      * screen
      *
      */
-    void ListConstraints() {
-        std::cout << "----------------------\n";
-        std::cout << "Constraint\tLower Bound\tUpper Bound\n";
-        std::cout << "----------------------\n";
-        for (auto c : constraints_) {
-            for (int i = 0; i < c.second.dim(); i++) {
-                std::cout << c.first << "_" << i << '\t' << c.second.lb()(i)
-                          << '\t' << c.second.ub()(i) << '\n';
-            }
-        }
-    }
+    void ListConstraints();
 
     /**
      * @brief Prints the current set of costs for the program to the
      * screen
      *
      */
-    void ListCosts() {
-        std::cout << "----------------------\n";
-        std::cout << "Cost\tWeigting\n";
-        std::cout << "----------------------\n";
-        for (auto c : costs_) {
-            std::cout << c.first << '\t' << c.second.weighting() << '\n';
-        }
-    }
+    void ListCosts();
 
-    void PrintProgramSummary() {
-        // Print number of variables, what the variables are (only base names)
-        std::cout << "-----------------------\n";
-        std::cout << "Program Name: " << name() << '\n';
-        std::cout << "Number of Decision Variables: "
-                  << NumberOfDecisionVariables() << '\n';
-        std::cout << "Variables\tSize\n";
-        for (auto v : variables_) {
-            std::cout << v.first << '\t' << v.second.size() << '\n';
-        }
-        std::cout << "Number of Constraints: " << NumberOfConstraints() << '\n';
-        std::cout << "Constraint\tSize\n";
-        for (auto c : constraints_) {
-            std::cout << c.first << "\t[" << c.second.dim() << ",1]\n";
-        }
-        // ! Fix the number of parameters
-        std::cout << "Number of Parameters: " << "TBD" << '\n';
-        std::cout << "Parameters\tSize\n";
-        for (auto p : parameters_) {
-            std::cout << p.first << '\t' << p.second.size() << '\n';
-        }
-        std::cout << "-----------------------\n";
-    }
+    /**
+     * @brief Prints a summary of the program, listing number of variables,
+     * parameters, constraints and costs
+     *
+     */
+    void PrintProgramSummary();
 
     /**
      * @brief Name of the program
@@ -505,12 +304,13 @@ class Program {
 
     void AddParameters(const std::string &name, int sz) {
         damotion::common::Profiler("Program::AddParameters");
-        // Look up parameters in parameter map and set values
-        auto p = parameters_.find(name);
         // If doesn't exist, add parameter
-        if (p == parameters_.end()) {
+        if (!IsParameter(name)) {
             parameters_[name] = casadi::SX::sym(name, sz);
             parameter_map_[name] = Eigen::VectorXd::Zero(sz);
+        } else {
+            std::cout << "Parameter " << name
+                      << "is not in the parameter map!\n";
         }
     }
 
@@ -530,6 +330,13 @@ class Program {
     Eigen::VectorXd &ConstraintsLowerBound() { return lbg_; }
     Eigen::VectorXd &ConstraintsUpperBound() { return ubg_; }
 
+    /**
+     * @brief Given the list of input names, assembles a vector of symbolic
+     * inputs using the variables and parameters present in the program
+     *
+     * @param inames
+     * @return casadi::SXVector
+     */
     casadi::SXVector GetSymbolicFunctionInput(
         const std::vector<std::string> &inames) {
         casadi::SXVector in = {};
@@ -543,6 +350,8 @@ class Program {
             } else {
                 std::cout << "Input " << name
                           << " is not a listed variable or parameter!\n";
+                // Return empty vector
+                return {};
             }
         }
 
@@ -584,6 +393,9 @@ class Program {
     std::unordered_map<std::string, Eigen::VectorXd> variable_map_;
     // Parameters
     std::unordered_map<std::string, Eigen::VectorXd> parameter_map_;
+
+    // Utilities
+    casadi::StringVector GetSXVectorNames(const casadi::SXVector &x);
 };
 
 }  // namespace solvers

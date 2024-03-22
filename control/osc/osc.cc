@@ -14,12 +14,6 @@ Eigen::Quaterniond RPYToQuaterion(const double roll, const double pitch,
 void OSCController::UpdateProgramParameters() {
     damotion::common::Profiler profiler(
         "OSCController::UpdateProgramParameters");
-    std::cout << "Updating\n";
-
-    std::cout << ConstraintsLowerBound().transpose() << std::endl;
-    std::cout << ConstraintsUpperBound().transpose() << std::endl;
-    std::cout << DecisionVariablesLowerBound().transpose() << std::endl;
-    std::cout << DecisionVariablesUpperBound().transpose() << std::endl;
 
     // Adjust bounds on contact forces depending on contact states
     for (auto &p : contact_tasks_) {

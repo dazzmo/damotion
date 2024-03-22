@@ -33,6 +33,10 @@ target_link_libraries(profiler damotion GTest::gtest_main)
 add_executable(osc ${CMAKE_CURRENT_SOURCE_DIR}/control/osc.cc)
 target_link_libraries(osc damotion GTest::gtest_main)
 
+# Solvers
+add_executable(program_test ${CMAKE_CURRENT_SOURCE_DIR}/solvers/program.cc)
+target_link_libraries(program_test damotion GTest::gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(codegen_test)
 gtest_discover_tests(eigen_wrapper_test)
@@ -42,3 +46,4 @@ gtest_discover_tests(constraint)
 gtest_discover_tests(log)
 gtest_discover_tests(profiler)
 gtest_discover_tests(osc)
+gtest_discover_tests(program_test)

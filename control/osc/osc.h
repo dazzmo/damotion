@@ -152,21 +152,49 @@ class OSCController : public solvers::Program {
         ContactTask task;
         CreateHolonomicConstraint(name, x, task);
 
+        // Set the dimension of the task
         task.SetDimension(3);
 
         // Add tracking task to map
         contact_tasks_[name] = task;
     }
 
+    /**
+     * @brief Adds a holonomic constraint \f$ c(q) = 0 \f$ to the OSC program.
+     * Function input c requires the constraint and its first two derivatives in
+     * time (i.e. \f$ c(q) , \dot{c}(q, \dot{q}), \ddot{c}(q, \dot{q},
+     * \ddot{q})\f$)
+     *
+     * @param name
+     * @param c Input function that computes the constraint and time derivatives
+     */
     void AddHolonomicConstraint(const std::string &name, casadi::Function &c) {
         // Create new constraint
         HolonomicConstraint constraint;
         CreateHolonomicConstraint(name, c, constraint);
+        // Set the dimension of the task
+        constraint.SetDimension(c.size1_out(0));
         // Add holonomic constraint to map
         holonomic_constraints_[name] = constraint;
     }
 
     void AddDynamics(casadi::Function &f) { fdyn_ = f; }
+
+    TrackingTask &GetTrackingTask(const std::string &name) {
+        if (tracking_tasks_.find(name) == tracking_tasks_.end()) {
+            throw std::runtime_error(name + "is not a tracking task");
+        } else {
+            return tracking_tasks_[name];
+        }
+    }
+
+    ContactTask &GetContactTask(const std::string &name) {
+        if (contact_tasks_.find(name) == contact_tasks_.end()) {
+            throw std::runtime_error(name + "is not a tracking task");
+        } else {
+            return contact_tasks_[name];
+        }
+    }
 
     void RegisterTrackingTask(TrackingTask &task) {
         damotion::common::Profiler("OSCController::RegisterTrackingTask");
@@ -228,6 +256,11 @@ class OSCController : public solvers::Program {
         /* No-slip constraint */
         Constraint c(task.name() + "_no_slip", xacc, in, inames,
                      DecisionVariableVector());
+
+        // Set equality bounds
+        c.lb().setZero();
+        c.ub().setZero();
+
         // Add constraint to program
         AddConstraint(task.name() + "_no_slip", c);
 
@@ -256,27 +289,11 @@ class OSCController : public solvers::Program {
         casadi::SX d2cdt2 = con.Function().f()(in)[2];
         // Set second rate of change of constraint to zero to ensure no change
         Constraint c(con.name(), d2cdt2, in, inames, DecisionVariableVector());
+        // Set constraint bounds to zero
+        c.lb().setZero();
+        c.ub().setZero();
         // Add constraint to program
         AddConstraint(con.name(), c);
-    }
-
-    // Functions for setting new weightings?
-    // Access through the map?
-    void UpdateTrackingCostGains(
-        const std::string &name,
-        const Eigen::DiagonalMatrix<double, Eigen::Dynamic> &Kp,
-        const Eigen::DiagonalMatrix<double, Eigen::Dynamic> &Kd) {
-        // ! Throw error if name is not in lookup
-        tracking_tasks_[name].Kp = Kp;
-        tracking_tasks_[name].Kd = Kd;
-    }
-
-    void UpdateTrackingReference(const std::string &name,
-                                 const Eigen::Vector3d &xr,
-                                 const Eigen::Quaterniond &qr) {
-        // ! Throw error if name is not in lookup
-        tracking_tasks_[name].xr = xr;
-        tracking_tasks_[name].qr = qr;
     }
 
     // Given all information for the problem, initialise the program
@@ -459,6 +476,11 @@ class OSCController : public solvers::Program {
 
         // Create constraint from the function and add it to the program
         Constraint c("dynamics", dyn, in, inames, DecisionVariableVector());
+        
+        // Equality constraints
+        c.lb().setZero();
+        c.ub().setZero();
+        
         AddConstraint("dynamics", c);
 
         // ? If projected dynamics, compute null-space dynamics independently

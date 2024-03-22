@@ -1,88 +1,89 @@
 #include "utils/pinocchio_model.h"
 
-using namespace casadi_utils;
+namespace damotion {
+namespace utils {
+namespace casadi {
 
 PinocchioModelWrapper &PinocchioModelWrapper::operator=(
     pinocchio::Model model) {
     // Cast model to type
-    model_ = model.cast<casadi::Matrix<AD>>();
+    model_ = model.cast<::casadi::Matrix<AD>>();
     // Create data for model
-    data_ = pinocchio::DataTpl<casadi::Matrix<AD>>(model_);
+    data_ = pinocchio::DataTpl<::casadi::Matrix<AD>>(model_);
 
     return *this;
 }
 
-casadi::Function PinocchioModelWrapper::aba() {
+::casadi::Function PinocchioModelWrapper::aba() {
     // Compute expression for aba
-    casadi::Matrix<AD> q = casadi::Matrix<AD>::sym("q", model_.nq),
-                       v = casadi::Matrix<AD>::sym("v", model_.nv),
-                       tau = casadi::Matrix<AD>::sym("tau", model_.nv), a;
+    ::casadi::Matrix<AD> q = ::casadi::Matrix<AD>::sym("q", model_.nq),
+                       v = ::casadi::Matrix<AD>::sym("v", model_.nv),
+                       tau = ::casadi::Matrix<AD>::sym("tau", model_.nv), a;
     // Convert to eigen expressions
-    Eigen::VectorX<casadi::Matrix<AD>> qe, ve, taue;
-    eigen::toEigen(q, qe);
-    eigen::toEigen(v, ve);
-    eigen::toEigen(tau, taue);
+    Eigen::VectorX<::casadi::Matrix<AD>> qe, ve, taue;
+    toEigen(q, qe);
+    toEigen(v, ve);
+    toEigen(tau, taue);
 
-    Eigen::VectorX<casadi::Matrix<AD>> ae =
-        pinocchio::aba<casadi::Matrix<AD>>(model_, data_, qe, ve, taue);
+    Eigen::VectorX<::casadi::Matrix<AD>> ae =
+        pinocchio::aba<::casadi::Matrix<AD>>(model_, data_, qe, ve, taue);
 
     // Create AD equivalent
-    eigen::toCasadi(ae, a);
+    toCasadi(ae, a);
 
     // Create function for ABA
-    return casadi::Function(model_.name + "_aba", {q, v, tau}, {a},
+    return ::casadi::Function(model_.name + "_aba", {q, v, tau}, {a},
                             {"q", "v", "u"}, {"a"});
 }
 
-casadi::Function PinocchioModelWrapper::rnea() {
+::casadi::Function PinocchioModelWrapper::rnea() {
     // Compute expression for aba
-    casadi::Matrix<AD> q = casadi::Matrix<AD>::sym("q", model_.nq),
-                       v = casadi::Matrix<AD>::sym("v", model_.nv),
-                       a = casadi::Matrix<AD>::sym("a", model_.nv), u;
+    ::casadi::Matrix<AD> q = ::casadi::Matrix<AD>::sym("q", model_.nq),
+                       v = ::casadi::Matrix<AD>::sym("v", model_.nv),
+                       a = ::casadi::Matrix<AD>::sym("a", model_.nv), u;
     // Convert to eigen expressions
-    Eigen::VectorX<casadi::Matrix<AD>> qe, ve, ae;
-    eigen::toEigen(q, qe);
-    eigen::toEigen(v, ve);
-    eigen::toEigen(a, ae);
+    Eigen::VectorX<::casadi::Matrix<AD>> qe, ve, ae;
+    toEigen(q, qe);
+    toEigen(v, ve);
+    toEigen(a, ae);
 
     // Convert to SX
-    Eigen::VectorX<casadi::Matrix<AD>> ue =
-        pinocchio::rnea<casadi::Matrix<AD>>(model_, data_, qe, ve, ae);
+    Eigen::VectorX<::casadi::Matrix<AD>> ue =
+        pinocchio::rnea<::casadi::Matrix<AD>>(model_, data_, qe, ve, ae);
 
-    eigen::toCasadi(ue, u);
+    toCasadi(ue, u);
 
     // Create function for RNEA
-    return casadi::Function(model_.name + "_rnea", {q, v, a}, {u},
+    return ::casadi::Function(model_.name + "_rnea", {q, v, a}, {u},
                             {"q", "v", "a"}, {"u"});
 };
 
 void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
     // Symbolic generalised coordinates and derivatives
-    casadi::Matrix<AD> qpos = casadi::Matrix<AD>::sym("q", model_.nq),
-                       qvel = casadi::Matrix<AD>::sym("v", model_.nv),
-                       qacc = casadi::Matrix<AD>::sym("a", model_.nv);
+    ::casadi::Matrix<AD> qpos = ::casadi::Matrix<AD>::sym("q", model_.nq),
+                       qvel = ::casadi::Matrix<AD>::sym("v", model_.nv),
+                       qacc = ::casadi::Matrix<AD>::sym("a", model_.nv);
     // Eigen-equivalents
-    Eigen::VectorX<casadi::Matrix<AD>> qpos_e, qvel_e, qacc_e;
-    eigen::toEigen(qpos, qpos_e);
-    eigen::toEigen(qvel, qvel_e);
-    eigen::toEigen(qacc, qacc_e);
+    Eigen::VectorX<::casadi::Matrix<AD>> qpos_e, qvel_e, qacc_e;
+    toEigen(qpos, qpos_e);
+    toEigen(qvel, qvel_e);
+    toEigen(qacc, qacc_e);
 
     // Perform forward kinematics on model
     pinocchio::forwardKinematics(model_, data_, qpos_e, qvel_e, qacc_e);
     // Perform forward kinematics and compute frames
     pinocchio::framesForwardKinematics(model_, data_, qpos_e);
     // Get SE3 data for the target frame
-    pinocchio::SE3Tpl<casadi::Matrix<AD>> se3_frame =
+    pinocchio::SE3Tpl<::casadi::Matrix<AD>> se3_frame =
         data_.oMf[model_.getFrameId(frame_name)];
 
-    Eigen::VectorX<casadi::Matrix<AD>> pos_e(7), vel_e(6), acc_e(6);
+    Eigen::VectorX<::casadi::Matrix<AD>> pos_e(7), vel_e(6), acc_e(6);
 
     // Translational component
     pos_e.topRows(3) = se3_frame.translation();
     // Rotational component
-    Eigen::Matrix3<casadi::Matrix<AD>> R =
-        se3_frame.rotation();
-    Eigen::Quaternion<casadi::Matrix<AD>> qR;
+    Eigen::Matrix3<::casadi::Matrix<AD>> R = se3_frame.rotation();
+    Eigen::Quaternion<::casadi::Matrix<AD>> qR;
     pinocchio::quaternion::assignQuaternion(qR, R);
 
     // Convert rotation matrix to quaternion representation
@@ -103,52 +104,52 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
                 .toVector();
 
     // Convert to casadi matrices
-    casadi::Matrix<AD> pos, vel, acc;
-    eigen::toCasadi(pos_e, pos);
-    eigen::toCasadi(vel_e, vel);
-    eigen::toCasadi(acc_e, acc);
+    ::casadi::Matrix<AD> pos, vel, acc;
+    toCasadi(pos_e, pos);
+    toCasadi(vel_e, vel);
+    toCasadi(acc_e, acc);
 
     // Get jacobian of this site with respect to the configuration of the
     // Compute Jacobian
-    pinocchio::DataTpl<casadi::Matrix<AD>>::Matrix6x Je(6, model_.nv);
+    pinocchio::DataTpl<::casadi::Matrix<AD>>::Matrix6x Je(6, model_.nv);
     Je.setZero();
 
     pinocchio::computeFrameJacobian(model_, data_, qpos_e,
                                     model_.getFrameId(frame_name),
                                     pinocchio::LOCAL_WORLD_ALIGNED, Je);
 
-    casadi::Matrix<AD> J;
-    eigen::toCasadi(Je, J);
+    ::casadi::Matrix<AD> J;
+    toCasadi(Je, J);
 
     // Create end-effector data struct and add to vector
     EndEffector ee;
     ee.S = Eigen::Matrix<double, 6, 6>::Identity();
 
-    ee.x = casadi::Function(model_.name + "_" + frame_name + "_ee",
+    ee.x = ::casadi::Function(model_.name + "_" + frame_name + "_ee",
                             {qpos, qvel, qacc}, {pos, vel, acc},
                             {"qpos", "qvel", "qacc"}, {"pos", "vel", "acc"});
 
-    ee.J = casadi::Function(model_.name + "_" + frame_name + "_ee_jac", {qpos},
+    ee.J = ::casadi::Function(model_.name + "_" + frame_name + "_ee_jac", {qpos},
                             {J}, {"qpos"}, {"J"});
 
     // Also create a function that indicates the error between a target
     // reference pose and the pose of the end-effector
-    casadi::Matrix<AD> q_ref = casadi::Matrix<AD>::sym("qr", 4),
-                       x_ref = casadi::Matrix<AD>::sym("qr", 3);
-    Eigen::Quaternion<casadi::Matrix<AD>> q;
-    Eigen::Vector3<casadi::Matrix<AD>> x;
-    eigen::toEigen(q_ref, q.coeffs());
-    eigen::toEigen(x_ref, x);
+    ::casadi::Matrix<AD> q_ref = ::casadi::Matrix<AD>::sym("qr", 4),
+                       x_ref = ::casadi::Matrix<AD>::sym("qr", 3);
+    Eigen::Quaternion<::casadi::Matrix<AD>> q;
+    Eigen::Vector3<::casadi::Matrix<AD>> x;
+    toEigen(q_ref, q.coeffs());
+    toEigen(x_ref, x);
 
     // Create pose
-    pinocchio::SE3Tpl<casadi::Matrix<AD>> se3_ref(q, x);
+    pinocchio::SE3Tpl<::casadi::Matrix<AD>> se3_ref(q, x);
 
     // Determine error
-    casadi::Matrix<AD> err;
-    eigen::toCasadi(poseError(se3_frame, se3_ref), err);
+    ::casadi::Matrix<AD> err;
+    toCasadi(poseError(se3_frame, se3_ref), err);
 
     // Create function
-    ee.pose_error = casadi::Function(
+    ee.pose_error = ::casadi::Function(
         model_.name + "_" + frame_name + "_ee_pose_err", {qpos, x_ref, q_ref},
         {err}, {"qpos", "x_ref", "q_ref"}, {"err"});
 
@@ -156,3 +157,7 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
     ee_idx_[frame_name] = ee_.size();
     ee_.push_back(ee);
 }
+
+}  // namespace casadi
+}  // namespace utils
+}  // namespace damotion

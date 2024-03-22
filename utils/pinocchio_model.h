@@ -15,12 +15,14 @@
 #include "utils/eigen_wrapper.h"
 #include "utils/log.h"
 
-namespace casadi_utils {
+namespace damotion {
+namespace utils {
+namespace casadi {
 
 class PinocchioModelWrapper {
    public:
     // Define casadi autodiff type
-    using AD = casadi::SXElem;
+    using AD = ::casadi::SXElem;
 
     PinocchioModelWrapper() = default;
     PinocchioModelWrapper(pinocchio::Model &model) { *this = model; }
@@ -33,7 +35,7 @@ class PinocchioModelWrapper {
      *
      * @return casadi::Function
      */
-    casadi::Function aba();
+    ::casadi::Function aba();
 
     /**
      * @brief Returns a casadi::Function that computes the inverse-dynamics of
@@ -41,7 +43,7 @@ class PinocchioModelWrapper {
      *
      * @return casadi::Function
      */
-    casadi::Function rnea();
+    ::casadi::Function rnea();
 
     /**
      * @brief End-effector data for a given point on the system, includes data
@@ -55,7 +57,7 @@ class PinocchioModelWrapper {
          * from the space of SE3 to that of se3.
          *
          */
-        casadi::Function pose_error;
+        ::casadi::Function pose_error;
 
         /**
          * @brief Function that computes the end-effector position/orientation
@@ -63,13 +65,13 @@ class PinocchioModelWrapper {
          * output (x, dx, ddx)
          *
          */
-        casadi::Function x;
+        ::casadi::Function x;
 
         /**
          * @brief End-effector Jacobian \f$ J(q) \f$
          *
          */
-        casadi::Function J;
+        ::casadi::Function J;
 
         /**
          * @brief Constraint motion subspace (i.e. basis for the constraint
@@ -100,12 +102,12 @@ class PinocchioModelWrapper {
 
     void addEndEffector(const std::string &frame_name);
 
-    pinocchio::ModelTpl<casadi::Matrix<AD>> &model() { return model_; }
-    pinocchio::DataTpl<casadi::Matrix<AD>> &data() { return data_; }
+    pinocchio::ModelTpl<::casadi::Matrix<AD>> &model() { return model_; }
+    pinocchio::DataTpl<::casadi::Matrix<AD>> &data() { return data_; }
 
    private:
-    pinocchio::ModelTpl<casadi::Matrix<AD>> model_;
-    pinocchio::DataTpl<casadi::Matrix<AD>> data_;
+    pinocchio::ModelTpl<::casadi::Matrix<AD>> model_;
+    pinocchio::DataTpl<::casadi::Matrix<AD>> data_;
 
     std::vector<EndEffector> ee_;
     std::unordered_map<std::string, int> ee_idx_;
@@ -137,6 +139,8 @@ Eigen::Vector<T, 6> poseError(const pinocchio::SE3Tpl<T> &p0,
     return err;
 }
 
-}  // namespace casadi_utils
+}  // namespace casadi
+}  // namespace utils
+}  // namespace damotion
 
-#endif/* UTILS_PINOCCHIO_MODEL_H */
+#endif /* UTILS_PINOCCHIO_MODEL_H */

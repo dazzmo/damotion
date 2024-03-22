@@ -7,7 +7,10 @@
 #include <casadi/casadi.hpp>
 
 
-namespace casadi_utils {
+
+namespace damotion {
+namespace utils {
+namespace casadi {
 
 /**
  * @brief Generates a dynamically linkable library for the function f and loads
@@ -18,9 +21,11 @@ namespace casadi_utils {
  * @return casadi::Function Function that utilises the created and loaded
  * library
  */
-casadi::Function codegen(const casadi::Function &f,
+::casadi::Function codegen(const ::casadi::Function &f,
                          const std::string &dir = "./");
 
 }  // namespace casadi_utils
+}
+}
 
 #endif /* UTILS_CODEGEN_H */

@@ -13,6 +13,8 @@ namespace solvers {
 
 class QPOASESSolverInstance : public SolverBase {
    public:
+    QPOASESSolverInstance() = default;
+
     QPOASESSolverInstance(Program& prog) : SolverBase(prog) {
         // Create problem
         qp_ = std::make_unique<qpOASES::SQProblem>(
@@ -77,12 +79,13 @@ class QPOASESSolverInstance : public SolverBase {
                       GetCurrentProgram().ConstraintsLowerBound().data(),
                       GetCurrentProgram().ConstraintsUpperBound().data(), nWSR);
         } else {
-            // qp_->hotstart(
-            //     H_.get(), objective_gradient_cache_.data(), A_.get(),
-            //     GetCurrentProgram().DecisionVariablesLowerBound().data(),
-            //     GetCurrentProgram().DecisionVariablesUpperBound().data(),
-            //     GetCurrentProgram().ConstraintsLowerBound().data(),
-            //     GetCurrentProgram().ConstraintsUpperBound().data(), nWSR);
+            qp_->hotstart(
+                lagrangian_hes_cache_.data(), objective_gradient_cache_.data(),
+                constraint_jacobian_cache_.data(),
+                GetCurrentProgram().DecisionVariablesLowerBound().data(),
+                GetCurrentProgram().DecisionVariablesUpperBound().data(),
+                GetCurrentProgram().ConstraintsLowerBound().data(),
+                GetCurrentProgram().ConstraintsUpperBound().data(), nWSR);
         }
 
         // Get primal solution
@@ -103,6 +106,9 @@ class QPOASESSolverInstance : public SolverBase {
 
 class QPOASESSolver {
    public:
+    QPOASESSolver() = default;
+    ~QPOASESSolver() = default;
+
     QPOASESSolver(Program& program) {
         // Create new instance
         qp_ = std::make_unique<QPOASESSolverInstance>(program);

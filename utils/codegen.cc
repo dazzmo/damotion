@@ -1,7 +1,11 @@
 #include "utils/codegen.h"
 
-casadi::Function casadi_utils::codegen(const casadi::Function &f,
-                         const std::string &dir) {
+namespace damotion {
+namespace utils {
+namespace casadi {
+
+::casadi::Function codegen(const ::casadi::Function &f,
+                           const std::string &dir) {
     // Create binary in desired directory
     // Get current path
     auto path = std::filesystem::current_path();
@@ -39,10 +43,15 @@ casadi::Function casadi_utils::codegen(const casadi::Function &f,
     }
 
     // Load the generated function
-    casadi::Function fcg = casadi::external(f.name(), "./" + f_name + ".so");
+    ::casadi::Function fcg =
+        ::casadi::external(f.name(), "./" + f_name + ".so");
 
     // Return back to normal path
     std::filesystem::current_path(path);
 
     return fcg;
 }
+
+}  // namespace casadi
+}  // namespace utils
+}  // namespace damotion

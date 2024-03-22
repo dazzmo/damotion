@@ -4,90 +4,86 @@
 #include <gtest/gtest.h>
 
 #include "pinocchio/parsers/urdf.hpp"
+#include "solvers/solver.h"
 #include "utils/pinocchio_model.h"
 
-TEST(OSC, Parameters) {
-    damotion::control::OSCController osc;
+class OSCTest : public testing::Test {
+   protected:
+    void SetUp() override {
+        damotion::control::OSCController osc0_;
 
-    osc.AddParameters("a", 5);
-    osc.AddParameters("b", 3);
-    osc.AddParameters("c", 2);
-    osc.AddParameters("b", 7);
-    osc.AddParameters("qacc", 9);
+        // Load UR10 arm
+        pinocchio::urdf::buildModel("./ur10_robot.urdf", model_, true);
+        data_ = pinocchio::Data(model_);
+        // Wrap model
+        wrapper_ = casadi_utils::PinocchioModelWrapper(model_);
+        // Create OSC
+        damotion::control::OSCController osc_(model_.nq, model_.nv, model_.nv);
+    }
 
-    osc.ListParameters();
+    // void TearDown() override {}
 
-    damotion::common::Profiler data;
+    damotion::control::OSCController osc0_;
+    damotion::control::OSCController osc_;
 
-    EXPECT_TRUE(true);
+    casadi_utils::PinocchioModelWrapper wrapper_;
+
+    pinocchio::Model model_;
+    pinocchio::Data data_;
+};
+
+TEST_F(OSCTest, IsEmptyInitially) {
+    EXPECT_EQ(osc0_.NumberOfDecisionVariables(), 0);
+    EXPECT_EQ(osc0_.NumberOfConstraints(), 0);
 }
 
-TEST(OSC, Cost) {
-    casadi::SX qacc = casadi::SX::sym("qacc", 1);
-    casadi::SX ctrl = casadi::SX::sym("ctrl", 1);
-    casadi::SX lam = casadi::SX::sym("lam", 1);
-    casadi::SX a = casadi::SX::sym("a", 1);
-    casadi::SX b = casadi::SX::sym("b", 1);
-
-    casadi::SX x = casadi::SX::vertcat({qacc, ctrl, lam});
-
-    casadi::SX J = qacc * ctrl + (a + lam) * b;
-
-    damotion::control::OSCController::Cost cost(
-        "cost", J, {qacc, ctrl, lam, a, b}, {"qacc", "ctrl", "lam", "a", "b"},
-        x);
-
-    EXPECT_TRUE(true);
+TEST_F(OSCTest, CorrectModelDimensions) {
+    EXPECT_EQ(osc_.nq(), model_.nq);
+    EXPECT_EQ(osc_.nv(), model_.nv);
 }
 
-TEST(OSC, AddEndEffector) {
-    // Load UR10 arm
-    pinocchio::Model model;
-    pinocchio::urdf::buildModel("./ur10_robot.urdf", model, true);
-    pinocchio::Data data(model);
-
-    casadi_utils::PinocchioModelWrapper wrapper(model);
-
-    // Create OSC with system dimensions
-    damotion::control::OSCController osc(model.nq, model.nv, model.nv);
-
-    // Create data for end-effector
-    wrapper.addEndEffector("tool0");
-
+TEST_F(OSCTest, AddDynamics) {
     // Create actuation map (use model if needed)
     casadi::SX B(6, 6);
     for (int i = 0; i < 6; i++) {
-        B(i, i) = model.rotorGearRatio(i);
+        B(i, i) = model_.rotorGearRatio(i);
     }
 
     // Compute symbolic expression for system dynamics
-    casadi::SX dyn = wrapper.rnea()(
-        casadi::SXVector({osc.GetParameters("qpos"), osc.GetParameters("qvel"),
-                          osc.GetVariables("qacc")}))[0];
+    casadi::SX dyn = wrapper_.rnea()(casadi::SXVector(
+        {osc_.GetParameters("qpos"), osc_.GetParameters("qvel"),
+         osc_.GetVariables("qacc")}))[0];
 
     // Add any additional nonlinearities (e.g. spring/damping of joints)
 
     // Add generalised inputs
-    dyn -= mtimes(B, osc.GetVariables("ctrl"));
+    dyn -= mtimes(B, osc_.GetVariables("ctrl"));
 
     // Create new function with actuation included
-    casadi::Function controlled_dynamics =
-        casadi::Function("dynamics",
-                         {osc.GetParameters("qpos"), osc.GetParameters("qvel"),
-                          osc.GetVariables("qacc"), osc.GetVariables("ctrl")},
-                         {dyn}, {"qpos", "qvel", "qacc", "ctrl"}, {"dyn"});
+    casadi::Function controlled_dynamics = casadi::Function(
+        "dynamics",
+        {osc_.GetParameters("qpos"), osc_.GetParameters("qvel"),
+         osc_.GetVariables("qacc"), osc_.GetVariables("ctrl")},
+        {dyn}, {"qpos", "qvel", "qacc", "ctrl"}, {"dyn"});
 
-    osc.AddDynamics(controlled_dynamics);
+    osc_.AddDynamics(controlled_dynamics);
+
+    EXPECT_TRUE(true);
+}
+
+TEST_F(OSCTest, AddTrackingTask) {
+    // Create data for end-effector
+    wrapper_.addEndEffector("tool0");
+
     // Add tracking tasks
-    osc.AddTrackingTask(
-        "tool0", wrapper.end_effector(0).x,
+    osc_.AddTrackingTask(
+        "tool0", wrapper_.end_effector(0).x,
         damotion::control::OSCController::TrackingTask::Type::kFull);
 
-    // Add a contact task
-    osc.AddContactTask("tool0", wrapper.end_effector(0).x);
+    EXPECT_TRUE(true);
+}
 
-    osc.Initialise();
-
+/*
     osc.ListParameters();
     osc.ListVariables();
     osc.ListCosts();
@@ -103,13 +99,15 @@ TEST(OSC, AddEndEffector) {
 
     osc.UpdateContactFrictionCoefficient("tool0", 1.0);
 
+    damotion::solvers::SolverBase solver(osc);
+
     // Generate program
     osc.UpdateProgramParameters();
+    // Update solver
+    solver.UpdateProgram(osc);
 
     osc.ListParameters();
-
     osc.PrintProgramSummary();
-    // Solve by passing the program to the solver
 
-    EXPECT_TRUE(true);
-}
+
+*/

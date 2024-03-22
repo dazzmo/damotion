@@ -1,8 +1,10 @@
 #include "utils/eigen_wrapper.h"
 
-using namespace casadi_utils::eigen;
+namespace damotion {
+namespace utils {
+namespace casadi {
 
-FunctionWrapper::FunctionWrapper(casadi::Function f) { *this = f; }
+FunctionWrapper::FunctionWrapper(::casadi::Function f) { *this = f; }
 
 FunctionWrapper::FunctionWrapper(const FunctionWrapper& other) {
     *this = other.f_;
@@ -20,7 +22,7 @@ FunctionWrapper::~FunctionWrapper() {
     }
 }
 
-FunctionWrapper& FunctionWrapper::operator=(casadi::Function f) {
+FunctionWrapper& FunctionWrapper::operator=(::casadi::Function f) {
     if (f.is_null()) {
         return *this;
     }
@@ -41,7 +43,7 @@ FunctionWrapper& FunctionWrapper::operator=(casadi::Function f) {
 
     // Create dense matrices for the output
     for (int i = 0; i < f_.n_out(); ++i) {
-        const casadi::Sparsity& sparsity = f_.sparsity_out(i);
+        const ::casadi::Sparsity& sparsity = f_.sparsity_out(i);
         // Get sparsity data for matrix
         std::vector<casadi_int> rows, cols;
         sparsity.get_triplet(rows, cols);
@@ -103,7 +105,7 @@ void FunctionWrapper::call() {
 const Eigen::MatrixXd& FunctionWrapper::getOutput(int i) {
     // Use sparse output data to construct dense matrix
     out_[i].setZero();
-    const casadi::Sparsity& sp = f_.sparsity_out(i);
+    const ::casadi::Sparsity& sp = f_.sparsity_out(i);
     // Set non-zero entries in the dense matrix
     for (int k = 0; k < sp.nnz(); ++k) {
         out_[i](rows_[i][k], cols_[i][k]) = out_data_[i][k];
@@ -124,7 +126,7 @@ const Eigen::SparseMatrix<double>& FunctionWrapper::getOutputSparse(int i) {
 }
 
 Eigen::SparseMatrix<double> FunctionWrapper::createSparseMatrix(
-    const casadi::Sparsity& sparsity, std::vector<casadi_int>& rows,
+    const ::casadi::Sparsity& sparsity, std::vector<casadi_int>& rows,
     std::vector<casadi_int>& cols) {
     // Create Eigen::SparseMatrix from sparsity information
     Eigen::SparseMatrix<double> M(sparsity.rows(), sparsity.columns());
@@ -143,3 +145,7 @@ Eigen::SparseMatrix<double> FunctionWrapper::createSparseMatrix(
 
     return M;
 }
+
+}  // namespace casadi
+}  // namespace utils
+}  // namespace damotion
