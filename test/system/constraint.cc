@@ -33,7 +33,7 @@ TEST(HolonomicConstraint, ConstraintCreationEndEffector) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, true);
     pinocchio::Data data(model);
 
-    casadi_utils::PinocchioModelWrapper wrapper(model);
+    utils::casadi::PinocchioModelWrapper wrapper(model);
 
     // Add an end-effector
     wrapper.addEndEffector("tool0");

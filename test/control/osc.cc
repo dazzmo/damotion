@@ -16,7 +16,7 @@ class OSCTest : public testing::Test {
         pinocchio::urdf::buildModel("./ur10_robot.urdf", model_, true);
         data_ = pinocchio::Data(model_);
         // Wrap model
-        wrapper_ = casadi_utils::PinocchioModelWrapper(model_);
+        wrapper_ = utils::casadi::PinocchioModelWrapper(model_);
         // Create OSC
         damotion::control::OSCController osc_(model_.nq, model_.nv, model_.nv);
     }
@@ -26,7 +26,7 @@ class OSCTest : public testing::Test {
     damotion::control::OSCController osc0_;
     damotion::control::OSCController osc_;
 
-    casadi_utils::PinocchioModelWrapper wrapper_;
+    utils::casadi::PinocchioModelWrapper wrapper_;
 
     pinocchio::Model model_;
     pinocchio::Data data_;

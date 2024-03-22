@@ -3,7 +3,7 @@
 using namespace damotion::system;
 
 SecondOrderControlledSystem &SecondOrderControlledSystem::operator=(
-    casadi_utils::PinocchioModelWrapper model) {
+    utils::casadi::PinocchioModelWrapper model) {
     // Create a SecondOrderControlledSystem class from the model wrapper
     this->nq_ = model.model().nq;
     this->nv_ = model.model().nv;

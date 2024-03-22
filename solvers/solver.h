@@ -4,6 +4,7 @@
 #include "solvers/program.h"
 
 namespace damotion {
+namespace optimisation {
 namespace solvers {
 
 class SolverBase {
@@ -29,12 +30,12 @@ class SolverBase {
      */
     void UpdateProgram(Program& program) { prog_ = program; }
 
-    void EvaluateCost(Program::Cost& cost, const Eigen::VectorXd& x, bool grad,
+    void EvaluateCost(Cost& cost, const Eigen::VectorXd& x, bool grad,
                       bool hes);
     void EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes);
 
     // Evaluates the constraint and updates the cache for the gradients
-    void EvaluateConstraint(Program::Constraint& c, const Eigen::VectorXd& x,
+    void EvaluateConstraint(Constraint& c, const Eigen::VectorXd& x,
                             bool jac);
     void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
 
@@ -62,6 +63,7 @@ class SolverBase {
 };
 
 }  // namespace solvers
+}  // namespace optimisation
 }  // namespace damotion
 
 #endif /* CONTROL_SOLVER_H */

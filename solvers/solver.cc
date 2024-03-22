@@ -1,49 +1,59 @@
 #include "solvers/solver.h"
 
 namespace damotion {
+namespace optimisation {
 namespace solvers {
 
 SolverBase::SolverBase(Program& prog) : prog_(prog) {
     // Construct caches
     // ! Program is currently dense, look at sparse alternative soon
 
+    // Decision variables
     decision_variable_cache_ =
         Eigen::VectorXd::Zero(prog_.NumberOfDecisionVariables());
+    // Output solution vector
     primal_solution_x_ =
         Eigen::VectorXd::Zero(prog_.NumberOfDecisionVariables());
+    // Objective gradient
     objective_gradient_cache_ =
         Eigen::VectorXd::Zero(prog_.NumberOfDecisionVariables());
+    // Constraint vector
     constraint_cache_ = Eigen::VectorXd::Zero(prog_.NumberOfConstraints());
+    // Dual variables
     lambda_cache_ = Eigen::VectorXd::Zero(prog_.NumberOfConstraints());
+    // Dense constraint Jacobian
     constraint_jacobian_cache_ = Eigen::MatrixXd::Zero(
         prog_.NumberOfConstraints(), prog_.NumberOfDecisionVariables());
-
+    // Dense constraint Hessian
     lagrangian_hes_cache_ = Eigen::MatrixXd::Zero(
         prog_.NumberOfDecisionVariables(), prog_.NumberOfDecisionVariables());
 }
 
-void SolverBase::EvaluateCost(Program::Cost& cost, const Eigen::VectorXd& x,
-                              bool grad, bool hes) {
+void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x, bool grad,
+                              bool hes) {
     // Map variables
-    cost.obj.call();
-    objective_cache_ += cost.weighting() * cost.obj.getOutput(0)(0);
+    cost.ObjectiveFunction().call();
+    objective_cache_ +=
+        cost.weighting() * cost.ObjectiveFunction().getOutput(0)(0);
 
     if (grad) {
         // Evaluate the gradient of the objective
-        cost.grad.call();
-        objective_gradient_cache_ += cost.weighting() * cost.grad.getOutput(0);
+        cost.GradientFunction().call();
+        objective_gradient_cache_ +=
+            cost.weighting() * cost.GradientFunction().getOutput(0);
     }
 
     if (hes) {
         // Evaluate the hessian of the objective
-        cost.hes.call();
-        lagrangian_hes_cache_ += cost.weighting() * cost.hes.getOutput(0);
+        cost.HessianFunction().call();
+        lagrangian_hes_cache_ +=
+            cost.weighting() * cost.HessianFunction().getOutput(0);
     }
 }
 
 void SolverBase::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
     // Update program decision variables
-    prog_.UpdateDecisionVariables(x);
+    prog_.SetDecisionVariablesFromVector(x);
 
     // Reset objective
     objective_cache_ = 0.0;
@@ -58,27 +68,25 @@ void SolverBase::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
 }
 
 // Evaluates the constraint and updates the cache for the gradients
-void SolverBase::EvaluateConstraint(Program::Constraint& c,
-                                    const Eigen::VectorXd& x, bool jac) {
-    // Update variables
-    prog_.UpdateDecisionVariables(x);
-
+void SolverBase::EvaluateConstraint(Constraint& c, const Eigen::VectorXd& x,
+                                    bool jac) {
     // Evaluate the constraint
-    c.con.call();
+    c.ConstraintFunction().call();
     // Add to constraint cache
-    constraint_cache_.middleRows(c.idx(), c.dim()) = c.con.getOutput(0);
+    constraint_cache_.middleRows(c.idx(), c.dim()) =
+        c.ConstraintFunction().getOutput(0);
 
     if (jac) {
-        c.jac.call();
+        c.JacobianFunction().call();
         // ! Currently a dense jacobian
         constraint_jacobian_cache_.middleRows(c.idx(), c.dim())
-            << c.jac.getOutput(0);
+            << c.JacobianFunction().getOutput(0);
     }
 }
 
 void SolverBase::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
     // Update program decision variables
-    prog_.UpdateDecisionVariables(x);
+    prog_.SetDecisionVariablesFromVector(x);
 
     // Reset constraint vector
     constraint_cache_.setZero();
@@ -92,5 +100,6 @@ void SolverBase::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
     }
 }
 
+}  // namespace solvers
 }  // namespace optimisation
 }  // namespace damotion

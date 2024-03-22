@@ -153,17 +153,17 @@ class UA1ProfileGenerator {
     Eigen::VectorXd& getMinimumActuation() { return tau_min_; }
 
     void setZeroDynamicsCoefficientFunction(
-        casadi_utils::eigen::FunctionWrapper& fun) {
+        utils::casadi::FunctionWrapper& fun) {
         f_abc_ = fun;
     }
-    casadi_utils::eigen::FunctionWrapper& getZeroDynamicsCoefficientFunction() {
+    utils::casadi::FunctionWrapper& getZeroDynamicsCoefficientFunction() {
         return f_abc_;
     }
 
-    void setInverseDynamicsFunction(casadi_utils::eigen::FunctionWrapper& fun) {
+    void setInverseDynamicsFunction(utils::casadi::FunctionWrapper& fun) {
         f_inv_ = fun;
     }
-    casadi_utils::eigen::FunctionWrapper& getInverseDynamicsFunction() {
+    utils::casadi::FunctionWrapper& getInverseDynamicsFunction() {
         return f_inv_;
     }
 
@@ -195,13 +195,13 @@ class UA1ProfileGenerator {
     Eigen::VectorXd tau_min_;  // Minimum actuation
 
     /* Function wrappers to compute kinodynamic quantities */
-    casadi_utils::eigen::FunctionWrapper f_abc_;
-    casadi_utils::eigen::FunctionWrapper f_inv_;
+    utils::casadi::FunctionWrapper f_abc_;
+    utils::casadi::FunctionWrapper f_inv_;
 
 };
 
 casadi::Function createZeroDynamicsCoefficients(
-    casadi_utils::PinocchioModelWrapper& wrapper, int unactuated_idx);
+    utils::casadi::PinocchioModelWrapper& wrapper, int unactuated_idx);
 
 }  // namespace path_parameterisation
 }  // namespace planning

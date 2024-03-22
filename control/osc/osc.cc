@@ -26,9 +26,15 @@ void OSCController::UpdateProgramParameters() {
             DecisionVariablesUpperBound().middleRows(idx, task.Dimension())
                 << 1e8,
                 1e8, 1e8;
+            DecisionVariablesLowerBound().middleRows(idx, task.Dimension())
+                << -1e8,
+                -1e8, 0.0;
         } else {
             // No contact forces
             DecisionVariablesUpperBound()
+                .middleRows(idx, task.Dimension())
+                .setZero();
+            DecisionVariablesLowerBound()
                 .middleRows(idx, task.Dimension())
                 .setZero();
         }
@@ -37,11 +43,8 @@ void OSCController::UpdateProgramParameters() {
     // Update tracking costs
     for (auto &p : tracking_tasks_) {
         TrackingTask &task = p.second;
-        Eigen::VectorXd xacc_d = task.ComputeDesiredAcceleration();
-        SetParameter(p.first + "_xacc_d", xacc_d);
+        SetParameter(p.first + "_xacc_d", task.ComputeDesiredAcceleration());
     }
-
-    // Return itself to update the program
 }
 
 Eigen::VectorXd OSCController::TrackingTask::ComputeDesiredAcceleration() {
@@ -90,7 +93,7 @@ Eigen::VectorXd OSCController::TrackingTask::ComputeDesiredAcceleration() {
         de.bottomRows(3) -= wr;  // Rotational component
     }
 
-    // Compute desired acceleration
+    // Return desired acceleration as a PD cost on task error
     return Kp * e + Kd * de;
 }
 

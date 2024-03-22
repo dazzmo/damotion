@@ -26,9 +26,9 @@ class Cost {
         void SetGradientFunction(casadi::Function &f) { grad_ = f; }
         void SetHessianFunction(casadi::Function &f) { hes_ = f; }
 
-        casadi_utils::eigen::FunctionWrapper &ObjectiveFunction() { return obj_; }
-        casadi_utils::eigen::FunctionWrapper &GradientFunction() { return grad_; }
-        casadi_utils::eigen::FunctionWrapper &HessianFunction() { return hes_; }
+        utils::casadi::FunctionWrapper &ObjectiveFunction() { return obj_; }
+        utils::casadi::FunctionWrapper &GradientFunction() { return grad_; }
+        utils::casadi::FunctionWrapper &HessianFunction() { return hes_; }
 
         /**
          * @brief Name of the cost
@@ -66,19 +66,19 @@ class Cost {
          * @brief Objective function
          *
          */
-        casadi_utils::eigen::FunctionWrapper obj_;
+        utils::casadi::FunctionWrapper obj_;
 
         /**
          * @brief Gradient function
          *
          */
-        casadi_utils::eigen::FunctionWrapper grad_;
+        utils::casadi::FunctionWrapper grad_;
 
         /**
          * @brief Hessian function
          *
          */
-        casadi_utils::eigen::FunctionWrapper hes_;
+        utils::casadi::FunctionWrapper hes_;
     };
 
 

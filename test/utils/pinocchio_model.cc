@@ -19,7 +19,7 @@ TEST(PinocchioModelWrapper, ABATest) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    casadi_utils::PinocchioModelWrapper wrapper(model);
+    utils::casadi::PinocchioModelWrapper wrapper(model);
 
     casadi::Function aba = wrapper.aba();
 
@@ -50,7 +50,7 @@ TEST(PinocchioModelWrapper, ABATestCodegen) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    casadi_utils::PinocchioModelWrapper wrapper(model);
+    utils::casadi::PinocchioModelWrapper wrapper(model);
 
     casadi::Function aba = wrapper.aba();
     aba = casadi_utils::codegen(aba, "./tmp/");
@@ -82,7 +82,7 @@ TEST(PinocchioModelWrapper, RNEATest) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    casadi_utils::PinocchioModelWrapper wrapper(model);
+    utils::casadi::PinocchioModelWrapper wrapper(model);
 
     casadi::Function rnea = wrapper.rnea();
 
@@ -113,7 +113,7 @@ TEST(PinocchioModelWrapper, RNEATestCodegen) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    casadi_utils::PinocchioModelWrapper wrapper(model);
+    utils::casadi::PinocchioModelWrapper wrapper(model);
 
     casadi::Function rnea = wrapper.rnea();
     rnea = casadi_utils::codegen(rnea, "./tmp/");
@@ -145,7 +145,7 @@ TEST(PinocchioModelWrapper, EndEffector) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    casadi_utils::PinocchioModelWrapper wrapper(model);
+    utils::casadi::PinocchioModelWrapper wrapper(model);
 
     wrapper.addEndEffector("tool0");
 
@@ -154,7 +154,7 @@ TEST(PinocchioModelWrapper, EndEffector) {
     Eigen::VectorXd a = Eigen::VectorXd::Zero(model.nv);
 
     // Create function wrapper for end-effector function
-    casadi_utils::eigen::FunctionWrapper ee(wrapper.end_effector(0).x);
+    utils::casadi::FunctionWrapper ee(wrapper.end_effector(0).x);
     ee.setInput(0, q);
     ee.setInput(1, v);
     ee.setInput(2, a);
@@ -173,7 +173,7 @@ TEST(PinocchioModelWrapper, RNEAWithEndEffector) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    casadi_utils::PinocchioModelWrapper wrapper(model);
+    utils::casadi::PinocchioModelWrapper wrapper(model);
 
     wrapper.addEndEffector("tool0");
     Eigen::Matrix<double, 6, 3> S;
@@ -194,11 +194,11 @@ TEST(PinocchioModelWrapper, PoseError) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    casadi_utils::PinocchioModelWrapper wrapper(model);
+    utils::casadi::PinocchioModelWrapper wrapper(model);
 
     wrapper.addEndEffector("tool0");
 
-    casadi_utils::eigen::FunctionWrapper fee(
+    utils::casadi::FunctionWrapper fee(
         casadi_utils::codegen(wrapper.end_effector(0).x, "./tmp")),
         f_err(
             casadi_utils::codegen(wrapper.end_effector(0).pose_error, "./tmp"));

@@ -18,24 +18,21 @@
 #include "common/profiler.h"
 #include "system/constraint.h"
 
-// Variables at play: qacc, u, lambda
-
-using namespace casadi_utils;
-
 namespace damotion {
 namespace control {
 
-class OSCController : public solvers::Program {
+class OSCController : public optimisation::Program {
    public:
     OSCController() = default;
     ~OSCController() = default;
 
     OSCController(int nq, int nv, int nu) : nq_(nq), nv_(nv) {
-        // Add default variables and parameters to map
+        // Add default variables to the problem
         AddVariables("qacc", nv);
         AddVariables("ctrl", nu);
         AddVariables("lam", 0);
 
+        // Default parameters to the problem
         AddParameters("qpos", nq);
         AddParameters("qvel", nv);
     }
@@ -56,15 +53,22 @@ class OSCController : public solvers::Program {
         const int ConstraintForceIndex() const { return lam_idx_; }
 
         void SetFunction(const casadi::Function &f) {
-            f_ = eigen::FunctionWrapper(f);
+            f_ = utils::casadi::FunctionWrapper(f);
         }
-        eigen::FunctionWrapper &Function() { return f_; }
+
+        /**
+         * @brief Function that computes the holonomic constraint c(q) and its
+         * first and second derivatives in time.
+         *
+         * @return utils::casadi::FunctionWrapper&
+         */
+        utils::casadi::FunctionWrapper &Function() { return f_; }
 
        private:
         int dim_ = 0;
         int lam_idx_ = -1;
         std::string name_;
-        eigen::FunctionWrapper f_;
+        utils::casadi::FunctionWrapper f_;
     };
 
     // Associated with tracking a given point in SE(3)
@@ -116,6 +120,14 @@ class OSCController : public solvers::Program {
         Eigen::Vector3d xr;
     };
 
+    /**
+     * @brief Creates a holonomic constraint based on the function c, adding any
+     * additional parameters to the program.
+     *
+     * @param name
+     * @param c
+     * @param constraint
+     */
     void CreateHolonomicConstraint(const std::string &name, casadi::Function &c,
                                    HolonomicConstraint &constraint) {
         constraint.SetName(name);
@@ -178,7 +190,7 @@ class OSCController : public solvers::Program {
         holonomic_constraints_[name] = constraint;
     }
 
-    void AddDynamics(casadi::Function &f) { fdyn_ = f; }
+    void AddSystemDynamicsFunction(casadi::Function &f) { fdyn_ = f; }
 
     TrackingTask &GetTrackingTask(const std::string &name) {
         if (tracking_tasks_.find(name) == tracking_tasks_.end()) {
@@ -212,8 +224,9 @@ class OSCController : public solvers::Program {
 
         // Create tracking error against desired task acceleration
         Eigen::VectorX<casadi::SX> xacc_e, xacc_d_e;
-        eigen::toEigen(d2cdt2, xacc_e);
-        eigen::toEigen(GetParameters(task.name() + "_xacc_d"), xacc_d_e);
+        utils::casadi::toEigen(d2cdt2, xacc_e);
+        utils::casadi::toEigen(GetParameters(task.name() + "_xacc_d"),
+                               xacc_d_e);
 
         // Create tracking cost
         casadi::SX obj = 0;
@@ -227,16 +240,12 @@ class OSCController : public solvers::Program {
         }
 
         in.push_back(GetParameters(task.name() + "_xacc_d"));
-        inames.push_back(task.name() + "_xacc_d");
 
-        // Create cost and derivatives given the optimisation vector x
-        Program::Cost cost(task.name() + "_tracking_cost", obj, in, inames,
-                           DecisionVariableVector());
+        // Add cost to the program
+        AddCost(task.name() + "_tracking_cost", obj, in);
 
         // Register function data to task
-        SetFunctionData(task.Function());
-        // Add tracking cost to program
-        AddCost(task.name() + "_tracking_cost", cost);
+        SetFunctionInputData(task.Function());
     }
 
     void RegisterContactTask(ContactTask &task) {
@@ -254,27 +263,18 @@ class OSCController : public solvers::Program {
         casadi::SX xacc = d2cdt2(casadi::Slice(0, 3));
 
         /* No-slip constraint */
-        Constraint c(task.name() + "_no_slip", xacc, in, inames,
-                     DecisionVariableVector());
-
-        // Set equality bounds
-        c.lb().setZero();
-        c.ub().setZero();
-
-        // Add constraint to program
-        AddConstraint(task.name() + "_no_slip", c);
+        AddConstraint(task.name() + "_no_slip", xacc, in,
+                      optimisation::BoundsType::kEquality);
 
         /* Friction cone constraint */
         // Get contact forces from force vector
         int idx = task.ConstraintForceIndex();
         casadi::SX lam = GetVariables("lam")(casadi::Slice(idx, idx + 3));
 
-        Constraint friction = FrictionConeConstraint(task.name(), lam);
-        // Add constraint to program
-        AddConstraint(task.name() + "_friction", friction);
+        AddFrictionConeConstraint(task.name(), lam);
 
         // Register function data to task
-        SetFunctionData(task.Function());
+        SetFunctionInputData(task.Function());
     }
 
     void RegisterHolonomicConstraint(HolonomicConstraint &con) {
@@ -288,12 +288,9 @@ class OSCController : public solvers::Program {
         // Get second time derivative of constraint
         casadi::SX d2cdt2 = con.Function().f()(in)[2];
         // Set second rate of change of constraint to zero to ensure no change
-        Constraint c(con.name(), d2cdt2, in, inames, DecisionVariableVector());
-        // Set constraint bounds to zero
-        c.lb().setZero();
-        c.ub().setZero();
         // Add constraint to program
-        AddConstraint(con.name(), c);
+        AddConstraint(con.name(), d2cdt2, in,
+                      optimisation::BoundsType::kEquality);
     }
 
     // Given all information for the problem, initialise the program
@@ -348,8 +345,8 @@ class OSCController : public solvers::Program {
      *
      * @param lambda
      */
-    Constraint FrictionConeConstraint(const std::string &name,
-                                      casadi::SX &lambda) {
+    void AddFrictionConeConstraint(const std::string &name,
+                                   casadi::SX &lambda) {
         // Square pyramid approximation
         casadi::SX l_x = lambda(0), l_y = lambda(1), l_z = lambda(2);
 
@@ -363,18 +360,14 @@ class OSCController : public solvers::Program {
         cone(2) = sqrt(2.0) * l_y + mu * l_z;
         cone(3) = -sqrt(2.0) * l_y - mu * l_z;
 
-        Constraint c_cone(
-            name, cone,
-            {GetVariables("qacc"), GetVariables("ctrl"), GetVariables("lam"),
-             GetParameters(name + "_friction_mu")},
-            {"qacc", "ctrl", "lam", name + "_friction_mu"},
-            DecisionVariableVector());
+        casadi::SXVector in = {GetVariables("qacc"), GetVariables("ctrl"),
+                               GetVariables("lam"),
+                               GetParameters(name + "_friction_mu")};
 
-        // Set constraint to be positive
-        c_cone.lb().setZero();
-        c_cone.ub().setConstant(1e8);
+        AddConstraint(name + "_friction", cone, in,
+                      optimisation::BoundsType::kPositive);
 
-        return c_cone;
+        // ! Need to add constraint bounds
     }
 
     void UpdateContactFrictionCoefficient(const std::string &name,
@@ -474,14 +467,7 @@ class OSCController : public solvers::Program {
         in.push_back(GetVariables("lam"));
         inames.push_back("lam");
 
-        // Create constraint from the function and add it to the program
-        Constraint c("dynamics", dyn, in, inames, DecisionVariableVector());
-        
-        // Equality constraints
-        c.lb().setZero();
-        c.ub().setZero();
-        
-        AddConstraint("dynamics", c);
+        AddConstraint("dynamics", dyn, in, optimisation::BoundsType::kEquality);
 
         // ? If projected dynamics, compute null-space dynamics independently
         // ? (i.e. using Eigen)

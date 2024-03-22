@@ -4,6 +4,7 @@
 #include <Eigen/Core>
 #include <casadi/casadi.hpp>
 
+#include "solvers/bounds.h"
 #include "utils/eigen_wrapper.h"
 
 namespace damotion {
@@ -16,9 +17,8 @@ class Constraint {
 
     Constraint(const std::string &name, const int dim)
         : name_(name), dim_(dim) {
-        double inf = std::numeric_limits<double>::infinity();
-        lb_ = -inf * Eigen::VectorXd::Ones(dim_);
-        ub_ = inf * Eigen::VectorXd::Ones(dim_);
+        lb_ = -Eigen::VectorXd::Ones(dim_);
+        ub_ = Eigen::VectorXd::Ones(dim_);
     }
 
     void SetSymbolicConstraint(const casadi::SX &c) { c_ = c; }
@@ -34,6 +34,12 @@ class Constraint {
     utils::casadi::FunctionWrapper &ConstraintFunction() { return con_; }
     utils::casadi::FunctionWrapper &JacobianFunction() { return jac_; }
     utils::casadi::FunctionWrapper &HessianFunction() { return hes_; }
+
+    const BoundsType &GetBoundsType() const { return bounds_type_; }
+    void SetBoundsType(const BoundsType &type) {
+        bounds_type_ = type;
+        SetBounds(ub_, lb_, bounds_type_);
+    }
 
     /**
      * @brief Name of the constraint
@@ -112,6 +118,8 @@ class Constraint {
 
     // Name of the constraint
     std::string name_;
+
+    BoundsType bounds_type_ = BoundsType::kUnbounded;
 
     // Underlying symbolic representation of constraint
     casadi::SX c_;

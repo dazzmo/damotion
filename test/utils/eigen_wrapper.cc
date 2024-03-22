@@ -11,7 +11,7 @@ TEST(EigenWrapper, EigenWrapperLoad) {
     casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
     casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});
 
-    casadi_utils::eigen::FunctionWrapper wrapper(f);
+    utils::casadi::FunctionWrapper wrapper(f);
 
     // Evaluate function
     Eigen::VectorXd x_in(1), y_in(1), output(1);
@@ -52,7 +52,7 @@ TEST(EigenWrapper, EigenWrapperSparse) {
 
     casadi::Function f("sparse_test", {x}, {y}, {"x"}, {"y"});
 
-    casadi_utils::eigen::FunctionWrapper wrapper(
+    utils::casadi::FunctionWrapper wrapper(
         casadi_utils::codegen(f, "./tmp"));
 
     // Evaluate function
@@ -75,7 +75,7 @@ TEST(EigenWrapper, EigenWrapperCodegenLoad) {
     casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
     casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});
 
-    casadi_utils::eigen::FunctionWrapper wrapper(
+    utils::casadi::FunctionWrapper wrapper(
         casadi_utils::codegen(f, "./tmp"));
 
     // Evaluate function

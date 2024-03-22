@@ -122,7 +122,7 @@ UA1ProfileGenerator::Status UA1ProfileGenerator::ComputeProfile(
 }
 
 casadi::Function createZeroDynamicsCoefficients(
-    casadi_utils::PinocchioModelWrapper& wrapper, int unactuated_idx) {
+    utils::casadi::PinocchioModelWrapper& wrapper, int unactuated_idx) {
     typedef casadi::SX Scalar;
     int nq = wrapper.model().nq;
 

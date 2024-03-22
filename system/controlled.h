@@ -119,12 +119,12 @@ class SecondOrderControlledSystem : public ControlledSystem {
     SecondOrderControlledSystem(int nq, int nv, int nu)
         : ControlledSystem(nq, nv, nu) {}
 
-    SecondOrderControlledSystem(casadi_utils::PinocchioModelWrapper &wrapper) { *this = wrapper; }
+    SecondOrderControlledSystem(utils::casadi::PinocchioModelWrapper &wrapper) { *this = wrapper; }
 
     ~SecondOrderControlledSystem() = default;
 
     SecondOrderControlledSystem &operator=(
-        casadi_utils::PinocchioModelWrapper wrapper);
+        utils::casadi::PinocchioModelWrapper wrapper);
 
     /**
      * @brief Dimension of the configuration of the system
