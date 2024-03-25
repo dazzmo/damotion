@@ -16,34 +16,34 @@ void OSCController::UpdateProgramParameters() {
         "OSCController::UpdateProgramParameters");
 
     // Adjust bounds on contact forces depending on contact states
+    Eigen::MatrixXd &lb = GetDecisionVariables("lam").LowerBound();
+    Eigen::MatrixXd &ub = GetDecisionVariables("lam").UpperBound();
+
     for (auto &p : contact_tasks_) {
         ContactTask &task = p.second;
         // Get index of contact forces in optimisation variable
-        int idx = GetVariableIndex("lam") + task.ConstraintForceIndex();
+        // Get upper and lower bounds for lambda
+        int idx = task.ConstraintForceIndex();
+
         // Update conditions on end-effectors
         if (task.inContact) {
             // Update bounds for lambda
-            DecisionVariablesUpperBound().middleRows(idx, task.Dimension())
-                << 1e8,
-                1e8, 1e8;
-            DecisionVariablesLowerBound().middleRows(idx, task.Dimension())
-                << -1e8,
-                -1e8, 0.0;
+            ub.middleRows(idx, task.Dimension()) << 1e8, 1e8, 1e8;
+            lb.middleRows(idx, task.Dimension()) << -1e8, -1e8, 0.0;
         } else {
             // No contact forces
-            DecisionVariablesUpperBound()
-                .middleRows(idx, task.Dimension())
-                .setZero();
-            DecisionVariablesLowerBound()
-                .middleRows(idx, task.Dimension())
-                .setZero();
+            ub.middleRows(idx, task.Dimension()).setZero();
+            lb.middleRows(idx, task.Dimension()).setZero();
         }
     }
+
+    // Update bounds for the lam variables
+    UpdateDecisionVariableVectorBounds("lam");
 
     // Update tracking costs
     for (auto &p : tracking_tasks_) {
         TrackingTask &task = p.second;
-        SetParameter(p.first + "_xacc_d", task.ComputeDesiredAcceleration());
+        SetParameters(p.first + "_xacc_d", task.ComputeDesiredAcceleration());
     }
 }
 

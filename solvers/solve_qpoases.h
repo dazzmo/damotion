@@ -1,7 +1,5 @@
 #ifndef CONTROL_SOLVE_QPOASES_H
 #define CONTROL_SOLVE_QPOASES_H
-#ifndef SOLVE_QPOASES_H
-#define SOLVE_QPOASES_H
 
 #include <qpOASES.hpp>
 
@@ -9,6 +7,7 @@
 #include "solvers/solver.h"
 
 namespace damotion {
+namespace optimisation {
 namespace solvers {
 
 class QPOASESSolverInstance : public SolverBase {
@@ -63,8 +62,13 @@ class QPOASESSolverInstance : public SolverBase {
         // 0.5 x^T Q x + g^T x
         lagrangian_hes_cache_ *= 2.0;
 
-        // Evaluate constraints and Jacobian
-        EvaluateConstraints(x, true);
+        // Constraints of the form c = A x + b
+        // Update constraint bounds
+        // lbA - b <= Ax <= ubA - b
+        Eigen::VectorXd lbA = GetCurrentProgram().ConstraintsLowerBound() -
+                              constraint_linearised_b_cache_;
+        Eigen::VectorXd ubA = GetCurrentProgram().ConstraintsUpperBound() -
+                              constraint_linearised_b_cache_;
 
         // TODO - Map to row major
 
@@ -76,16 +80,14 @@ class QPOASESSolverInstance : public SolverBase {
                       constraint_jacobian_cache_.data(),
                       GetCurrentProgram().DecisionVariablesLowerBound().data(),
                       GetCurrentProgram().DecisionVariablesUpperBound().data(),
-                      GetCurrentProgram().ConstraintsLowerBound().data(),
-                      GetCurrentProgram().ConstraintsUpperBound().data(), nWSR);
+                      lbA.data(), ubA.data(), nWSR);
         } else {
             qp_->hotstart(
                 lagrangian_hes_cache_.data(), objective_gradient_cache_.data(),
                 constraint_jacobian_cache_.data(),
                 GetCurrentProgram().DecisionVariablesLowerBound().data(),
                 GetCurrentProgram().DecisionVariablesUpperBound().data(),
-                GetCurrentProgram().ConstraintsLowerBound().data(),
-                GetCurrentProgram().ConstraintsUpperBound().data(), nWSR);
+                lbA.data(), ubA.data(), nWSR);
         }
 
         // Get primal solution
@@ -128,7 +130,7 @@ class QPOASESSolver {
 };
 
 }  // namespace solvers
+}  // namespace optimisation
 }  // namespace damotion
-#endif /* SOLVE_QPOASES_H */
 
-#endif /* CONTROL_SOLVE_QPOASES_H */
+#endif /* SOLVE_QPOASES_H */

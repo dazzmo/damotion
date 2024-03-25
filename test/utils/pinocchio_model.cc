@@ -5,7 +5,6 @@
 #include "pinocchio/parsers/urdf.hpp"
 #include "utils/codegen.h"
 
-using namespace casadi_utils::eigen;
 
 TEST(PinocchioModelWrapper, LoadModel) {
     pinocchio::Model model;
@@ -19,7 +18,7 @@ TEST(PinocchioModelWrapper, ABATest) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    utils::casadi::PinocchioModelWrapper wrapper(model);
+    damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
     casadi::Function aba = wrapper.aba();
 
@@ -33,14 +32,14 @@ TEST(PinocchioModelWrapper, ABATest) {
 
     // Compute through function
     casadi::DM qd, vd, ud;
-    toCasadi(q, qd);
-    toCasadi(v, vd);
-    toCasadi(tau, ud);
+    damotion::utils::casadi::toCasadi(q, qd);
+    damotion::utils::casadi::toCasadi(v, vd);
+    damotion::utils::casadi::toCasadi(tau, ud);
 
     casadi::DM ad = aba(casadi::DMVector({qd, vd, ud}))[0];
 
     Eigen::VectorXd ac;
-    toEigen(ad, ac);
+    damotion::utils::casadi::toEigen(ad, ac);
 
     EXPECT_TRUE(a.isApprox(ac));
 }
@@ -50,10 +49,10 @@ TEST(PinocchioModelWrapper, ABATestCodegen) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    utils::casadi::PinocchioModelWrapper wrapper(model);
+    damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
     casadi::Function aba = wrapper.aba();
-    aba = casadi_utils::codegen(aba, "./tmp/");
+    aba = damotion::utils::casadi::codegen(aba, "./tmp/");
 
     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
     Eigen::VectorXd v(model.nv);
@@ -65,14 +64,14 @@ TEST(PinocchioModelWrapper, ABATestCodegen) {
 
     // Compute through function
     casadi::DM qd, vd, ud;
-    toCasadi(q, qd);
-    toCasadi(v, vd);
-    toCasadi(tau, ud);
+    damotion::utils::casadi::toCasadi(q, qd);
+    damotion::utils::casadi::toCasadi(v, vd);
+    damotion::utils::casadi::toCasadi(tau, ud);
 
     casadi::DM ad = aba(casadi::DMVector({qd, vd, ud}))[0];
 
     Eigen::VectorXd ac;
-    toEigen(ad, ac);
+    damotion::utils::casadi::toEigen(ad, ac);
 
     EXPECT_TRUE(a.isApprox(ac));
 }
@@ -82,7 +81,7 @@ TEST(PinocchioModelWrapper, RNEATest) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    utils::casadi::PinocchioModelWrapper wrapper(model);
+    damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
     casadi::Function rnea = wrapper.rnea();
 
@@ -96,14 +95,14 @@ TEST(PinocchioModelWrapper, RNEATest) {
 
     // Compute through function
     casadi::DM qd, vd, ad;
-    toCasadi(q, qd);
-    toCasadi(v, vd);
-    toCasadi(a, ad);
+    damotion::utils::casadi::toCasadi(q, qd);
+    damotion::utils::casadi::toCasadi(v, vd);
+    damotion::utils::casadi::toCasadi(a, ad);
 
     casadi::DM ud = rnea(casadi::DMVector({qd, vd, ad}))[0];
 
     Eigen::VectorXd uc;
-    toEigen(ud, uc);
+    damotion::utils::casadi::toEigen(ud, uc);
 
     EXPECT_TRUE(u.isApprox(uc));
 }
@@ -113,10 +112,10 @@ TEST(PinocchioModelWrapper, RNEATestCodegen) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    utils::casadi::PinocchioModelWrapper wrapper(model);
+    damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
     casadi::Function rnea = wrapper.rnea();
-    rnea = casadi_utils::codegen(rnea, "./tmp/");
+    rnea = damotion::utils::casadi::codegen(rnea, "./tmp/");
 
     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
     Eigen::VectorXd v(model.nv);
@@ -128,14 +127,14 @@ TEST(PinocchioModelWrapper, RNEATestCodegen) {
 
     // Compute through function
     casadi::DM qd, vd, ad;
-    toCasadi(q, qd);
-    toCasadi(v, vd);
-    toCasadi(a, ad);
+    damotion::utils::casadi::toCasadi(q, qd);
+    damotion::utils::casadi::toCasadi(v, vd);
+    damotion::utils::casadi::toCasadi(a, ad);
 
     casadi::DM ud = rnea(casadi::DMVector({qd, vd, ad}))[0];
 
     Eigen::VectorXd uc;
-    toEigen(ud, uc);
+    damotion::utils::casadi::toEigen(ud, uc);
 
     EXPECT_TRUE(u.isApprox(uc));
 }
@@ -145,7 +144,7 @@ TEST(PinocchioModelWrapper, EndEffector) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    utils::casadi::PinocchioModelWrapper wrapper(model);
+    damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
     wrapper.addEndEffector("tool0");
 
@@ -154,7 +153,7 @@ TEST(PinocchioModelWrapper, EndEffector) {
     Eigen::VectorXd a = Eigen::VectorXd::Zero(model.nv);
 
     // Create function wrapper for end-effector function
-    utils::casadi::FunctionWrapper ee(wrapper.end_effector(0).x);
+    damotion::utils::casadi::FunctionWrapper ee(wrapper.end_effector(0).x);
     ee.setInput(0, q);
     ee.setInput(1, v);
     ee.setInput(2, a);
@@ -173,7 +172,7 @@ TEST(PinocchioModelWrapper, RNEAWithEndEffector) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    utils::casadi::PinocchioModelWrapper wrapper(model);
+    damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
     wrapper.addEndEffector("tool0");
     Eigen::Matrix<double, 6, 3> S;
@@ -194,14 +193,14 @@ TEST(PinocchioModelWrapper, PoseError) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
     pinocchio::Data data(model);
 
-    utils::casadi::PinocchioModelWrapper wrapper(model);
+    damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
     wrapper.addEndEffector("tool0");
 
-    utils::casadi::FunctionWrapper fee(
-        casadi_utils::codegen(wrapper.end_effector(0).x, "./tmp")),
+    damotion::utils::casadi::FunctionWrapper fee(
+        damotion::utils::casadi::codegen(wrapper.end_effector(0).x, "./tmp")),
         f_err(
-            casadi_utils::codegen(wrapper.end_effector(0).pose_error, "./tmp"));
+            damotion::utils::casadi::codegen(wrapper.end_effector(0).pose_error, "./tmp"));
 
     // Get two random configurations and compute transforms
     Eigen::VectorXd q0 = pinocchio::randomConfiguration(model),

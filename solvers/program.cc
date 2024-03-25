@@ -64,6 +64,36 @@ void Program::RemoveDecisionVariables(const std::string &name) {
     }
 }
 
+void Program::UpdateDecisionVariableVectorBounds(const std::string &name) {
+    int id = GetDecisionVariablesId(name);
+    assert(id >= 0 && "Variable not found in program!\n");
+    lbx_.middleRows(variables_idx_[id], variables_[id].sz()) =
+        variables_[id].LowerBound();
+    ubx_.middleRows(variables_idx_[id], variables_[id].sz()) =
+        variables_[id].UpperBound();
+}
+
+void Program::UpdateDecisionVariableVectorBounds() {
+    for (auto &v : variables_id_) {
+        UpdateDecisionVariableVectorBounds(v.first);
+    }
+}
+
+void Program::UpdateConstraintVectorBounds(const std::string &name) {
+    int id = GetConstraintId(name);
+    assert(id >= 0 && "Constraint not found in program!\n");
+    lbg_.middleRows(constraints_idx_[id], constraints_[id].dim()) =
+        constraints_[id].lb();
+    ubg_.middleRows(constraints_idx_[id], constraints_[id].dim()) =
+        constraints_[id].ub();
+}
+
+void Program::UpdateConstraintVectorBounds() {
+    for (auto &c : constraints_id_) {
+        UpdateConstraintVectorBounds(c.first);
+    }
+}
+
 inline bool Program::IsParameter(const std::string &name) {
     // Indicate if it is present in the parameter map
     return parameters_id_.find(name) != parameters_id_.end();
@@ -190,7 +220,7 @@ void Program::AddParameters(const std::string &name, const int n, const int m) {
 }
 
 void Program::SetParameters(const std::string &name,
-                           const Eigen::MatrixXd &val) {
+                            const Eigen::MatrixXd &val) {
     int id = GetParametersId(name);
     if (id >= 0) {
         parameters_[id].val() << val;
@@ -203,12 +233,15 @@ void Program::SetFunctionInputData(utils::casadi::FunctionWrapper &f) {
     for (int i = 0; i < f.f().n_in(); ++i) {
         std::string name = f.f().name_in(i);
         if (IsDecisionVariable(name)) {
+            // Set variable input data as sub-vector of optimisation vector
             f.setInput(f.f().index_in(name),
-                       variables_[variables_id_[name]].val());
+                       x_.val().data() + variables_idx_[variables_id_[name]]);
         } else if (IsParameter(name)) {
+            // Set parameter input data as vector in parameter map
             f.setInput(f.f().index_in(name),
                        parameters_[parameters_id_[name]].val());
         } else {
+            // Throw warning that the input was not found
             std::cout << "Input " << name << " is not registered in program!\n";
         }
     }
@@ -230,14 +263,13 @@ void Program::ConstructDecisionVariableVector(
     }
 
     // Create optimisation vector
-    x_ = casadi::SX::vertcat(x);
-
-    // Set number of decision variables
-    nx_ = x_.size1();
+    x_ = Variable("x", idx);
+    // Symbolic vector
+    x_.sym() = casadi::SX::vertcat(x);
 
     // Create bounds for the variables
-    lbx_.resize(nx_);
-    ubx_.resize(nx_);
+    lbx_.resize(x_.sz());
+    ubx_.resize(x_.sz());
 
     lbx_.setConstant(-std::numeric_limits<double>::infinity());
     ubx_.setConstant(std::numeric_limits<double>::infinity());
@@ -287,19 +319,23 @@ casadi::SXVector Program::GetSymbolicFunctionInput(
     return in;
 }
 
+std::string Program::GetSXName(const casadi::SX &x) {
+    // Get first element of the SX matrix
+    std::string name = x(0).name();
+    // Remove trailing '_0' to get variable name
+    if (name.substr(name.size() - 2) == "_0") {
+        name = name.substr(0, name.size() - 2);
+    }
+
+    // Return the name of the vector
+    return name;
+}
+
 casadi::StringVector Program::GetSXVectorNames(const casadi::SXVector &x) {
     casadi::StringVector inames = {};
 
     for (casadi::SX xi : x) {
-        // Get the name of the symbol
-        std::string name = xi(0).name();
-
-        // Remove trailing '_0' to get variable name
-        if (name.substr(name.size() - 2) == "_0") {
-            name = name.substr(0, name.size() - 2);
-        }
-
-        inames.push_back(name);
+        inames.push_back(GetSXName(xi));
     }
 
     return inames;
@@ -343,30 +379,50 @@ void Program::AddConstraint(const std::string &name, casadi::SX &constraint,
     constraints_.push_back(c);
 }
 
-void Program::SetUpCost(Cost &cost) {
+void Program::SetUpCost(Cost &cost, const casadi::SXVector &x) {
     // With initialised program, create cost using given vector
     casadi::StringVector inames = GetSXVectorNames(cost.SymbolicInputs());
-    casadi::SX &x = DecisionVariableVector();
+
+    casadi::SX J = cost.SymbolicObjective();
 
     // Create functions to compute the necessary gradients and hessians
     /* Objective */
-    casadi::Function obj = casadi::Function(
-        cost.name() + "_obj", cost.SymbolicInputs(), {cost.SymbolicObjective()},
-        inames, {cost.name() + "_obj"});
+    casadi::Function obj =
+        casadi::Function(cost.name() + "_obj", cost.SymbolicInputs(), {J},
+                         inames, {cost.name() + "_obj"});
 
     cost.SetObjectiveFunction(obj);
 
     /* Objective Gradient */
-    casadi::Function grad =
-        casadi::Function(cost.name() + "_grad", cost.SymbolicInputs(),
-                         {gradient(cost.SymbolicObjective(), x)}, inames,
-                         {cost.name() + "_grad"});
+    // ! See if this is going to work
+    casadi::SXVector g;
+    casadi::StringVector g_names;
+    for (const casadi::SX &xi : x) {
+        // Compute gradients of cost with respect to variable set x
+        g.push_back(gradient(J, xi));
+        g_names.push_back(cost.name() + "_grad_" + GetSXName(xi));
+    }
+
+    casadi::Function grad = casadi::Function(
+        cost.name() + "_grad", cost.SymbolicInputs(), g, inames, g_names);
     cost.SetGradientFunction(grad);
+
+    casadi::SXVector H;
+    casadi::StringVector H_names;
+
+    // Compute Hessians for given partitioning
+    for (int i = 0; i < x.size(); ++i) {
+        for (int j = i; i < x.size(); ++j) {
+            // TODO: Look at making only upper triangular for diagonal terms
+            H.push_back(jacobian(gradient(J, x[i]).T(), x[j]));
+            H_names.push_back(cost.name() + "_hes_" + GetSXName(x[i]) + "_" +
+                              GetSXName(x[j]));
+        }
+    }
 
     /* Objective Hessian */
     casadi::Function hes = casadi::Function(
-        cost.name() + "_hes", cost.SymbolicInputs(),
-        {hessian(cost.SymbolicObjective(), x)}, inames, {cost.name() + "_hes"});
+        cost.name() + "_hes", cost.SymbolicInputs(), H, inames, H_names);
 
     cost.SetHessianFunction(hes);
 
@@ -378,7 +434,7 @@ void Program::SetUpCost(Cost &cost) {
 
 void Program::SetUpCosts() {
     for (Cost &c : costs_) {
-        SetUpCost(c);
+        // SetUpCost(c); // TODO - Fix this
     }
     // ! Delete data for the costs to free up space
 }
@@ -386,7 +442,7 @@ void Program::SetUpCosts() {
 void Program::SetUpConstraint(Constraint &constraint) {
     // With initialised program, create constraint using given vector
     casadi::StringVector inames = GetSXVectorNames(constraint.SymbolicInputs());
-    casadi::SX &x = DecisionVariableVector();
+    casadi::SX &x = DecisionVariableVector().sym();
 
     // Create functions to compute the necessary gradients and hessians
 
@@ -396,18 +452,29 @@ void Program::SetUpConstraint(Constraint &constraint) {
                          {constraint.SymbolicConstraint()}, inames,
                          {constraint.name() + "_con"});
 
-    /* Objective Gradient */
+    /* Constraint Jacobian */
     casadi::Function jac(constraint.name() + "_jac",
                          constraint.SymbolicInputs(),
                          {jacobian(constraint.SymbolicConstraint(), x)}, inames,
                          {constraint.name() + "_jac"});
 
+    /* Linearised constraint */
+    // c(x) = A x + b = A(x - x0) + c(x0) = A x + (c(x0) - A x0)
+    // casadi::SX A = jacobian(constraint.SymbolicConstraint(), x);
+    // casadi::SX b = constraint.SymbolicConstraint() - casadi::SX::mtimes(A, x);
+
+    // casadi::Function lin(constraint.name() + "_linearised",
+    //                      {constraint.SymbolicInputs()}, {A, b}, inames,
+    //                      {constraint.name() + "_A", constraint.name() + "_b"});
+
     constraint.SetConstraintFunction(con);
     constraint.SetJacobianFunction(jac);
+    // constraint.SetLinearisedConstraintFunction(lin);
 
     // Set inputs for the functions
     SetFunctionInputData(constraint.ConstraintFunction());
     SetFunctionInputData(constraint.JacobianFunction());
+    // SetFunctionInputData(constraint.LinearisedConstraintFunction());
 }
 
 void Program::SetUpConstraints() {
@@ -422,20 +489,28 @@ void Program::ListParameters() {
     std::cout << "Parameter\tCurrent Value\n";
     std::cout << "----------------------\n";
     for (auto p : parameters_id_) {
-        Eigen::VectorXd &par = parameters_data_[p.second];
-        for (int i = 0; i < par.size(); i++) {
-            std::cout << p.first << "_" << i << '\t' << par(i) << '\n';
+        Variable &v = parameters_[p.second];
+        for (int i = 0; i < v.rows(); i++) {
+            for (int j = 0; j < v.cols(); j++) {
+                std::cout << p.first << "_" << i << "_" << j << '\t'
+                          << v.val()(i, j) << '\n';
+            }
         }
     }
 }
 
 void Program::ListVariables() {
     std::cout << "----------------------\n";
-    std::cout << "Variable\tSize\n";
+    std::cout << "Variable\tCurrent Value\n";
     std::cout << "----------------------\n";
     for (auto p : variables_id_) {
-        casadi::SX &v = variables_[p.second];
-        std::cout << p.first << '\t' << v.size() << '\n';
+        Variable &v = variables_[p.second];
+        for (int i = 0; i < v.rows(); i++) {
+            for (int j = 0; j < v.cols(); j++) {
+                std::cout << p.first << "_" << i << "_" << j << '\t'
+                          << v.val()(i, j) << '\n';
+            }
+        }
     }
 }
 
@@ -468,8 +543,8 @@ void Program::PrintProgramSummary() {
               << '\n';
     std::cout << "Variables\tSize\n";
     for (auto p : variables_id_) {
-        casadi::SX &v = variables_[p.second];
-        std::cout << p.first << '\t' << v.size() << '\n';
+        Variable &v = variables_[p.second];
+        std::cout << p.first << '\t' << v.sym().size() << '\n';
     }
     std::cout << "Number of Constraints: " << NumberOfConstraints() << '\n';
     std::cout << "Constraint\tSize\n";
@@ -477,13 +552,12 @@ void Program::PrintProgramSummary() {
         std::cout << p.first << "\t[" << constraints_[p.second].dim()
                   << ",1]\n";
     }
-    // ! Fix the number of parameters
     std::cout << "Number of Parameters: "
               << "TBD" << '\n';
     std::cout << "Parameters\tSize\n";
     for (auto p : parameters_id_) {
-        casadi::SX &v = parameters_[p.second];
-        std::cout << p.first << '\t' << v.size() << '\n';
+        Variable &v = parameters_[p.second];
+        std::cout << p.first << '\t' << v.sym().size() << '\n';
     }
     std::cout << "-----------------------\n";
 }

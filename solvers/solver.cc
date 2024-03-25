@@ -24,6 +24,11 @@ SolverBase::SolverBase(Program& prog) : prog_(prog) {
     // Dense constraint Jacobian
     constraint_jacobian_cache_ = Eigen::MatrixXd::Zero(
         prog_.NumberOfConstraints(), prog_.NumberOfDecisionVariables());
+
+    // Dense linearised Jacobian component
+    constraint_linearised_b_cache_ =
+        Eigen::VectorXd::Zero(prog_.NumberOfConstraints());
+
     // Dense constraint Hessian
     lagrangian_hes_cache_ = Eigen::MatrixXd::Zero(
         prog_.NumberOfDecisionVariables(), prog_.NumberOfDecisionVariables());
@@ -62,8 +67,8 @@ void SolverBase::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
         objective_gradient_cache_.setZero();
     }
     // Loop through all constraints
-    for (auto& c : prog_.Costs()) {
-        EvaluateCost(c.second, x, grad, hes);
+    for (Cost& c : prog_.GetCosts()) {
+        EvaluateCost(c, x, grad, hes);
     }
 }
 
@@ -77,10 +82,15 @@ void SolverBase::EvaluateConstraint(Constraint& c, const Eigen::VectorXd& x,
         c.ConstraintFunction().getOutput(0);
 
     if (jac) {
+        c.LinearisedConstraintFunction().call();
         c.JacobianFunction().call();
         // ! Currently a dense jacobian
         constraint_jacobian_cache_.middleRows(c.idx(), c.dim())
             << c.JacobianFunction().getOutput(0);
+
+        // Add Jacobian and constant component
+        constraint_linearised_b_cache_.middleRows(c.idx(), c.dim())
+            << c.LinearisedConstraintFunction().getOutput(1);
     }
 }
 
@@ -95,8 +105,8 @@ void SolverBase::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
         constraint_jacobian_cache_.setZero();
     }
     // Loop through all constraints
-    for (auto& c : prog_.Constraints()) {
-        EvaluateConstraint(c.second, x, jac);
+    for (Constraint& c : prog_.GetConstraints()) {
+        EvaluateConstraint(c, x, jac);
     }
 }
 

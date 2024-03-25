@@ -16,7 +16,7 @@ class OSCTest : public testing::Test {
         pinocchio::urdf::buildModel("./ur10_robot.urdf", model_, true);
         data_ = pinocchio::Data(model_);
         // Wrap model
-        wrapper_ = utils::casadi::PinocchioModelWrapper(model_);
+        wrapper_ = damotion::utils::casadi::PinocchioModelWrapper(model_);
         // Create OSC
         damotion::control::OSCController osc_(model_.nq, model_.nv, model_.nv);
     }
@@ -26,7 +26,7 @@ class OSCTest : public testing::Test {
     damotion::control::OSCController osc0_;
     damotion::control::OSCController osc_;
 
-    utils::casadi::PinocchioModelWrapper wrapper_;
+    damotion::utils::casadi::PinocchioModelWrapper wrapper_;
 
     pinocchio::Model model_;
     pinocchio::Data data_;
@@ -51,22 +51,23 @@ TEST_F(OSCTest, AddDynamics) {
 
     // Compute symbolic expression for system dynamics
     casadi::SX dyn = wrapper_.rnea()(casadi::SXVector(
-        {osc_.GetParameters("qpos"), osc_.GetParameters("qvel"),
-         osc_.GetVariables("qacc")}))[0];
+        {osc_.GetParameters("qpos").sym(), osc_.GetParameters("qvel").sym(),
+         osc_.GetDecisionVariables("qacc").sym()}))[0];
 
     // Add any additional nonlinearities (e.g. spring/damping of joints)
 
     // Add generalised inputs
-    dyn -= mtimes(B, osc_.GetVariables("ctrl"));
+    dyn -= mtimes(B, osc_.GetDecisionVariables("ctrl").sym());
 
     // Create new function with actuation included
     casadi::Function controlled_dynamics = casadi::Function(
         "dynamics",
-        {osc_.GetParameters("qpos"), osc_.GetParameters("qvel"),
-         osc_.GetVariables("qacc"), osc_.GetVariables("ctrl")},
+        {osc_.GetParameters("qpos").sym(), osc_.GetParameters("qvel").sym(),
+         osc_.GetDecisionVariables("qacc").sym(),
+         osc_.GetDecisionVariables("ctrl").sym()},
         {dyn}, {"qpos", "qvel", "qacc", "ctrl"}, {"dyn"});
 
-    osc_.AddDynamics(controlled_dynamics);
+    osc_.AddSystemDynamicsFunction(controlled_dynamics);
 
     EXPECT_TRUE(true);
 }

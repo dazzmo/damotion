@@ -4,14 +4,12 @@
 
 #include "utils/codegen.h"
 
-using namespace casadi_utils::eigen;
-
 TEST(EigenWrapper, EigenWrapperLoad) {
     // Create codegen function
     casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
     casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});
 
-    utils::casadi::FunctionWrapper wrapper(f);
+    damotion::utils::casadi::FunctionWrapper wrapper(f);
 
     // Evaluate function
     Eigen::VectorXd x_in(1), y_in(1), output(1);
@@ -34,12 +32,12 @@ TEST(EigenWrapper, ToCasadiDM) {
 
     // Convert to casadi::DM
     casadi::DM xd;
-    toCasadi(x, xd);
+    damotion::utils::casadi::toCasadi(x, xd);
 
     // Convert back to Eigen::VectorXd
     Eigen::VectorXd xt;
-    toEigen(xd, xt);
-    
+    damotion::utils::casadi::toEigen(xd, xt);
+
     EXPECT_TRUE(x.isApprox(xt));
 }
 
@@ -52,8 +50,8 @@ TEST(EigenWrapper, EigenWrapperSparse) {
 
     casadi::Function f("sparse_test", {x}, {y}, {"x"}, {"y"});
 
-    utils::casadi::FunctionWrapper wrapper(
-        casadi_utils::codegen(f, "./tmp"));
+    damotion::utils::casadi::FunctionWrapper wrapper(
+        damotion::utils::casadi::codegen(f, "./tmp"));
 
     // Evaluate function
     Eigen::VectorXd x_in(1);
@@ -75,8 +73,8 @@ TEST(EigenWrapper, EigenWrapperCodegenLoad) {
     casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
     casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});
 
-    utils::casadi::FunctionWrapper wrapper(
-        casadi_utils::codegen(f, "./tmp"));
+    damotion::utils::casadi::FunctionWrapper wrapper(
+        damotion::utils::casadi::codegen(f, "./tmp"));
 
     // Evaluate function
     Eigen::VectorXd x_in(1), y_in(1), output(1);

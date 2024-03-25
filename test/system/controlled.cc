@@ -13,7 +13,7 @@ TEST(ControlledSystem, FromPinocchioModelWrapper) {
     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, true);
     pinocchio::Data data(model);
 
-    utils::casadi::PinocchioModelWrapper wrapper(model);
+    damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
     damotion::system::SecondOrderControlledSystem system(wrapper);
 

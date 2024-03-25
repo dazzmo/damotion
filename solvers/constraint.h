@@ -30,10 +30,12 @@ class Constraint {
     void SetConstraintFunction(casadi::Function &f) { con_ = f; }
     void SetJacobianFunction(casadi::Function &f) { jac_ = f; }
     void SetHessianFunction(casadi::Function &f) { hes_ = f; }
+    void SetLinearisedConstraintFunction(casadi::Function &f) { lin_ = f; }
 
     utils::casadi::FunctionWrapper &ConstraintFunction() { return con_; }
     utils::casadi::FunctionWrapper &JacobianFunction() { return jac_; }
     utils::casadi::FunctionWrapper &HessianFunction() { return hes_; }
+    utils::casadi::FunctionWrapper &LinearisedConstraintFunction() { return lin_; }
 
     const BoundsType &GetBoundsType() const { return bounds_type_; }
     void SetBoundsType(const BoundsType &type) {
@@ -137,6 +139,10 @@ class Constraint {
     utils::casadi::FunctionWrapper jac_;
     // Hessian of vector-product
     utils::casadi::FunctionWrapper hes_;
+
+    // Linearised constraint
+    utils::casadi::FunctionWrapper lin_;
+
 };
 
 }  // namespace optimisation

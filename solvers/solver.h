@@ -54,6 +54,8 @@ class SolverBase {
     Eigen::VectorXd constraint_cache_;
     Eigen::MatrixXd constraint_jacobian_cache_;
 
+    Eigen::VectorXd constraint_linearised_b_cache_;
+
     Eigen::MatrixXd lagrangian_hes_cache_;
 
     Eigen::VectorXd primal_solution_x_;

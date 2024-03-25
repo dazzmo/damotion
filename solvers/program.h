@@ -6,11 +6,10 @@
 #include "common/profiler.h"
 #include "solvers/constraint.h"
 #include "solvers/cost.h"
+#include "solvers/variable.h"
 #include "utils/casadi.h"
 #include "utils/codegen.h"
 #include "utils/eigen_wrapper.h"
-
-#include "solvers/variable.h"
 
 namespace damotion {
 namespace optimisation {
@@ -58,7 +57,8 @@ class Program {
      * @param n Number of rows
      * @param m Number of columns
      */
-    void AddDecisionVariables(const std::string &name, const int n, const int m = 1);
+    void AddDecisionVariables(const std::string &name, const int n,
+                              const int m = 1);
 
     /**
      * @brief Removes a variable currently considered by the program.
@@ -84,7 +84,8 @@ class Program {
      * @param name Name of the decision variables
      * @param sz The new size
      */
-    void ResizeDecisionVariables(const std::string &name, const int n, const int m = 1);
+    void ResizeDecisionVariables(const std::string &name, const int n,
+                                 const int m = 1);
 
     /**
      * @brief Indicates whether the provided variable is present within the
@@ -140,17 +141,35 @@ class Program {
     int GetConstraintIndex(const std::string &name);
 
     /**
-     * @brief Symbolic decision variable for the program.
+     * @brief Decision variable vector for the program.
      *
-     * @return casadi::SX&
+     * @return Variable&
      */
-    casadi::SX &DecisionVariableVector() { return x_; }
+    Variable &DecisionVariableVector() { return x_; }
 
     Eigen::VectorXd &DecisionVariablesLowerBound() { return lbx_; }
     Eigen::VectorXd &DecisionVariablesUpperBound() { return ubx_; }
 
     Eigen::VectorXd &ConstraintsLowerBound() { return lbg_; }
     Eigen::VectorXd &ConstraintsUpperBound() { return ubg_; }
+
+    /**
+     * @brief Updates the bounds for the decision variable vector for the
+     * variable given by name
+     *
+     * @param name
+     */
+    void UpdateDecisionVariableVectorBounds(const std::string &name);
+
+    /**
+     * @brief Updates the bounds for the decision variable vector for all
+     * decision variables
+     *
+     */
+    void UpdateDecisionVariableVectorBounds();
+
+    void UpdateConstraintVectorBounds(const std::string &name);
+    void UpdateConstraintVectorBounds();
 
     /**
      * @brief Prints the current set of parameters for the program to the
@@ -187,6 +206,28 @@ class Program {
      */
     void PrintProgramSummary();
 
+    /**
+     * @brief Returns the id of a cost within the costs vector of the program.
+     * If the cost does not exist, returns -1.
+     *
+     * @param name
+     * @return  int
+     */
+    int GetCostId(const std::string &name);
+
+    /**
+     * @brief Returns the id of a constraint within the constraints vector of
+     * the program. If the constraint does not exist, returns -1.
+     *
+     * @param name
+     * @return  int
+     */
+    int GetConstraintId(const std::string &name);
+
+    std::vector<Cost> &GetCosts() { return costs_; }
+
+    std::vector<Constraint> &GetConstraints() { return constraints_; }
+
    protected:
     /**
      * @brief Returns the id of a variable within the variables vectors of the
@@ -206,26 +247,7 @@ class Program {
      */
     int GetParametersId(const std::string &name);
 
-    /**
-     * @brief Returns the id of a cost within the costs vector of the program.
-     * If the cost does not exist, returns -1.
-     *
-     * @param name
-     * @return  int
-     */
-    int GetCostId(const std::string &name);
-
-    /**
-     * @brief Returns the id of a constraint within the constraints vector of
-     * the program. If the constraint does not exist, returns -1.
-     *
-     * @param name
-     * @return  int
-     */
-    int GetConstraintId(const std::string &name);
-
     void SetUpCosts();
-
     void SetUpConstraints();
 
     void ConstructConstraintVector();
@@ -258,6 +280,8 @@ class Program {
      */
     void ConstructDecisionVariableVector(const std::vector<std::string> &order);
 
+    // void FormatFunctionInput();
+
    private:
     // Program name
     std::string name_;
@@ -279,8 +303,8 @@ class Program {
     // Constrain vector upper bound
     Eigen::VectorXd ubg_;
 
-    // Symbolic decision variables vector
-    casadi::SX x_;
+    // Optimisation vector
+    Variable x_;
 
     // Variables
     std::unordered_map<std::string, int> variables_id_;
@@ -300,10 +324,11 @@ class Program {
     std::unordered_map<std::string, int> costs_id_;
     std::vector<Cost> costs_;
 
-    void SetUpCost(Cost &cost);
+    void SetUpCost(Cost &cost, const casadi::SXVector &x);
     void SetUpConstraint(Constraint &constraint);
 
     // Utilities
+    std::string GetSXName(const casadi::SX &x);
     casadi::StringVector GetSXVectorNames(const casadi::SXVector &x);
 };
 

@@ -69,7 +69,7 @@ void FunctionWrapper::setSparseOutput(int i) {
     out_sparse_[i] = createSparseMatrix(f_.sparsity_out(i), rows_[i], cols_[i]);
 }
 
-void FunctionWrapper::setInput(int i, Eigen::Ref<const Eigen::VectorXd> x) {
+void FunctionWrapper::setInput(int i, Eigen::Ref<const Eigen::MatrixXd> x) {
     // Check input dimension
     if (x.size() != f_.size1_in(i)) {
         throw std::invalid_argument(f_.name() + ": input " + std::to_string(i) +
@@ -89,9 +89,14 @@ void FunctionWrapper::setInput(int i, Eigen::Ref<const Eigen::VectorXd> x) {
     in_data_ptr_[i] = x.data();
 }
 
+void FunctionWrapper::setInput(int i, double* x_ptr) {
+    // TODO - Perform checks of the input data
+    in_data_ptr_[i] = x_ptr;
+}
+
 void FunctionWrapper::setInput(
     const std::vector<int>& idx,
-    const std::vector<Eigen::Ref<const Eigen::VectorXd>>& x) {
+    const std::vector<Eigen::Ref<const Eigen::MatrixXd>>& x) {
     for (int i = 0; i < idx.size(); ++i) {
         setInput(idx[i], x[i]);
     }

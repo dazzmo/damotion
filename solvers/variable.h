@@ -32,22 +32,58 @@ class Variable {
 
     const std::string &name() { return name_; }
 
-    const int &rows() const {return val_.rows();}
-    const int &cols() const {return val_.cols();}
+    /**
+     * @brief Number of rows the variable has
+     *
+     * @return const int&
+     */
+    const int &rows() const { return val_.rows(); }
 
+    /**
+     * @brief Number of columns the variable has
+     *
+     * @return const int&
+     */
+    const int &cols() const { return val_.cols(); }
+
+    /**
+     * @brief Symbolic representation of variable
+     *
+     * @return casadi::SX&
+     */
     casadi::SX &sym() { return sym_; }
     const casadi::SX &sym() const { return sym_; }
 
+    /**
+     * @brief Value of the variable
+     *
+     * @return Eigen::MatrixXd&
+     */
     Eigen::MatrixXd &val() { return val_; }
     const Eigen::MatrixXd &val() const { return val_; }
 
+    /**
+     * @brief Number of values within the variable
+     *
+     * @return const int
+     */
     const int sz() { return val_.size(); }
 
-    Eigen::MatrixXd &lb() { return lb_; }
-    const Eigen::MatrixXd &lb() const { return lb_; }
+    /**
+     * @brief Lower bounds for the variable
+     *
+     * @return Eigen::MatrixXd&
+     */
+    Eigen::MatrixXd &LowerBound() { return lb_; }
+    const Eigen::MatrixXd &LowerBound() const { return lb_; }
 
-    Eigen::MatrixXd &ub() { return ub_; }
-    const Eigen::MatrixXd &ub() const { return ub_; }
+    /**
+     * @brief Upper bounds for the variable
+     *
+     * @return Eigen::MatrixXd&
+     */
+    Eigen::MatrixXd &UpperBound() { return ub_; }
+    const Eigen::MatrixXd &UpperBound() const { return ub_; }
 
    private:
     std::string name_;

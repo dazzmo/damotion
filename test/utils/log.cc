@@ -20,11 +20,11 @@ TEST(Log, Log3) {
 
     // Create function
     casadi::SX res;
-    casadi_utils::eigen::toCasadi(wR, res);
+    damotion::utils::casadi::toCasadi(wR, res);
 
     // Generate function and codegen
     casadi::Function flog3("log3", {q.w(), q.x(), q.y(), q.z()}, {res});
-    flog3 = casadi_utils::codegen(flog3, "./tmp");
+    flog3 = damotion::utils::casadi::codegen(flog3, "./tmp");
 
     // Generate random SE3 configuration and extract rotation matrix
     pinocchio::SE3 se3;
@@ -40,7 +40,7 @@ TEST(Log, Log3) {
     // Damotion
     Eigen::VectorXd wd;
     casadi::DMVector in = {qR.w(), qR.x(), qR.y(), qR.z()};
-    casadi_utils::eigen::toEigen(flog3(in)[0], wd);
+    damotion::utils::casadi::toEigen(flog3(in)[0], wd);
 
     // Compare values
     EXPECT_TRUE(wd.isApprox(wp));
@@ -63,11 +63,11 @@ TEST(Log, JLog3) {
 
     // Create function
     casadi::SX res;
-    casadi_utils::eigen::toCasadi(Jlog, res);
+    damotion::utils::casadi::toCasadi(Jlog, res);
 
     // Generate function and codegen
     casadi::Function flog3("Jlog3", {q.w(), q.x(), q.y(), q.z()}, {res});
-    flog3 = casadi_utils::codegen(flog3, "./tmp");
+    flog3 = damotion::utils::casadi::codegen(flog3, "./tmp");
 
     // Generate random SE3 configuration and extract rotation matrix
     pinocchio::SE3 se3;
@@ -85,7 +85,7 @@ TEST(Log, JLog3) {
     // Damotion
     Eigen::MatrixXd wd;
     casadi::DMVector in = {qR.w(), qR.x(), qR.y(), qR.z()};
-    casadi_utils::eigen::toEigen(flog3(in)[0], wd);
+    damotion::utils::casadi::toEigen(flog3(in)[0], wd);
 
     // Compare values
     EXPECT_TRUE(wd.isApprox(wp));
@@ -109,12 +109,12 @@ TEST(Log, Log6) {
 
     // Create function
     casadi::SX res;
-    casadi_utils::eigen::toCasadi(log, res);
+    damotion::utils::casadi::toCasadi(log, res);
 
     // Generate function and codegen
     casadi::Function flog6(
         "log6", {x.x(), x.y(), x.z(), q.w(), q.x(), q.y(), q.z()}, {res});
-    flog6 = casadi_utils::codegen(flog6, "./tmp");
+    flog6 = damotion::utils::casadi::codegen(flog6, "./tmp");
 
     // Generate random SE3 configuration and extract rotation matrix
     pinocchio::SE3 se3;
@@ -135,7 +135,7 @@ TEST(Log, Log6) {
                            qR.x(),
                            qR.y(),
                            qR.z()};
-    casadi_utils::eigen::toEigen(flog6(in)[0], wd);
+    damotion::utils::casadi::toEigen(flog6(in)[0], wd);
 
     // Compare values
     EXPECT_TRUE(wd.isApprox(wp));
@@ -162,14 +162,14 @@ TEST(Log, JLog6) {
 
     // Create function
     casadi::SX res;
-    casadi_utils::eigen::toCasadi(Jlog, res);
+    damotion::utils::casadi::toCasadi(Jlog, res);
 
     std::cout << res(casadi::Slice(3, 6), casadi::Slice(0, 3)) << std::endl;
 
     // Generate function and codegen
     casadi::Function log6_map(
         "Jlog6", {x.x(), x.y(), x.z(), q.w(), q.x(), q.y(), q.z()}, {res});
-    log6_map = casadi_utils::codegen(log6_map, "./tmp");
+    log6_map = damotion::utils::casadi::codegen(log6_map, "./tmp");
 
     // Generate random SE3 configuration and extract rotation matrix
     pinocchio::SE3 se3;
@@ -194,7 +194,7 @@ TEST(Log, JLog6) {
 
     std::cout << log6_map(in)[0](casadi::Slice(3, 6), casadi::Slice(0, 3))
               << std::endl;
-    casadi_utils::eigen::toEigen(log6_map(in)[0], wd);
+    damotion::utils::casadi::toEigen(log6_map(in)[0], wd);
 
     std::cout << wp << std::endl;
     std::cout << wd << std::endl;

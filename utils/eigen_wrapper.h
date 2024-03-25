@@ -112,7 +112,7 @@ class FunctionWrapper {
      * @param i
      * @param x
      */
-    void setInput(int i, Eigen::Ref<const Eigen::VectorXd> x);
+    void setInput(int i, Eigen::Ref<const Eigen::MatrixXd> x);
 
     /**
      * @brief Sets a set of inputs for the function
@@ -121,7 +121,16 @@ class FunctionWrapper {
      * @param x Vector of inputs
      */
     void setInput(const std::vector<int> &idx,
-                  const std::vector<Eigen::Ref<const Eigen::VectorXd>> &x);
+                  const std::vector<Eigen::Ref<const Eigen::MatrixXd>> &x);
+
+    /**
+     * @brief Sets the i-th input for the function by direct pointer to the
+     * input data array
+     *
+     * @param i
+     * @param x_ptr Pointer to the start of the data array
+     */
+    void setInput(int i, double *x_ptr);
 
     /**
      * @brief Calls the function with the current inputs
