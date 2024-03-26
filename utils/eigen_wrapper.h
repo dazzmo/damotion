@@ -107,6 +107,20 @@ class FunctionWrapper {
     ~FunctionWrapper();
 
     /**
+     * @brief Number of inputs for the function
+     *
+     * @return const int
+     */
+    const int n_in() const { return f_.n_in(); }
+
+    /**
+     * @brief Number of outputs for the function
+     *
+     * @return const int
+     */
+    const int n_out() const { return f_.n_out(); }
+
+    /**
      * @brief Sets the i-th input for the function
      *
      * @param i
@@ -130,7 +144,7 @@ class FunctionWrapper {
      * @param i
      * @param x_ptr Pointer to the start of the data array
      */
-    void setInput(int i, double *x_ptr);
+    void setInput(int i, const double *x_ptr);
 
     /**
      * @brief Calls the function with the current inputs

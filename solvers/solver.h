@@ -1,5 +1,5 @@
-#ifndef CONTROL_SOLVER_H
-#define CONTROL_SOLVER_H
+#ifndef SOLVERS_SOLVER_H
+#define SOLVERS_SOLVER_H
 
 #include "solvers/program.h"
 
@@ -30,12 +30,14 @@ class SolverBase {
      */
     void UpdateProgram(Program& program) { prog_ = program; }
 
-    void EvaluateCost(Cost& cost, const Eigen::VectorXd& x, bool grad,
+    void EvaluateCost(int id, 
+                      const Eigen::VectorXd& x, bool grad,
                       bool hes);
     void EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes);
 
     // Evaluates the constraint and updates the cache for the gradients
-    void EvaluateConstraint(Constraint& c, const Eigen::VectorXd& x,
+    void EvaluateConstraint(int id,
+    const Eigen::VectorXd& x,
                             bool jac);
     void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
 
@@ -68,4 +70,4 @@ class SolverBase {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* CONTROL_SOLVER_H */
+#endif /* SOLVERS_SOLVER_H */

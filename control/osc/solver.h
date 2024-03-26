@@ -1,5 +1,0 @@
-#ifndef CONTROL_SOLVER_H
-#define CONTROL_SOLVER_H
-
-
-#endif/* CONTROL_SOLVER_H */

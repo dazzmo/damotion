@@ -34,8 +34,11 @@ SolverBase::SolverBase(Program& prog) : prog_(prog) {
         prog_.NumberOfDecisionVariables(), prog_.NumberOfDecisionVariables());
 }
 
-void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x, bool grad,
+void SolverBase::EvaluateCost(Cost& cost, 
+                              const Eigen::VectorXd& x, bool grad,
                               bool hes) {
+    // Get cost ID
+    
     // Map variables
     cost.ObjectiveFunction().call();
     objective_cache_ +=
@@ -44,15 +47,24 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x, bool grad,
     if (grad) {
         // Evaluate the gradient of the objective
         cost.GradientFunction().call();
-        objective_gradient_cache_ +=
-            cost.weighting() * cost.GradientFunction().getOutput(0);
+        // Set gradient blocks
+        for (int i = 0; i < cost.GradientFunction().n_out(); ++i) {
+            BlockIndex& idx = ;
+            objective_gradient_cache_.middleRows(idx.i_start(), idx.i_sz()) +=
+                cost.weighting() * cost.GradientFunction().getOutput(i);
+        }
     }
 
     if (hes) {
         // Evaluate the hessian of the objective
         cost.HessianFunction().call();
-        lagrangian_hes_cache_ +=
-            cost.weighting() * cost.HessianFunction().getOutput(0);
+        // Set hessian blocks
+        for (int i = 0; i < cost.HessianFunction().n_out(); ++i) {
+            BlockIndex& idx = cost.GetHessianBlockIndex(i);
+            lagrangian_hes_cache_.block(idx.i_start(), idx.j_start(),
+                                        idx.i_sz(), idx.j_sz()) +=
+                cost.weighting() * cost.HessianFunction().getOutput(i);
+        }
     }
 }
 
@@ -78,19 +90,27 @@ void SolverBase::EvaluateConstraint(Constraint& c, const Eigen::VectorXd& x,
     // Evaluate the constraint
     c.ConstraintFunction().call();
     // Add to constraint cache
-    constraint_cache_.middleRows(c.idx(), c.dim()) =
+    BlockIndex& idx = c.idx();
+
+    constraint_cache_.middleRows(idx.i_start(), idx.i_sz()) =
         c.ConstraintFunction().getOutput(0);
 
     if (jac) {
-        c.LinearisedConstraintFunction().call();
+        // c.LinearisedConstraintFunction().call();
         c.JacobianFunction().call();
+
         // ! Currently a dense jacobian
-        constraint_jacobian_cache_.middleRows(c.idx(), c.dim())
-            << c.JacobianFunction().getOutput(0);
+        // Update Jacobian blocks
+        for (int i = 0; i < c.JacobianFunction().n_out(); ++i) {
+            BlockIndex& idx = c.GetJacobianBlockIndex(i);
+            constraint_jacobian_cache_.block(idx.i_start(), idx.j_start(),
+                                             idx.i_sz(), idx.j_sz()) =
+                c.JacobianFunction().getOutput(i);
+        }
 
         // Add Jacobian and constant component
-        constraint_linearised_b_cache_.middleRows(c.idx(), c.dim())
-            << c.LinearisedConstraintFunction().getOutput(1);
+        // constraint_linearised_b_cache_.middleRows(c.idx(), c.dim())
+        // << c.LinearisedConstraintFunction().getOutput(1);
     }
 }
 

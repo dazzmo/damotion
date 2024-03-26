@@ -3,7 +3,7 @@
 namespace damotion {
 namespace optimisation {
 
-inline bool Program::IsDecisionVariable(const std::string &name) {
+bool Program::IsDecisionVariable(const std::string &name) {
     // Indicate if it is present in the variable map
     return variables_id_.find(name) != variables_id_.end();
 }
@@ -16,16 +16,6 @@ void Program::AddDecisionVariables(const std::string &name, const int n,
     } else {
         std::cout << "Variables with name " << name
                   << " already exist in program!\n";
-    }
-}
-
-void Program::SetDecisionVariablesFromVector(const Eigen::VectorXd &x) {
-    damotion::common::Profiler profiler("Program::UpdateDecisionVariables");
-    // Use current mapping to compute variables
-    for (auto &xi : variables_id_) {
-        int id = xi.second;
-        Variable &v = variables_[id];
-        v.val() << x.middleRows(variables_idx_[id], v.rows() * v.cols());
     }
 }
 
@@ -67,9 +57,9 @@ void Program::RemoveDecisionVariables(const std::string &name) {
 void Program::UpdateDecisionVariableVectorBounds(const std::string &name) {
     int id = GetDecisionVariablesId(name);
     assert(id >= 0 && "Variable not found in program!\n");
-    lbx_.middleRows(variables_idx_[id], variables_[id].sz()) =
+    lbx_.middleRows(variables_[id].idx().i_start(), variables_[id].sz()) =
         variables_[id].LowerBound();
-    ubx_.middleRows(variables_idx_[id], variables_[id].sz()) =
+    ubx_.middleRows(variables_[id].idx().i_start(), variables_[id].sz()) =
         variables_[id].UpperBound();
 }
 
@@ -82,10 +72,10 @@ void Program::UpdateDecisionVariableVectorBounds() {
 void Program::UpdateConstraintVectorBounds(const std::string &name) {
     int id = GetConstraintId(name);
     assert(id >= 0 && "Constraint not found in program!\n");
-    lbg_.middleRows(constraints_idx_[id], constraints_[id].dim()) =
-        constraints_[id].lb();
-    ubg_.middleRows(constraints_idx_[id], constraints_[id].dim()) =
-        constraints_[id].ub();
+    lbg_.middleRows(constraints_idx_[id].i_start(),
+                    constraints_idx_[id].i_sz()) = constraints_[id].lb();
+    ubg_.middleRows(constraints_idx_[id].i_start(),
+                    constraints_idx_[id].i_sz()) = constraints_[id].ub();
 }
 
 void Program::UpdateConstraintVectorBounds() {
@@ -191,7 +181,7 @@ void Program::RemoveCost(const std::string &name) {
 int Program::GetDecisionVariablesIndex(const std::string &name) {
     int id = GetDecisionVariablesId(name);
     if (id >= 0) {
-        return variables_idx_[variables_id_[name]];
+        return variables_[variables_id_[name]].idx().i_start();
     } else {
         std::cout << "Variable " << name << " is not within this program!\n";
         return -1;
@@ -201,7 +191,7 @@ int Program::GetDecisionVariablesIndex(const std::string &name) {
 int Program::GetConstraintIndex(const std::string &name) {
     int id = GetConstraintId(name);
     if (id >= 0) {
-        return constraints_idx_[constraints_id_[name]];
+        return constraints_idx_[constraints_id_[name]].i_start();
     } else {
         std::cout << "Constraint " << name << " is not within this program!\n";
         return -1;
@@ -234,8 +224,9 @@ void Program::SetFunctionInputData(utils::casadi::FunctionWrapper &f) {
         std::string name = f.f().name_in(i);
         if (IsDecisionVariable(name)) {
             // Set variable input data as sub-vector of optimisation vector
+            int id = variables_id_[name];
             f.setInput(f.f().index_in(name),
-                       x_.val().data() + variables_idx_[variables_id_[name]]);
+                       x_.val().data() + variables_[id].idx().i_start());
         } else if (IsParameter(name)) {
             // Set parameter input data as vector in parameter map
             f.setInput(f.f().index_in(name),
@@ -258,7 +249,8 @@ void Program::ConstructDecisionVariableVector(
         int id = GetDecisionVariablesId(order[i]);
         // Add to vector and set index
         x.push_back(variables_[id].sym());
-        variables_idx_[id] = idx;
+        variables_idx_[id] = BlockIndex(idx, variables_[id].sz());
+        // Increase idx counter
         idx += variables_[id].sz();
     }
 
@@ -279,7 +271,11 @@ void Program::ConstructConstraintVector() {
     // TODO - Make custom ordering possible
     nc_ = 0;
     for (Constraint &c : constraints_) {
-        c.SetIndex(nc_);
+        // Update row indexing for the constraint and its Jacobians
+        int id = GetConstraintId(c.name());
+        for (BlockIndex &idx : constraints_jac_idx_[id]) {
+            idx.UpdateRowStartIndex(nc_);
+        }
         nc_ += c.dim();
     }
 
@@ -289,12 +285,6 @@ void Program::ConstructConstraintVector() {
 
     lbg_.setConstant(-std::numeric_limits<double>::infinity());
     ubg_.setConstant(std::numeric_limits<double>::infinity());
-
-    // Set bounds
-    for (Constraint &c : constraints_) {
-        lbg_.middleRows(c.idx(), c.dim()) = c.lb();
-        ubg_.middleRows(c.idx(), c.dim()) = c.ub();
-    }
 }
 
 casadi::SXVector Program::GetSymbolicFunctionInput(
@@ -341,26 +331,97 @@ casadi::StringVector Program::GetSXVectorNames(const casadi::SXVector &x) {
     return inames;
 }
 
-void Program::AddCost(const std::string &name, casadi::SX &cost,
-                      casadi::SXVector &in) {
+void Program::AddCost(
+    const std::string &name, casadi::SX &cost, casadi::SXVector &in,
+    const casadi::SXVector &x, const casadi::StringVector xnames,
+    const std::vector<std::pair<::casadi::SX, ::casadi::SX>> &xy,
+    const std::vector<std::pair<std::string, std::string>> &xynames) {
     int id = GetCostId(name);
     if (id >= 0) {
         std::cout << "Cost " << name << " already exists within the program!\n";
         return;
     }
 
+    casadi::SX &xv = DecisionVariableVector().sym();
+
     // Create cost and establish symbolic inputs and value
     Cost c(name);
     c.SetSymbolicObjective(cost);
     c.SetSymbolicInputs(in);
 
-    // Add to map
+    casadi::Function obj, grad, hes;
+
+    // Create cost function
+    casadi::StringVector inames = GetSXVectorNames(in);
+    obj = casadi::Function(name + "_obj", in, {cost}, inames, {name + "_obj"});
+
+    c.SetObjectiveFunction(obj);
+
+    // Add indexing data for gradient and hessian calculations
+    costs_grad_idx_.push_back({});
+    costs_hes_idx_.push_back({});
+
+    if (x.size()) {
+        // Compute gradient with respect to custom variable set x
+        grad = utils::casadi::CreateGradientFunction(name, cost, in, inames, x,
+                                                     xnames);
+        // Add indexing data for the gradient blocks
+        costs_grad_idx_[id].resize(xnames.size());
+        for (int i = 0; i < xnames.size(); ++i) {
+            costs_grad_idx_[id][i] =
+                BlockIndex(GetDecisionVariablesIndex(xnames[i]),
+                           GetDecisionVariables(xnames[i]).sz());
+        }
+
+    } else {
+        // Compute gradient with respect to optimisation vector only
+        grad = utils::casadi::CreateGradientFunction(name, cost, in, inames,
+                                                     {xv}, {"x"});
+        // Add indexing data for the gradient
+        costs_grad_idx_[id] = {BlockIndex(0, DecisionVariableVector().sz())};
+    }
+    c.SetGradientFunction(grad);
+
+    if (xy.size()) {
+        // Compute hessian with respect to custom variable set x
+        hes = utils::casadi::CreateHessianFunction(name, cost, in, inames, xy,
+                                                   xynames);
+        // Add indexing data for the hessian blocks
+        // Add indexing data for the gradient blocks
+        costs_hes_idx_[id].resize(xnames.size());
+        for (int i = 0; i < xnames.size(); ++i) {
+            costs_hes_idx_[id][i] =
+                BlockIndex(GetDecisionVariablesIndex(xynames[i].first),
+                           GetDecisionVariables(xynames[i].first).sz(),
+                           GetDecisionVariablesIndex(xynames[i].second),
+                           GetDecisionVariables(xynames[i].second).sz());
+        }
+    } else {
+        // Compute hessian with respect to optimisation vector only
+        hes = utils::casadi::CreateHessianFunction(name, cost, in, inames,
+                                                   {{xv, xv}}, {{"x", "x"}});
+        // Add indexing data for the hessian
+        costs_grad_idx_[id] = {BlockIndex(0, DecisionVariableVector().sz(), 0,
+                                          DecisionVariableVector().sz())};
+    }
+    c.SetHessianFunction(hes);
+
+    // Set up variable inputs
+    SetFunctionInputData(c.ObjectiveFunction());
+    SetFunctionInputData(c.GradientFunction());
+    SetFunctionInputData(c.HessianFunction());
+
+    // Add cost to map
     costs_id_[name] = costs_.size();
     costs_.push_back(c);
 }
 
-void Program::AddConstraint(const std::string &name, casadi::SX &constraint,
-                            casadi::SXVector &in, const BoundsType &bounds) {
+void Program::AddConstraint(
+    const std::string &name, casadi::SX &constraint, casadi::SXVector &in,
+    const BoundsType &bounds, const casadi::SXVector &x,
+    const casadi::StringVector xnames,
+    const std::vector<std::pair<::casadi::SX, ::casadi::SX>> &xy,
+    const std::vector<std::pair<std::string, std::string>> &xynames) {
     int id = GetConstraintId(name);
     if (id >= 0) {
         std::cout << "Constraint " << name
@@ -368,120 +429,65 @@ void Program::AddConstraint(const std::string &name, casadi::SX &constraint,
         return;
     }
 
+    casadi::SX &xv = DecisionVariableVector().sym();
+
     // Create cost and establish symbolic inputs and value
     Constraint c(name, constraint.size1());
     c.SetSymbolicConstraint(constraint);
     c.SetSymbolicInputs(in);
     c.SetBoundsType(bounds);
 
-    // Add to map
+    // Add constraint id
     constraints_id_[name] = constraints_.size();
-    constraints_.push_back(c);
-}
+    // Add indexing data for gradient and hessian calculations
+    constraints_jac_idx_.push_back({});
+    constraints_hes_idx_.push_back({});
 
-void Program::SetUpCost(Cost &cost, const casadi::SXVector &x) {
-    // With initialised program, create cost using given vector
-    casadi::StringVector inames = GetSXVectorNames(cost.SymbolicInputs());
+    casadi::Function con, jac, hes;
 
-    casadi::SX J = cost.SymbolicObjective();
+    // Create cost function
+    casadi::StringVector inames = GetSXVectorNames(in);
+    con = casadi::Function(name + "_obj", in, {constraint}, inames,
+                           {name + "_con"});
 
-    // Create functions to compute the necessary gradients and hessians
-    /* Objective */
-    casadi::Function obj =
-        casadi::Function(cost.name() + "_obj", cost.SymbolicInputs(), {J},
-                         inames, {cost.name() + "_obj"});
+    c.SetConstraintFunction(con);
 
-    cost.SetObjectiveFunction(obj);
-
-    /* Objective Gradient */
-    // ! See if this is going to work
-    casadi::SXVector g;
-    casadi::StringVector g_names;
-    for (const casadi::SX &xi : x) {
-        // Compute gradients of cost with respect to variable set x
-        g.push_back(gradient(J, xi));
-        g_names.push_back(cost.name() + "_grad_" + GetSXName(xi));
-    }
-
-    casadi::Function grad = casadi::Function(
-        cost.name() + "_grad", cost.SymbolicInputs(), g, inames, g_names);
-    cost.SetGradientFunction(grad);
-
-    casadi::SXVector H;
-    casadi::StringVector H_names;
-
-    // Compute Hessians for given partitioning
-    for (int i = 0; i < x.size(); ++i) {
-        for (int j = i; i < x.size(); ++j) {
-            // TODO: Look at making only upper triangular for diagonal terms
-            H.push_back(jacobian(gradient(J, x[i]).T(), x[j]));
-            H_names.push_back(cost.name() + "_hes_" + GetSXName(x[i]) + "_" +
-                              GetSXName(x[j]));
+    if (x.size()) {
+        // Compute gradient with respect to custom variable set x
+        jac = utils::casadi::CreateJacobianFunction(name, constraint, in,
+                                                    inames, x, xnames);
+        // Add indexing data for the jacobian blocks
+        constraints_jac_idx_[id].resize(xnames.size());
+        for (int i = 0; i < xnames.size(); ++i) {
+            constraints_jac_idx_[id][i] =
+                BlockIndex(0, c.dim(), GetDecisionVariablesIndex(xnames[i]),
+                           GetDecisionVariables(xnames[i]).sz());
         }
+    } else {
+        // Compute jacobian with respect to optimisation vector only
+        jac = utils::casadi::CreateJacobianFunction(name, constraint, in,
+                                                    inames, {xv}, {"x"});
+        // Add indexing data for the hessian
+        constraints_jac_idx_[id] = {
+            BlockIndex(0, c.dim(), 0, DecisionVariableVector().sz())};
     }
+    c.SetJacobianFunction(jac);
 
-    /* Objective Hessian */
-    casadi::Function hes = casadi::Function(
-        cost.name() + "_hes", cost.SymbolicInputs(), H, inames, H_names);
+    // TODO - Hessian calculations for constraints for NLP
+    if (xy.size()) {
+        // Compute hessian with respect to custom variable set x
 
-    cost.SetHessianFunction(hes);
-
-    // Register functions with variable and parameter data
-    SetFunctionInputData(cost.ObjectiveFunction());
-    SetFunctionInputData(cost.GradientFunction());
-    SetFunctionInputData(cost.HessianFunction());
-}
-
-void Program::SetUpCosts() {
-    for (Cost &c : costs_) {
-        // SetUpCost(c); // TODO - Fix this
+    } else {
+        // Compute hessian with respect to optimisation vector only
     }
-    // ! Delete data for the costs to free up space
-}
+    // c.SetHessianFunction(hes);
 
-void Program::SetUpConstraint(Constraint &constraint) {
-    // With initialised program, create constraint using given vector
-    casadi::StringVector inames = GetSXVectorNames(constraint.SymbolicInputs());
-    casadi::SX &x = DecisionVariableVector().sym();
+    // Set up variable inputs
+    SetFunctionInputData(c.ConstraintFunction());
+    SetFunctionInputData(c.JacobianFunction());
+    // SetFunctionInputData(c.HessianFunction());
 
-    // Create functions to compute the necessary gradients and hessians
-
-    /* Constraint */
-    casadi::Function con(constraint.name() + "_con",
-                         constraint.SymbolicInputs(),
-                         {constraint.SymbolicConstraint()}, inames,
-                         {constraint.name() + "_con"});
-
-    /* Constraint Jacobian */
-    casadi::Function jac(constraint.name() + "_jac",
-                         constraint.SymbolicInputs(),
-                         {jacobian(constraint.SymbolicConstraint(), x)}, inames,
-                         {constraint.name() + "_jac"});
-
-    /* Linearised constraint */
-    // c(x) = A x + b = A(x - x0) + c(x0) = A x + (c(x0) - A x0)
-    // casadi::SX A = jacobian(constraint.SymbolicConstraint(), x);
-    // casadi::SX b = constraint.SymbolicConstraint() - casadi::SX::mtimes(A, x);
-
-    // casadi::Function lin(constraint.name() + "_linearised",
-    //                      {constraint.SymbolicInputs()}, {A, b}, inames,
-    //                      {constraint.name() + "_A", constraint.name() + "_b"});
-
-    constraint.SetConstraintFunction(con);
-    constraint.SetJacobianFunction(jac);
-    // constraint.SetLinearisedConstraintFunction(lin);
-
-    // Set inputs for the functions
-    SetFunctionInputData(constraint.ConstraintFunction());
-    SetFunctionInputData(constraint.JacobianFunction());
-    // SetFunctionInputData(constraint.LinearisedConstraintFunction());
-}
-
-void Program::SetUpConstraints() {
-    for (Constraint &c : constraints_) {
-        SetUpConstraint(c);
-    }
-    // ! Delete data for the costs to free up space
+    constraints_.push_back(c);
 }
 
 void Program::ListParameters() {
@@ -515,8 +521,6 @@ void Program::ListVariables() {
 }
 
 void Program::ListConstraints() {
-    std::cout << "----------------------\n";
-    std::cout << "Constraint\tLower Bound\tUpper Bound\n";
     std::cout << "----------------------\n";
     for (auto p : constraints_id_) {
         for (int i = 0; i < constraints_[p.second].dim(); i++) {

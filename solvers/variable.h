@@ -55,6 +55,14 @@ class Variable {
     const casadi::SX &sym() const { return sym_; }
 
     /**
+     * @brief Indexing data for the variable within an optimisation vector
+     *
+     * @return const BlockIndex&
+     */
+    BlockIndex &idx() { return idx_; }
+    void SetIndex(const BlockIndex &idx) { idx_ = idx; }
+
+    /**
      * @brief Value of the variable
      *
      * @return Eigen::MatrixXd&
@@ -93,6 +101,9 @@ class Variable {
 
     Eigen::MatrixXd lb_;
     Eigen::MatrixXd ub_;
+
+    // Indexing data for the variable
+    BlockIndex idx_;
 };
 
 }  // namespace optimisation

@@ -14,10 +14,17 @@
 namespace damotion {
 namespace optimisation {
 
+// Forward declaration of SolverBase
+namespace solvers {
+class SolverBase;
+}
+
 class Program {
    public:
     Program() = default;
     ~Program() = default;
+
+    friend class solvers::SolverBase;
 
     Program(const std::string &name) : name_(name), nx_(0), nc_(0), np_(0) {}
 
@@ -95,15 +102,7 @@ class Program {
      * @return true
      * @return false
      */
-    inline bool IsDecisionVariable(const std::string &name);
-
-    /**
-     * @brief Given the decision variable vector x, set all variables within the
-     * program using the values from x.
-     *
-     * @param x
-     */
-    void SetDecisionVariablesFromVector(const Eigen::VectorXd &x);
+    bool IsDecisionVariable(const std::string &name);
 
     void SetParameters(const std::string &name, const Eigen::MatrixXd &val);
     void AddParameters(const std::string &name, const int n, const int m = 1);
@@ -120,14 +119,53 @@ class Program {
      */
     inline bool IsParameter(const std::string &name);
 
-    void AddCost(const std::string &name, casadi::SX &cost,
-                 casadi::SXVector &in);
+    /**
+     * @brief Adds a cost to the program given by the expression cost and inputs
+     * in. Cost gradients can be computed with respect to a custom list of
+     * variables given by x and xnames. Similarly, cost hessians can also be
+     * computed by providing custom variable pairings in xy and xynames.
+     *
+     * @param name Name of the cost
+     * @param cost Expression for cost
+     * @param in Inputs used to generate cost
+     * @param x Variables to compute gradient of cost with respect to
+     * @param xnames Names of variables in x
+     * @param xy Variable pairs to compute cost hessian with respect to
+     * @param xynames Names of variables in xy
+     */
+    void AddCost(
+        const std::string &name, casadi::SX &cost, casadi::SXVector &in,
+        const casadi::SXVector &x = {}, const casadi::StringVector xnames = {},
+        const std::vector<std::pair<::casadi::SX, ::casadi::SX>> &xy = {},
+        const std::vector<std::pair<std::string, std::string>> &xynames = {});
+
     void RemoveCost(const std::string &name);
     Cost &GetCost(const std::string &name);
 
-    void AddConstraint(const std::string &name, casadi::SX &constraint,
-                       casadi::SXVector &in,
-                       const BoundsType &bounds = BoundsType::kUnbounded);
+    /**
+     * @brief Adds a constraint to the program given by the expression
+     * constraint and inputs in. Jacobians can be computed with respect to a
+     * custom list of variables given by x and xnames, otherwise the jaocbian is
+     * only computed for the current decision variable vector given by
+     * DecisionVariableVector(). Similarly, hessians can also be computed
+     * by providing custom variable pairings in xy and xynames.
+     *
+     * @param name
+     * @param constraint
+     * @param in
+     * @param bounds
+     * @param x
+     * @param xnames
+     * @param xy
+     * @param xynames
+     */
+    void AddConstraint(
+        const std::string &name, casadi::SX &constraint, casadi::SXVector &in,
+        const BoundsType &bounds = BoundsType::kUnbounded,
+        const casadi::SXVector &x = {}, const casadi::StringVector xnames = {},
+        const std::vector<std::pair<::casadi::SX, ::casadi::SX>> &xy = {},
+        const std::vector<std::pair<std::string, std::string>> &xynames = {});
+
     Constraint &GetConstraint(const std::string &name);
     void RemoveConstraint(const std::string &name);
 
@@ -224,10 +262,6 @@ class Program {
      */
     int GetConstraintId(const std::string &name);
 
-    std::vector<Cost> &GetCosts() { return costs_; }
-
-    std::vector<Constraint> &GetConstraints() { return constraints_; }
-
    protected:
     /**
      * @brief Returns the id of a variable within the variables vectors of the
@@ -246,9 +280,6 @@ class Program {
      * @return  int
      */
     int GetParametersId(const std::string &name);
-
-    void SetUpCosts();
-    void SetUpConstraints();
 
     void ConstructConstraintVector();
 
@@ -282,6 +313,42 @@ class Program {
 
     // void FormatFunctionInput();
 
+    /**
+     * @brief Get the vector of current Cost objects within the program
+     *
+     * @return std::vector<Cost>&
+     */
+    std::vector<Cost> &GetCosts() { return costs_; }
+
+    /**
+     * @brief Get the vector of current Constraint objects within the program.
+     *
+     * @return std::vector<Constraint>&
+     */
+    std::vector<Constraint> &GetConstraints() { return constraints_; }
+
+    /**
+     * @brief Sets the optimisation vector to the values given in the vector x
+     *
+     * @param x
+     */
+    void SetDecisionVariableVector(const Eigen::VectorXd &x) { x_.val() = x; }
+
+    /**
+     * @brief Sets each decision variable within GetVariables() to the values
+     * within the vector x
+     *
+     * @param x
+     */
+    void SetDecisionVariablesFromVector(const Eigen::VectorXd &x) {
+        // Use current mapping to compute variables
+        for (auto &xi : variables_id_) {
+            int id = xi.second;
+            Variable &v = variables_[id];
+            v.val() << x.middleRows(v.idx().i_start(), v.idx().i_sz());
+        }
+    }
+
    private:
     // Program name
     std::string name_;
@@ -308,7 +375,7 @@ class Program {
 
     // Variables
     std::unordered_map<std::string, int> variables_id_;
-    std::vector<int> variables_idx_;
+    std::vector<BlockIndex> variables_idx_;
     std::vector<Variable> variables_;
 
     // Parameters
@@ -317,15 +384,17 @@ class Program {
 
     // Constraints
     std::unordered_map<std::string, int> constraints_id_;
-    std::vector<int> constraints_idx_;
+    std::vector<BlockIndex> constraints_idx_;
+    std::vector<std::vector<BlockIndex>> constraints_jac_idx_;
+    std::vector<std::vector<BlockIndex>> constraints_hes_idx_;
     std::vector<Constraint> constraints_;
 
     // Costs
     std::unordered_map<std::string, int> costs_id_;
-    std::vector<Cost> costs_;
+    std::vector<std::vector<BlockIndex>> costs_grad_idx_;
+    std::vector<std::vector<BlockIndex>> costs_hes_idx_;
 
-    void SetUpCost(Cost &cost, const casadi::SXVector &x);
-    void SetUpConstraint(Constraint &constraint);
+    std::vector<Cost> costs_;
 
     // Utilities
     std::string GetSXName(const casadi::SX &x);

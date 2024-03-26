@@ -100,6 +100,8 @@ class OSCController : public optimisation::Program {
         Eigen::Vector3d wr = Eigen::Vector3d::Zero();
 
         Eigen::VectorXd ComputeDesiredAcceleration();
+
+        damotion::optimisation::Cost *cost;
     };
 
     // Associated with point-contact with a given surface
@@ -118,6 +120,9 @@ class OSCController : public optimisation::Program {
 
         // Point to keep in contact with
         Eigen::Vector3d xr;
+
+        damotion::optimisation::Constraint *friction;
+        damotion::optimisation::Cost *cost;
     };
 
     /**
@@ -211,14 +216,10 @@ class OSCController : public optimisation::Program {
     void SetUpTrackingTask(TrackingTask &task) {
         damotion::common::Profiler("OSCController::SetUpTrackingTask");
 
-
-        // for(int i = 0; i)
         // Get necessary inputs
         casadi::StringVector inames =
             utils::casadi::CreateInputNames(task.Function().f());
         casadi::SXVector in = GetSymbolicFunctionInput(inames);
-
-        // ! Only extract parameters? Make input {x, p}
 
         // Get second time derivative of constraint
         casadi::SX d2cdt2 = task.Function().f()(in)[2];
@@ -246,9 +247,16 @@ class OSCController : public optimisation::Program {
         in.push_back(GetParameters(task.name() + "_xacc_d").sym());
 
         // Add cost to the program
-        AddCost(task.name() + "_tracking_cost", obj, in);
+        casadi::SX &qacc = GetDecisionVariables("qacc").sym();
 
-        // SetUp function data to task
+        std::cout << "Adding Cost\n";
+        // Add cost, only dependent on qacc
+        AddCost(task.name() + "_tracking_cost", obj, in, {qacc}, {"qacc"},
+                {{qacc, qacc}}, {{"qacc", "qacc"}});
+
+        std::cout << "Added Cost\n";
+
+        // Set inputs for task function
         SetFunctionInputData(task.Function());
     }
 
@@ -266,19 +274,24 @@ class OSCController : public optimisation::Program {
         // Get translational component
         casadi::SX xacc = d2cdt2(casadi::Slice(0, 3));
 
+        casadi::SX &qacc = GetDecisionVariables("qacc").sym(),
+                   &lam = GetDecisionVariables("lam").sym();
+
         /* No-slip constraint */
         AddConstraint(task.name() + "_no_slip", xacc, in,
-                      optimisation::BoundsType::kEquality);
+                      optimisation::BoundsType::kEquality, {qacc, lam},
+                      {"qacc", "lam"}, {{qacc, qacc}, {lam, lam}},
+                      {{"qacc", "qacc"}, {"lam", "lam"}});
 
         /* Friction cone constraint */
         // Get contact forces from force vector
         int idx = task.ConstraintForceIndex();
-        casadi::SX lam =
+        casadi::SX lam_c =
             GetDecisionVariables("lam").sym()(casadi::Slice(idx, idx + 3));
 
-        AddFrictionConeConstraint(task.name(), lam);
+        AddFrictionConeConstraint(task.name(), lam_c);
 
-        // SetUp function data to task
+        // Set up function data for task computations
         SetFunctionInputData(task.Function());
     }
 
@@ -292,9 +305,13 @@ class OSCController : public optimisation::Program {
         // Get second time derivative of constraint
         casadi::SX d2cdt2 = con.Function().f()(in)[2];
         // Set second rate of change of constraint to zero to ensure no change
-        // Add constraint to program
+
+        casadi::SX &qacc = GetDecisionVariables("qacc").sym();
+
+        /* No-slip constraint */
         AddConstraint(con.name(), d2cdt2, in,
-                      optimisation::BoundsType::kEquality);
+                      optimisation::BoundsType::kEquality, {qacc}, {"qacc"},
+                      {{qacc, qacc}}, {{"qacc", "qacc"}});
     }
 
     // Given all information for the problem, initialise the program
@@ -317,31 +334,38 @@ class OSCController : public optimisation::Program {
         // Resize lambda to account for all constraint forces
         ResizeDecisionVariables("lam", nc);
 
+        std::cout << "Decision variables\n";
         // Create optimisation vector with given ordering
         ConstructDecisionVariableVector({"qacc", "ctrl", "lam"});
 
+        std::cout << "Contact Tasks\n";
         // Set up contact constraints to program
         for (auto &p : contact_tasks_) {
             ContactTask &task = p.second;
             SetUpContactTask(task);
         }
 
+        std::cout << "Tracking Tasks\n";
         // SetUp tracking tasks to program
         for (auto &task : tracking_tasks_) {
             SetUpTrackingTask(task.second);
         }
 
+        std::cout << "Holonomic\n";
         // SetUp holonomic constraints to program
         for (auto &con : holonomic_constraints_) {
             SetUpHolonomicConstraint(con.second);
         }
 
+        std::cout << "Dynamics\n";
         // Compute constrained dynamics constraint and add to program
         ComputeConstrainedDynamics();
 
-        // Construct the final constraint vector
-        ConstructConstraintVector();
+        std::cout << "Constraint Vector\n";
+        // Construct the final constraint vector after creating all constraints
+        ConstructConstraintVector();  // TODO - Set warning if this isn't called
 
+        std::cout << "Update Vector\n";
         // Create bounds for decision variables and constraints
         UpdateDecisionVariableVectorBounds();
         UpdateConstraintVectorBounds();
@@ -368,15 +392,15 @@ class OSCController : public optimisation::Program {
         cone(2) = sqrt(2.0) * l_y + mu * l_z;
         cone(3) = -sqrt(2.0) * l_y - mu * l_z;
 
-        casadi::SXVector in = {GetDecisionVariables("qacc").sym(),
-                               GetDecisionVariables("ctrl").sym(),
-                               GetDecisionVariables("lam").sym(),
+        casadi::SXVector in = {GetDecisionVariables("lam").sym(),
                                GetParameters(name + "_friction_mu").sym()};
 
-        AddConstraint(name + "_friction", cone, in,
-                      optimisation::BoundsType::kPositive);
+        casadi::SX &lam = GetDecisionVariables("lam").sym();
 
-        // ! Need to add constraint bounds
+        // Add cost with given partitioning for gradients and hessians
+        AddConstraint(name + "_friction", cone, in,
+                      optimisation::BoundsType::kPositive, {lam}, {"lam"},
+                      {{lam, lam}}, {{"lam", "lam"}});
     }
 
     void UpdateContactFrictionCoefficient(const std::string &name,
@@ -478,7 +502,15 @@ class OSCController : public optimisation::Program {
         in.push_back(GetDecisionVariables("lam").sym());
         inames.push_back("lam");
 
-        AddConstraint("dynamics", dyn, in, optimisation::BoundsType::kEquality);
+        casadi::SX &qacc = GetDecisionVariables("qacc").sym(),
+                   &ctrl = GetDecisionVariables("ctrl").sym(),
+                   &lam = GetDecisionVariables("lam").sym();
+
+        /* No-slip constraint */
+        AddConstraint("dynamics", dyn, in, optimisation::BoundsType::kEquality,
+                      {qacc, ctrl, lam}, {"qacc", "ctrl", "lam"},
+                      {{qacc, qacc}, {ctrl, ctrl}, {lam, lam}},
+                      {{"qacc", "qacc"}, {"ctrl", "ctrl"}, {"lam", "lam"}});
 
         // ? If projected dynamics, compute null-space dynamics independently
         // ? (i.e. using Eigen)

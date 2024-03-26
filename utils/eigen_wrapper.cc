@@ -89,7 +89,7 @@ void FunctionWrapper::setInput(int i, Eigen::Ref<const Eigen::MatrixXd> x) {
     in_data_ptr_[i] = x.data();
 }
 
-void FunctionWrapper::setInput(int i, double* x_ptr) {
+void FunctionWrapper::setInput(int i, const  double* x_ptr) {
     // TODO - Perform checks of the input data
     in_data_ptr_[i] = x_ptr;
 }

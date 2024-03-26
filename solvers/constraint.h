@@ -5,6 +5,7 @@
 #include <casadi/casadi.hpp>
 
 #include "solvers/bounds.h"
+#include "solvers/index.h"
 #include "utils/eigen_wrapper.h"
 
 namespace damotion {
@@ -14,6 +15,9 @@ class Constraint {
    public:
     Constraint() = default;
     ~Constraint() = default;
+
+    // Constraint(const casadi::SX &c, const casadi::SXVector &x,
+    //            const casadi::SXVector &p, bool jac = false, bool hes = false) {}
 
     Constraint(const std::string &name, const int dim)
         : name_(name), dim_(dim) {
@@ -29,13 +33,16 @@ class Constraint {
 
     void SetConstraintFunction(casadi::Function &f) { con_ = f; }
     void SetJacobianFunction(casadi::Function &f) { jac_ = f; }
+
     void SetHessianFunction(casadi::Function &f) { hes_ = f; }
     void SetLinearisedConstraintFunction(casadi::Function &f) { lin_ = f; }
 
     utils::casadi::FunctionWrapper &ConstraintFunction() { return con_; }
     utils::casadi::FunctionWrapper &JacobianFunction() { return jac_; }
     utils::casadi::FunctionWrapper &HessianFunction() { return hes_; }
-    utils::casadi::FunctionWrapper &LinearisedConstraintFunction() { return lin_; }
+    utils::casadi::FunctionWrapper &LinearisedConstraintFunction() {
+        return lin_;
+    }
 
     const BoundsType &GetBoundsType() const { return bounds_type_; }
     void SetBoundsType(const BoundsType &type) {
@@ -56,21 +63,6 @@ class Constraint {
      * @return const int
      */
     const int dim() const { return dim_; }
-
-    /**
-     * @brief The index of the constraint within the constraint vector
-     *
-     * @return const int&
-     */
-    const int &idx() const { return idx_; }
-
-    /**
-     * @brief Set the index of this constraint within the program constraint
-     * vector
-     *
-     * @param idx
-     */
-    void SetIndex(const int idx) { idx_ = idx; }
 
     /**
      * @brief Constraint lower bound (dim x 1)
@@ -115,8 +107,6 @@ class Constraint {
    private:
     // Dimension of the constraint
     int dim_ = 0;
-    // Starting index of the constraint within the overall constraint vector
-    int idx_ = 0;
 
     // Name of the constraint
     std::string name_;
@@ -142,7 +132,6 @@ class Constraint {
 
     // Linearised constraint
     utils::casadi::FunctionWrapper lin_;
-
 };
 
 }  // namespace optimisation

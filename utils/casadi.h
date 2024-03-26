@@ -36,6 +36,25 @@ namespace casadi {
                                           const ::casadi::StringVector &xnames);
 
 /**
+ * @brief Creates a jacobian function for expression f with outputs being
+ * jacobians with respect to the variables given by x.
+ *
+ * @param name Name of the expression
+ * @param f Expression to generate the gradients for
+ * @param in Symbolic inputs required to generate the expression
+ * @param inames Names of the symbolic inputs in in
+ * @param x Symbolic variables to compute the gradients with respect to
+ * @param xnames Names of the symbolic variables in x
+ * @return casadi::Function
+ */
+::casadi::Function CreateJacobianFunction(const std::string &name,
+                                          const ::casadi::SX &f,
+                                          const ::casadi::SXVector &in,
+                                          const ::casadi::StringVector &inames,
+                                          const ::casadi::SXVector &x,
+                                          const ::casadi::StringVector &xnames);
+
+/**
  * @brief Creates a hessian function for expression f with outputs being
  * hessians with respect to the variables given by x.
  *

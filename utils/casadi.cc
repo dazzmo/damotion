@@ -27,14 +27,32 @@ namespace casadi {
     // For each entry, compute the gradient
     for (int i = 0; i < x.size(); ++i) {
         // Compute gradients of cost with respect to variable set x
-        ::casadi::SX grad = gradient(f, x[i]);
-        std::cout << grad << std::endl;
         g.push_back(gradient(f, x[i]));
         gnames.push_back("grad_" + xnames[i]);
     }
-    std::cout << "Done\n";
     // Create function
     return ::casadi::Function(name + "_grad", in, g, inames, gnames);
+}
+
+::casadi::Function CreateJacobianFunction(
+    const std::string &name, const ::casadi::SX &f,
+    const ::casadi::SXVector &in, const ::casadi::StringVector &inames,
+    const ::casadi::SXVector &x, const ::casadi::StringVector &xnames) {
+    assert(in.size() == inames.size() &&
+           "Number of inputs and input names don't match!");
+    assert(x.size() == xnames.size() &&
+           "Number of independent variables and names don't match!");
+    // Vector of gradients and output names
+    ::casadi::SXVector jac;
+    ::casadi::StringVector jacnames;
+    // For each entry, compute the gradient
+    for (int i = 0; i < x.size(); ++i) {
+        // Compute gradients of cost with respect to variable set x
+        jac.push_back(jacobian(f, x[i]));
+        jacnames.push_back("jac_" + xnames[i]);
+    }
+    // Create function
+    return ::casadi::Function(name + "_jac", in, jac, inames, jacnames);
 }
 
 ::casadi::Function CreateHessianFunction(
