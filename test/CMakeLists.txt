@@ -21,6 +21,8 @@ target_link_libraries(log damotion GTest::gtest_main)
 add_executable(casadi_utils ${CMAKE_CURRENT_SOURCE_DIR}/utils/casadi.cc)
 target_link_libraries(casadi_utils damotion GTest::gtest_main)
 
+add_executable(expression ${CMAKE_CURRENT_SOURCE_DIR}/utils/expression.cc)
+target_link_libraries(expression damotion GTest::gtest_main)
 
 # System
 add_executable(controlled_system ${CMAKE_CURRENT_SOURCE_DIR}/system/controlled.cc)
@@ -52,3 +54,4 @@ gtest_discover_tests(profiler)
 gtest_discover_tests(osc)
 gtest_discover_tests(program_test)
 gtest_discover_tests(casadi_utils)
+gtest_discover_tests(expression)

@@ -5,7 +5,7 @@
 #include <casadi/casadi.hpp>
 
 #include "solvers/bounds.h"
-#include "solvers/index.h"
+#include "symbolic/expression.h"
 #include "utils/eigen_wrapper.h"
 
 namespace damotion {
@@ -16,46 +16,30 @@ class Constraint {
     Constraint() = default;
     ~Constraint() = default;
 
-    // Constraint(const casadi::SX &c, const casadi::SXVector &x,
-    //            const casadi::SXVector &p, bool jac = false, bool hes = false) {}
+    /**
+     * @brief Construct a new Constraint object from the symbolic expression c
+     *
+     * @param c
+     * @param jac
+     * @param hes
+     */
+    Constraint(const symbolic::Expression &c,
+               const BoundsType &bounds = BoundsType::kUnbounded,
+               bool jac = false, bool hes = false);
 
-    Constraint(const std::string &name, const int dim)
-        : name_(name), dim_(dim) {
-        lb_ = -Eigen::VectorXd::Ones(dim_);
-        ub_ = Eigen::VectorXd::Ones(dim_);
-    }
-
-    void SetSymbolicConstraint(const casadi::SX &c) { c_ = c; }
-    casadi::SX &SymbolicConstraint() { return c_; }
-
-    void SetSymbolicInputs(const casadi::SXVector &inputs) { inputs_ = inputs; }
-    casadi::SXVector &SymbolicInputs() { return inputs_; }
-
-    void SetConstraintFunction(casadi::Function &f) { con_ = f; }
-    void SetJacobianFunction(casadi::Function &f) { jac_ = f; }
-
-    void SetHessianFunction(casadi::Function &f) { hes_ = f; }
-    void SetLinearisedConstraintFunction(casadi::Function &f) { lin_ = f; }
+    void SetConstraintFunction(const casadi::Function &f) { con_ = f; }
+    void SetJacobianFunction(const casadi::Function &f) { jac_ = f; }
+    void SetHessianFunction(const casadi::Function &f) { hes_ = f; }
 
     utils::casadi::FunctionWrapper &ConstraintFunction() { return con_; }
     utils::casadi::FunctionWrapper &JacobianFunction() { return jac_; }
     utils::casadi::FunctionWrapper &HessianFunction() { return hes_; }
-    utils::casadi::FunctionWrapper &LinearisedConstraintFunction() {
-        return lin_;
-    }
 
     const BoundsType &GetBoundsType() const { return bounds_type_; }
     void SetBoundsType(const BoundsType &type) {
         bounds_type_ = type;
         SetBounds(ub_, lb_, bounds_type_);
     }
-
-    /**
-     * @brief Name of the constraint
-     *
-     * @return const std::string&
-     */
-    const std::string &name() const { return name_; }
 
     /**
      * @brief Dimension of the constraint
@@ -108,15 +92,7 @@ class Constraint {
     // Dimension of the constraint
     int dim_ = 0;
 
-    // Name of the constraint
-    std::string name_;
-
     BoundsType bounds_type_ = BoundsType::kUnbounded;
-
-    // Underlying symbolic representation of constraint
-    casadi::SX c_;
-    // Symbolic input vector
-    casadi::SXVector inputs_;
 
     // Constraint lower bound
     Eigen::VectorXd lb_;
@@ -130,8 +106,59 @@ class Constraint {
     // Hessian of vector-product
     utils::casadi::FunctionWrapper hes_;
 
-    // Linearised constraint
-    utils::casadi::FunctionWrapper lin_;
+    // Number of variable inputs
+    int nx_ = 0;
+    // Number of parameter inputs
+    int np_ = 0;
+};
+
+class LinearConstraint : public Constraint {
+   public:
+    LinearConstraint(const Eigen::MatrixXd &A, const Eigen::VectorXd &b) {
+        // Create constraints
+        casadi::DM Adm, bdm;
+        damotion::utils::casadi::toCasadi(A, Adm);
+        damotion::utils::casadi::toCasadi(b, bdm);
+
+        casadi::SX Asx = Adm, bsx = bdm;
+
+        // Create constraint, including the constant term b as well
+        casadi::SX x = casadi::SX::sym("x", A.cols());
+        casadi::SX c = casadi::SX::mtimes(Asx, x) + bsx;
+        // Create the constraint
+        casadi::Function f = casadi::Function("lin_con", {x}, {c, bsx});
+        casadi::Function fjac = casadi::Function("lin_con_jac", {x}, {Asx});
+        SetConstraintFunction(f);
+        SetJacobianFunction(fjac);
+    }
+
+    LinearConstraint(const casadi::SX &A, const casadi::SX &b,
+                     const casadi::SXVector &p) {
+        // Create constraint
+        casadi::SX x = casadi::SX::sym("x", A.size2());
+
+        casadi::SXVector in = {x};
+        // Add any parameters that define A and b
+        for (const casadi::SX &pi : p) {
+            in.push_back(pi);
+        }
+
+        casadi::SX linear_constraint = casadi::SX::mtimes(A, x) + b;
+
+        // Create the constraint, including the constant term b as well
+        casadi::Function f =
+            casadi::Function("lin_con", in, {linear_constraint, b});
+        casadi::Function fjac = casadi::Function("lin_con_jac", in, {A});
+        SetConstraintFunction(f);
+        SetJacobianFunction(fjac);
+    }
+
+    const Eigen::MatrixXd &A() { return JacobianFunction().getOutput(0); }
+    const Eigen::VectorXd &b() { return ConstraintFunction().getOutput(1); }
+
+   private:
+    Eigen::MatrixXd A_;
+    Eigen::VectorXd b_;
 };
 
 }  // namespace optimisation

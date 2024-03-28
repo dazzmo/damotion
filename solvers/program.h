@@ -4,12 +4,16 @@
 #include <casadi/casadi.hpp>
 
 #include "common/profiler.h"
+#include "solvers/binding.h"
 #include "solvers/constraint.h"
 #include "solvers/cost.h"
-#include "solvers/variable.h"
+#include "symbolic/expression.h"
+#include "symbolic/variable.h"
 #include "utils/casadi.h"
 #include "utils/codegen.h"
 #include "utils/eigen_wrapper.h"
+
+namespace sym = damotion::symbolic;
 
 namespace damotion {
 namespace optimisation {
@@ -19,6 +23,13 @@ namespace solvers {
 class SolverBase;
 }
 
+/**
+ * @brief The program class creates mathematical programs.
+ * It uses a block structure to allow greater speed in accessing data, thus
+ * optimisation variables are grouped in sets, which can be as small as a single
+ * unit.
+ *
+ */
 class Program {
    public:
     Program() = default;
@@ -26,7 +37,11 @@ class Program {
 
     friend class solvers::SolverBase;
 
-    Program(const std::string &name) : name_(name), nx_(0), nc_(0), np_(0) {}
+    Program(const std::string &name)
+        : name_(name),
+          n_decision_variables_(0),
+          n_constraints_(0),
+          n_parameters_(0) {}
 
     /**
      * @brief Name of the program
@@ -40,174 +55,136 @@ class Program {
      *
      * @return const int&
      */
-    const int &NumberOfDecisionVariables() const { return nx_; }
+    const int &NumberOfDecisionVariables() const {
+        return n_decision_variables_;
+    }
 
     /**
      * @brief Number of constraints currently in the program
      *
      * @return const int&
      */
-    const int &NumberOfConstraints() const { return nc_; }
+    const int &NumberOfConstraints() const { return n_constraints_; }
 
     /**
      * @brief Number of parameters currently in the program
      *
      * @return const int&
      */
-    const int &NumberOfParameters() const { return np_; }
+    const int &NumberOfParameters() const { return n_parameters_; }
 
     /**
-     * @brief Adds symbolic variable vector to the list of variables within the
-     * program. Duplicate names are not allowed.
+     * @brief Add decision variables to the program
      *
-     * @param name
-     * @param n Number of rows
-     * @param m Number of columns
+     * @param var
      */
-    void AddDecisionVariables(const std::string &name, const int n,
-                              const int m = 1);
+    void AddDecisionVariables(const Eigen::Ref<sym::VariableMatrix> &var);
 
     /**
-     * @brief Removes a variable currently considered by the program.
+     * @brief Removes variables currently considered by the program.
      *
-     * @param name
+     * @param var
      */
-    void RemoveDecisionVariables(const std::string &name);
+    void RemoveDecisionVariables(const Eigen::Ref<sym::VariableMatrix> &var);
 
-    Variable &GetDecisionVariables(const std::string &name);
+    int GetDecisionVariableStartIndex(const sym::VariableVector &v);
+
+    bool IsDecisionVariable(const sym::Variable &var);
 
     /**
-     * @brief The index of the variables given by name within the decision
-     * variable vector given by DecisionVariableVector()
+     * @brief Add parameters to the program
      *
-     * @param name
-     * @return int
+     * @param var
      */
-    int GetDecisionVariablesIndex(const std::string &name);
+    Eigen::Ref<const Eigen::MatrixXd> AddParameters(const std::string &name,
+                                                    int n, int m = 1);
+
+    Eigen::Ref<const Eigen::MatrixXd> GetParameters(const std::string &name);
+
+    void SetParameters(const std::string &name,
+                       Eigen::Ref<const Eigen::MatrixXd> val);
 
     /**
-     * @brief Resizes a decision variable to a new size sz.
+     * @brief Removes variables currently considered by the program.
      *
-     * @param name Name of the decision variables
-     * @param sz The new size
+     * @param var
      */
-    void ResizeDecisionVariables(const std::string &name, const int n,
-                                 const int m = 1);
-
-    /**
-     * @brief Indicates whether the provided variable is present within the
-     * problem
-     *
-     * @param name
-     * @return true
-     * @return false
-     */
-    bool IsDecisionVariable(const std::string &name);
-
-    void SetParameters(const std::string &name, const Eigen::MatrixXd &val);
-    void AddParameters(const std::string &name, const int n, const int m = 1);
     void RemoveParameters(const std::string &name);
-    Variable &GetParameters(const std::string &name);
+
+    Binding<Cost> AddCost(const sym::Expression &cost,
+                          const sym::VariableRefVector &x,
+                          const sym::ParameterRefVector &p);
+
+    // TODO - Remove cost or constraint
+
+    Binding<LinearConstraint> AddLinearConstraint(
+        const Eigen::MatrixXd &A, const Eigen::VectorXd &b,
+        const sym::VariableRefVector &x);
+
+    Binding<LinearConstraint> AddLinearConstraint(
+        const std::shared_ptr<LinearConstraint> &con,
+        const sym::VariableRefVector &x, const sym::ParameterRefVector &p);
+
+    Binding<Constraint> AddGenericConstraint(const sym::Expression &c,
+                                             const sym::VariableRefVector &x,
+                                             const sym::ParameterRefVector &p);
 
     /**
-     * @brief Indicates whether the provided parameter is present within the
-     * problem
+     * @brief Add a constraint to the program that uses the variables
+     * and parameters given by x and p respectively.
      *
-     * @param name
-     * @return true
-     * @return false
-     */
-    inline bool IsParameter(const std::string &name);
-
-    /**
-     * @brief Adds a cost to the program given by the expression cost and inputs
-     * in. Cost gradients can be computed with respect to a custom list of
-     * variables given by x and xnames. Similarly, cost hessians can also be
-     * computed by providing custom variable pairings in xy and xynames.
-     *
-     * @param name Name of the cost
-     * @param cost Expression for cost
-     * @param in Inputs used to generate cost
-     * @param x Variables to compute gradient of cost with respect to
-     * @param xnames Names of variables in x
-     * @param xy Variable pairs to compute cost hessian with respect to
-     * @param xynames Names of variables in xy
-     */
-    void AddCost(
-        const std::string &name, casadi::SX &cost, casadi::SXVector &in,
-        const casadi::SXVector &x = {}, const casadi::StringVector xnames = {},
-        const std::vector<std::pair<::casadi::SX, ::casadi::SX>> &xy = {},
-        const std::vector<std::pair<std::string, std::string>> &xynames = {});
-
-    void RemoveCost(const std::string &name);
-    Cost &GetCost(const std::string &name);
-
-    /**
-     * @brief Adds a constraint to the program given by the expression
-     * constraint and inputs in. Jacobians can be computed with respect to a
-     * custom list of variables given by x and xnames, otherwise the jaocbian is
-     * only computed for the current decision variable vector given by
-     * DecisionVariableVector(). Similarly, hessians can also be computed
-     * by providing custom variable pairings in xy and xynames.
-     *
-     * @param name
-     * @param constraint
-     * @param in
-     * @param bounds
+     * @param c
      * @param x
-     * @param xnames
-     * @param xy
-     * @param xynames
+     * @param p
+     * @return Binding<Constraint>
      */
-    void AddConstraint(
-        const std::string &name, casadi::SX &constraint, casadi::SXVector &in,
-        const BoundsType &bounds = BoundsType::kUnbounded,
-        const casadi::SXVector &x = {}, const casadi::StringVector xnames = {},
-        const std::vector<std::pair<::casadi::SX, ::casadi::SX>> &xy = {},
-        const std::vector<std::pair<std::string, std::string>> &xynames = {});
-
-    Constraint &GetConstraint(const std::string &name);
-    void RemoveConstraint(const std::string &name);
+    Binding<Constraint> AddConstraint(const std::shared_ptr<Constraint> &c,
+                                      const sym::VariableRefVector &x,
+                                      const sym::ParameterRefVector &p);
 
     /**
-     * @brief The index of the variables given by name within the decision
-     * variable vector given by DecisionVariableVector()
+     * @brief Add a generic constraint to the program that uses the variables
+     * and parameters given by x and p respectively.
      *
-     * @param name
-     * @return int
+     * @param c
+     * @param x
+     * @param p
+     * @return Binding<Constraint>
      */
-    int GetConstraintIndex(const std::string &name);
+    Binding<Constraint> AddGenericConstraint(std::shared_ptr<Constraint> &c,
+                                             const sym::VariableRefVector &x,
+                                             const sym::ParameterRefVector &p);
+
+    std::vector<Binding<Constraint>> GetAllConstraints() {
+        std::vector<Binding<Constraint>> constraints;
+        constraints.insert(constraints.begin(), linear_constraints_.begin(),
+                           linear_constraints_.end());
+
+        // Return vector of all constraints
+        return constraints;
+    }
 
     /**
      * @brief Decision variable vector for the program.
      *
-     * @return Variable&
+     * @return const Eigen::VectorXd &
      */
-    Variable &DecisionVariableVector() { return x_; }
+    const Eigen::VectorXd &DecisionVariableVector() const { return x_; }
+
+    Eigen::Ref<Eigen::VectorXd> GetDecisionVariablesLowerBound(
+        const sym::VariableVector &v) {
+        return lbx_.middleRows(GetDecisionVariableStartIndex(v), v.size());
+    }
+    Eigen::Ref<Eigen::VectorXd> GetDecisionVariablesUpperBound(
+        const sym::VariableVector &v) {
+        return ubx_.middleRows(GetDecisionVariableStartIndex(v), v.size());
+    }
 
     Eigen::VectorXd &DecisionVariablesLowerBound() { return lbx_; }
     Eigen::VectorXd &DecisionVariablesUpperBound() { return ubx_; }
 
     Eigen::VectorXd &ConstraintsLowerBound() { return lbg_; }
     Eigen::VectorXd &ConstraintsUpperBound() { return ubg_; }
-
-    /**
-     * @brief Updates the bounds for the decision variable vector for the
-     * variable given by name
-     *
-     * @param name
-     */
-    void UpdateDecisionVariableVectorBounds(const std::string &name);
-
-    /**
-     * @brief Updates the bounds for the decision variable vector for all
-     * decision variables
-     *
-     */
-    void UpdateDecisionVariableVectorBounds();
-
-    void UpdateConstraintVectorBounds(const std::string &name);
-    void UpdateConstraintVectorBounds();
 
     /**
      * @brief Prints the current set of parameters for the program to the
@@ -245,108 +222,60 @@ class Program {
     void PrintProgramSummary();
 
     /**
-     * @brief Returns the id of a cost within the costs vector of the program.
-     * If the cost does not exist, returns -1.
-     *
-     * @param name
-     * @return  int
-     */
-    int GetCostId(const std::string &name);
-
-    /**
-     * @brief Returns the id of a constraint within the constraints vector of
-     * the program. If the constraint does not exist, returns -1.
-     *
-     * @param name
-     * @return  int
-     */
-    int GetConstraintId(const std::string &name);
-
-   protected:
-    /**
-     * @brief Returns the id of a variable within the variables vectors of the
-     * program. If the variable does not exist, returns -1.
-     *
-     * @param name
-     * @return  int
-     */
-    int GetDecisionVariablesId(const std::string &name);
-
-    /**
-     * @brief Returns the id of a parameter within the parameters vectors of
-     * the program. If the parameter does not exist, returns -1.
-     *
-     * @param name
-     * @return  int
-     */
-    int GetParametersId(const std::string &name);
-
-    void ConstructConstraintVector();
-
-    /**
-     * @brief Given the list of input names, assembles a vector of symbolic
-     * inputs using the variables and parameters present in the program
-     *
-     * @param inames
-     * @return casadi::SXVector
-     */
-    casadi::SXVector GetSymbolicFunctionInput(
-        const std::vector<std::string> &inames);
-
-    /**
-     * @brief For a given FunctionWrapper f, sets the inputs of the function to
-     * the variable and parameter data vectors within the program so future
-     * calls to f will use the most recent values of the variables and
-     * parameters.
-     *
-     * @param f
-     */
-    void SetFunctionInputData(utils::casadi::FunctionWrapper &f);
-
-    /**
-     * @brief Sets the optimisation vector for the program to a vector with
-     * ordering of variables provided by order
+     * @brief Sets the optimisation vector with the given ordering of variables
      *
      * @param order
      */
-    void ConstructDecisionVariableVector(const std::vector<std::string> &order);
-
-    // void FormatFunctionInput();
+    bool SetDecisionVariableVector(const Eigen::Ref<sym::VariableVector> &var);
 
     /**
-     * @brief Get the vector of current Cost objects within the program
+     * @brief Set the optimisation to the default ordering of variables (ordered
+     * by when they were added to the program)
      *
-     * @return std::vector<Cost>&
      */
-    std::vector<Cost> &GetCosts() { return costs_; }
+    void SetDecisionVariableVector();
 
     /**
-     * @brief Get the vector of current Constraint objects within the program.
+     * @brief Get the vector of current LinearConstraint objects within the
+     * program.
      *
-     * @return std::vector<Constraint>&
+     * @return std::vector<Binding<LinearConstraint>>&
      */
-    std::vector<Constraint> &GetConstraints() { return constraints_; }
+    std::vector<Binding<LinearConstraint>> GetLinearConstraintBindings() {
+        // Create constraints
+        return linear_constraints_;
+    }
 
-    /**
-     * @brief Sets the optimisation vector to the values given in the vector x
-     *
-     * @param x
-     */
-    void SetDecisionVariableVector(const Eigen::VectorXd &x) { x_.val() = x; }
+    std::vector<Binding<Cost>> &GetCostBindings() {
+        // TODO - Look at different classes of costs
+        return costs_;
+    }
 
-    /**
-     * @brief Sets each decision variable within GetVariables() to the values
-     * within the vector x
-     *
-     * @param x
-     */
-    void SetDecisionVariablesFromVector(const Eigen::VectorXd &x) {
-        // Use current mapping to compute variables
-        for (auto &xi : variables_id_) {
-            int id = xi.second;
-            Variable &v = variables_[id];
-            v.val() << x.middleRows(v.idx().i_start(), v.idx().i_sz());
+    // Update all bindings and indices
+    void UpdateBindings() {
+        // Go through all types of constraints to update
+
+        for (Binding<LinearConstraint> &b : GetLinearConstraintBindings()) {
+            // Update indexing based on current decision variable and parameter
+            // vectors
+            std::vector<int> xi = {};
+            for (int i = 0; i < b.NumberOfVariables(); ++i) {
+                xi.push_back(GetDecisionVariableStartIndex(b.GetVariable(i)));
+            }
+            b.SetVariableStartIndices(xi);
+            // ! Set bindings to parameters
         }
+
+        for (Binding<Cost> &b : GetCostBindings()) {
+            std::vector<int> xi = {};
+            for (int i = 0; i < b.NumberOfVariables(); ++i) {
+                xi.push_back(GetDecisionVariableStartIndex(b.GetVariable(i)));
+            }
+
+            b.SetVariableStartIndices(xi);
+        }
+
+        // Add Sparse Jacobian stuff here as well
     }
 
    private:
@@ -354,11 +283,11 @@ class Program {
     std::string name_;
 
     // Number of decision variables
-    int nx_ = 0;
+    int n_decision_variables_ = 0;
     // Number of constraints
-    int nc_ = 0;
+    int n_constraints_ = 0;
     // Number of parameters
-    int np_ = 0;
+    int n_parameters_ = 0;
 
     // Decision variables lower bound
     Eigen::VectorXd lbx_;
@@ -371,34 +300,27 @@ class Program {
     Eigen::VectorXd ubg_;
 
     // Optimisation vector
-    Variable x_;
+    Eigen::VectorXd x_;
+    // Parameter vector
+    typedef sym::Variable Parameter;
+    Parameter p_;
 
-    // Variables
-    std::unordered_map<std::string, int> variables_id_;
-    std::vector<BlockIndex> variables_idx_;
-    std::vector<Variable> variables_;
+    // Decision variables
+    std::unordered_map<sym::Variable::Id, int> decision_variable_start_idx_;
+    std::vector<sym::VariableVector> decision_variables_;
+
+    // ID of each decision variable within the program
+    std::vector<sym::Variable::Id> decision_variable_id_;
 
     // Parameters
-    std::unordered_map<std::string, int> parameters_id_;
-    std::vector<Variable> parameters_;
+    std::unordered_map<std::string, Eigen::MatrixXd> parameters_;
 
     // Constraints
-    std::unordered_map<std::string, int> constraints_id_;
-    std::vector<BlockIndex> constraints_idx_;
-    std::vector<std::vector<BlockIndex>> constraints_jac_idx_;
-    std::vector<std::vector<BlockIndex>> constraints_hes_idx_;
-    std::vector<Constraint> constraints_;
+    std::vector<Binding<Constraint>> constraints_;
+    std::vector<Binding<LinearConstraint>> linear_constraints_;
 
     // Costs
-    std::unordered_map<std::string, int> costs_id_;
-    std::vector<std::vector<BlockIndex>> costs_grad_idx_;
-    std::vector<std::vector<BlockIndex>> costs_hes_idx_;
-
-    std::vector<Cost> costs_;
-
-    // Utilities
-    std::string GetSXName(const casadi::SX &x);
-    casadi::StringVector GetSXVectorNames(const casadi::SXVector &x);
+    std::vector<Binding<Cost>> costs_;
 };
 
 }  // namespace optimisation

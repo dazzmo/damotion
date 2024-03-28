@@ -17,8 +17,8 @@ PinocchioModelWrapper &PinocchioModelWrapper::operator=(
 ::casadi::Function PinocchioModelWrapper::aba() {
     // Compute expression for aba
     ::casadi::Matrix<AD> q = ::casadi::Matrix<AD>::sym("q", model_.nq),
-                       v = ::casadi::Matrix<AD>::sym("v", model_.nv),
-                       tau = ::casadi::Matrix<AD>::sym("tau", model_.nv), a;
+                         v = ::casadi::Matrix<AD>::sym("v", model_.nv),
+                         tau = ::casadi::Matrix<AD>::sym("tau", model_.nv), a;
     // Convert to eigen expressions
     Eigen::VectorX<::casadi::Matrix<AD>> qe, ve, taue;
     toEigen(q, qe);
@@ -33,14 +33,14 @@ PinocchioModelWrapper &PinocchioModelWrapper::operator=(
 
     // Create function for ABA
     return ::casadi::Function(model_.name + "_aba", {q, v, tau}, {a},
-                            {"q", "v", "u"}, {"a"});
+                              {"q", "v", "u"}, {"a"});
 }
 
 ::casadi::Function PinocchioModelWrapper::rnea() {
     // Compute expression for aba
     ::casadi::Matrix<AD> q = ::casadi::Matrix<AD>::sym("q", model_.nq),
-                       v = ::casadi::Matrix<AD>::sym("v", model_.nv),
-                       a = ::casadi::Matrix<AD>::sym("a", model_.nv), u;
+                         v = ::casadi::Matrix<AD>::sym("v", model_.nv),
+                         a = ::casadi::Matrix<AD>::sym("a", model_.nv), u;
     // Convert to eigen expressions
     Eigen::VectorX<::casadi::Matrix<AD>> qe, ve, ae;
     toEigen(q, qe);
@@ -55,14 +55,14 @@ PinocchioModelWrapper &PinocchioModelWrapper::operator=(
 
     // Create function for RNEA
     return ::casadi::Function(model_.name + "_rnea", {q, v, a}, {u},
-                            {"q", "v", "a"}, {"u"});
+                              {"q", "v", "a"}, {"u"});
 };
 
 void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
     // Symbolic generalised coordinates and derivatives
     ::casadi::Matrix<AD> qpos = ::casadi::Matrix<AD>::sym("q", model_.nq),
-                       qvel = ::casadi::Matrix<AD>::sym("v", model_.nv),
-                       qacc = ::casadi::Matrix<AD>::sym("a", model_.nv);
+                         qvel = ::casadi::Matrix<AD>::sym("v", model_.nv),
+                         qacc = ::casadi::Matrix<AD>::sym("a", model_.nv);
     // Eigen-equivalents
     Eigen::VectorX<::casadi::Matrix<AD>> qpos_e, qvel_e, qacc_e;
     toEigen(qpos, qpos_e);
@@ -123,37 +123,15 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
 
     // Create end-effector data struct and add to vector
     EndEffector ee;
-    ee.S = Eigen::Matrix<double, 6, 6>::Identity();
 
     ee.x = ::casadi::Function(model_.name + "_" + frame_name + "_ee",
-                            {qpos, qvel, qacc}, {pos, vel, acc},
-                            {"qpos", "qvel", "qacc"}, {"pos", "vel", "acc"});
+                              {qpos, qvel, qacc}, {pos, vel, acc},
+                              {"qpos", "qvel", "qacc"}, {"pos", "vel", "acc"});
 
-    ee.J = ::casadi::Function(model_.name + "_" + frame_name + "_ee_jac", {qpos},
-                            {J}, {"qpos"}, {"J"});
+    ee.J = ::casadi::Function(model_.name + "_" + frame_name + "_ee_jac",
+                              {qpos}, {J}, {"qpos"}, {"J"});
 
-    // Also create a function that indicates the error between a target
-    // reference pose and the pose of the end-effector
-    ::casadi::Matrix<AD> q_ref = ::casadi::Matrix<AD>::sym("qr", 4),
-                       x_ref = ::casadi::Matrix<AD>::sym("qr", 3);
-    Eigen::Quaternion<::casadi::Matrix<AD>> q;
-    Eigen::Vector3<::casadi::Matrix<AD>> x;
-    toEigen(q_ref, q.coeffs());
-    toEigen(x_ref, x);
-
-    // Create pose
-    pinocchio::SE3Tpl<::casadi::Matrix<AD>> se3_ref(q, x);
-
-    // Determine error
-    ::casadi::Matrix<AD> err;
-    toCasadi(poseError(se3_frame, se3_ref), err);
-
-    // Create function
-    ee.pose_error = ::casadi::Function(
-        model_.name + "_" + frame_name + "_ee_pose_err", {qpos, x_ref, q_ref},
-        {err}, {"qpos", "x_ref", "q_ref"}, {"err"});
-
-    // Add to vector
+    // Add to map
     ee_idx_[frame_name] = ee_.size();
     ee_.push_back(ee);
 }

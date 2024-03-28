@@ -35,23 +35,23 @@ TEST(HolonomicConstraint, ConstraintCreationEndEffector) {
 
     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
-    // Add an end-effector
-    wrapper.addEndEffector("tool0");
+    // // Add an end-effector
+    // wrapper.addEndEffector("tool0");
 
-    // Get function for pose error
-    // TODO: Look at how parameters should be passed
-    casadi::SX q = casadi::SX::sym("qpos", wrapper.model().nq),
-               v = casadi::SX::sym("qvel", wrapper.model().nv),
-               a = casadi::SX::sym("qvel", wrapper.model().nv);
+    // // Get function for pose error
+    // // TODO: Look at how parameters should be passed
+    // casadi::SX q = casadi::SX::sym("qpos", wrapper.model().nq),
+    //            v = casadi::SX::sym("qvel", wrapper.model().nv),
+    //            a = casadi::SX::sym("qvel", wrapper.model().nv);
 
-    casadi::SX qR = casadi::SX::sym("qref", 4), pR = casadi::SX::sym("pref", 3);
+    // casadi::SX qR = casadi::SX::sym("qref", 4), pR = casadi::SX::sym("pref", 3);
 
-    // Compute functions for end-effector velocity and acceleration
-    casadi::SX c = wrapper.end_effector(0).pose_error(
-                   casadi::SXVector({q, qR, pR}))[0],
-               dc = wrapper.end_effector(0).x(casadi::SXVector({q, v, a}))[1],
-               ddc = wrapper.end_effector(0).x(casadi::SXVector({q, v, a}))[2],
-               J = wrapper.end_effector(0).J(casadi::SXVector({q}))[0];
+    // // Compute functions for end-effector velocity and acceleration
+    // casadi::SX c = wrapper.end_effector(0).pose_error(
+    //                casadi::SXVector({q, qR, pR}))[0],
+    //            dc = wrapper.end_effector(0).x(casadi::SXVector({q, v, a}))[1],
+    //            ddc = wrapper.end_effector(0).x(casadi::SXVector({q, v, a}))[2],
+    //            J = wrapper.end_effector(0).J(casadi::SXVector({q}))[0];
 
     // Create holonomic constraint
  

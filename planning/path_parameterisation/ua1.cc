@@ -121,35 +121,35 @@ UA1ProfileGenerator::Status UA1ProfileGenerator::ComputeProfile(
     return Status::kSuccess;
 }
 
-casadi::Function createZeroDynamicsCoefficients(
-    utils::casadi::PinocchioModelWrapper& wrapper, int unactuated_idx) {
-    typedef casadi::SX Scalar;
-    int nq = wrapper.model().nq;
+// casadi::Function createZeroDynamicsCoefficients(
+//     utils::casadi::PinocchioModelWrapper& wrapper, int unactuated_idx) {
+//     typedef casadi::SX Scalar;
+//     int nq = wrapper.model().nq;
 
-    // Path position, gradient and curvature
-    Scalar pos = Scalar::sym("pos", nq), grd = Scalar::sym("grd", nq),
-           crv = Scalar::sym("crv", nq);
+//     // Path position, gradient and curvature
+//     Scalar pos = Scalar::sym("pos", nq), grd = Scalar::sym("grd", nq),
+//            crv = Scalar::sym("crv", nq);
 
-    // Create zero vector
-    Scalar vz = Scalar::zeros(nq);
-    Scalar a(nq), b(nq), c(nq);
-    // Set q = P, q̇ = 0, q̈ = 0 to get c = G
-    c = wrapper.rnea()(std::vector<Scalar>({pos, vz, vz}))[0];
-    // Set q = P, q̇ = 0, q̈ = P' to get a = (M(q) P' + G) - G
-    a = wrapper.rnea()(std::vector<Scalar>({pos, vz, grd}))[0] - c;
-    // Set q = P, q̇ = P', q̈ = P'' to get b = (M(q) P'' + C(q, q̇) P' + G) - G
-    b = wrapper.rnea()(std::vector<Scalar>({pos, grd, crv}))[0] - c;
+//     // Create zero vector
+//     Scalar vz = Scalar::zeros(nq);
+//     Scalar a(nq), b(nq), c(nq);
+//     // Set q = P, q̇ = 0, q̈ = 0 to get c = G
+//     c = wrapper.rnea()(std::vector<Scalar>({pos, vz, vz}))[0];
+//     // Set q = P, q̇ = 0, q̈ = P' to get a = (M(q) P' + G) - G
+//     a = wrapper.rnea()(std::vector<Scalar>({pos, vz, grd}))[0] - c;
+//     // Set q = P, q̇ = P', q̈ = P'' to get b = (M(q) P'' + C(q, q̇) P' + G) - G
+//     b = wrapper.rnea()(std::vector<Scalar>({pos, grd, crv}))[0] - c;
 
-    /* Extract the underactuated components */
-    Scalar abc(3);
-    abc(0) = a(unactuated_idx);
-    abc(1) = b(unactuated_idx);
-    abc(2) = c(unactuated_idx);
+//     /* Extract the underactuated components */
+//     Scalar abc(3);
+//     abc(0) = a(unactuated_idx);
+//     abc(1) = b(unactuated_idx);
+//     abc(2) = c(unactuated_idx);
 
-    // Create function
-    return casadi::Function(wrapper.model().name + "_abc", {pos, grd, crv},
-                            {abc}, {"pos", "grd", "crv"}, {"abc"});
-};
+//     // Create function
+//     return casadi::Function(wrapper.model().name + "_abc", {pos, grd, crv},
+//                             {abc}, {"pos", "grd", "crv"}, {"abc"});
+// };
 
 }  // namespace path_parameterisation
 }  // namespace planning

@@ -24,6 +24,7 @@ file (GLOB_RECURSE SOURCE_FILES
 "control/*.cc"
 "planning/*.cc"
 "solvers/*.cc"
+"symbolic/*.cc"
 "system/*.cc"
 "utils/*.cc"
 )
@@ -66,6 +67,7 @@ install(DIRECTORY
         "${CMAKE_SOURCE_DIR}/control"
         "${CMAKE_SOURCE_DIR}/planning"
         "${CMAKE_SOURCE_DIR}/solvers"
+        "${CMAKE_SOURCE_DIR}/symbolic"
         "${CMAKE_SOURCE_DIR}/system"
         "${CMAKE_SOURCE_DIR}/utils"
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME} # target directory

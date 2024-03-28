@@ -52,14 +52,6 @@ class PinocchioModelWrapper {
      */
     struct EndEffector {
         /**
-         * @brief Function that computes the pose error between a target
-         * configuration and the current configuration of the end-effector. Maps
-         * from the space of SE3 to that of se3.
-         *
-         */
-        ::casadi::Function pose_error;
-
-        /**
          * @brief Function that computes the end-effector position/orientation
          * (x), velocity and acceleration. A function with inputs (q, v, a) and
          * output (x, dx, ddx)
@@ -72,13 +64,6 @@ class PinocchioModelWrapper {
          *
          */
         ::casadi::Function J;
-
-        /**
-         * @brief Constraint motion subspace (i.e. basis for the constraint
-         * forces that act on the end-effector in the operational frame)
-         *
-         */
-        Eigen::Matrix<double, 6, -1> S;
     };
 
     /**
@@ -90,6 +75,16 @@ class PinocchioModelWrapper {
     EndEffector &end_effector(int i) { return ee_[i]; }
 
     /**
+     * @brief End-effector with name 'name' in the end-effector vector
+     *
+     * @param i
+     * @return EndEffector&
+     */
+    EndEffector &end_effector(const std::string &name) {
+        return ee_[end_effector_idx(name)];
+    }
+
+    /**
      * @brief The index of the end-effector given by name in the end-effector
      * vector
      *
@@ -97,6 +92,11 @@ class PinocchioModelWrapper {
      * @return const int&
      */
     const int &end_effector_idx(const std::string &name) {
+        if (ee_idx_.find(name) == ee_idx_.end()) {
+            std::cout << "End effector with name " << name
+                      << " is not included in this model!\n";
+            return -1;
+        }
         return ee_idx_[name];
     }
 

@@ -3,7 +3,7 @@
 
 #include <casadi/casadi.hpp>
 
-#include "solvers/index.h"
+#include "symbolic/expression.h"
 #include "utils/eigen_wrapper.h"
 
 namespace damotion {
@@ -14,28 +14,15 @@ class Cost {
     Cost() = default;
     ~Cost() = default;
 
-    Cost(const std::string &name) : name_(name) {}
+    Cost(const symbolic::Expression &expr, bool grad = false, bool hes = false);
 
-    void SetSymbolicObjective(const casadi::SX &c) { c_ = c; }
-    const casadi::SX &SymbolicObjective() const { return c_; }
-
-    void SetSymbolicInputs(const casadi::SXVector &inputs) { inputs_ = inputs; }
-    const casadi::SXVector &SymbolicInputs() const { return inputs_; }
-
-    void SetObjectiveFunction(casadi::Function &f) { obj_ = f; }
-    void SetGradientFunction(casadi::Function &f) { grad_ = f; }
-    void SetHessianFunction(casadi::Function &f) { hes_ = f; }
+    void SetObjectiveFunction(const casadi::Function &f) { obj_ = f; }
+    void SetGradientFunction(const casadi::Function &f) { grad_ = f; }
+    void SetHessianFunction(const casadi::Function &f) { hes_ = f; }
 
     utils::casadi::FunctionWrapper &ObjectiveFunction() { return obj_; }
     utils::casadi::FunctionWrapper &GradientFunction() { return grad_; }
     utils::casadi::FunctionWrapper &HessianFunction() { return hes_; }
-
-    /**
-     * @brief Name of the cost
-     *
-     * @return const std::string&
-     */
-    const std::string &name() const { return name_; }
 
     /**
      * @brief Cost weighting
@@ -52,15 +39,8 @@ class Cost {
     double &weighting() { return w_; }
 
    private:
-    // Cost name
-    std::string name_;
     // Cost weighting
     double w_;
-
-    // Underlying symbolic representation of objective
-    casadi::SX c_;
-    // Symbolic input vector
-    casadi::SXVector inputs_;
 
     /**
      * @brief Objective function
@@ -79,6 +59,11 @@ class Cost {
      *
      */
     utils::casadi::FunctionWrapper hes_;
+
+    // Number of variable inputs
+    int nx_ = 0;
+    // Number of parameter inputs
+    int np_ = 0;
 };
 
 }  // namespace optimisation

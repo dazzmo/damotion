@@ -30,25 +30,27 @@ class SolverBase {
      */
     void UpdateProgram(Program& program) { prog_ = program; }
 
-    void EvaluateCost(int id, 
-                      const Eigen::VectorXd& x, bool grad,
+    void EvaluateCost(Binding<Cost>& b, const Eigen::VectorXd& x, bool grd,
                       bool hes);
     void EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes);
 
     // Evaluates the constraint and updates the cache for the gradients
-    void EvaluateConstraint(int id,
-    const Eigen::VectorXd& x,
-                            bool jac);
+    void EvaluateConstraint(Binding<Constraint>& b, const int& constraint_idx,
+                            const Eigen::VectorXd& x, bool jac);
+
     void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
 
     const Eigen::VectorXd& GetPrimalSolution() const {
         return primal_solution_x_;
     }
 
+    std::vector<Binding<Constraint>>& GetConstraints() { return constraints_; }
+    std::vector<Binding<Cost>>& GetCosts() { return costs_; }
+
    protected:
     // Solver caches
     Eigen::VectorXd decision_variable_cache_;
-    Eigen::VectorXd lambda_cache_;
+    Eigen::VectorXd dual_variable_cache_;
 
     double objective_cache_;
     Eigen::VectorXd objective_gradient_cache_;
@@ -56,11 +58,13 @@ class SolverBase {
     Eigen::VectorXd constraint_cache_;
     Eigen::MatrixXd constraint_jacobian_cache_;
 
-    Eigen::VectorXd constraint_linearised_b_cache_;
-
     Eigen::MatrixXd lagrangian_hes_cache_;
 
     Eigen::VectorXd primal_solution_x_;
+
+    // Vector of constraint bindings
+    std::vector<Binding<Constraint>> constraints_;
+    std::vector<Binding<Cost>> costs_;
 
    private:
     Program& prog_;
