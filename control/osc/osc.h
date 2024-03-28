@@ -53,10 +53,10 @@ class EndEffector : public sym::ExpressionVector {
      */
     const ::casadi::SX &Acceleration() const { return (*this)[kAcceleration]; }
 
-    const Eigen::VectorXd &EvalPosition() {
+    const Eigen::VectorXd EvalPosition() {
         return Function().getOutput(kPosition);
     }
-    const Eigen::VectorXd &EvalVelocity() {
+    const Eigen::VectorXd EvalVelocity() {
         return Function().getOutput(kVelocity);
     }
 
@@ -108,10 +108,10 @@ class HolonomicConstraint : public sym::ExpressionVector {
         return (*this)[kSecondDerivative];
     }
 
-    const Eigen::VectorXd &EvalConstraint() {
+    const Eigen::VectorXd EvalConstraint() {
         return Function().getOutput(kConstraint);
     }
-    const Eigen::VectorXd &EvalConstraintFirstDerivative() {
+    const Eigen::VectorXd EvalConstraintFirstDerivative() {
         return Function().getOutput(kFirstDerivative);
     }
 

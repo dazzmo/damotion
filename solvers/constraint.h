@@ -70,13 +70,6 @@ class Constraint {
      *
      * @return const std::string
      */
-    void SetName(const std::string &name) { name_ = name; }
-
-    /**
-     * @brief Name of the constraint
-     *
-     * @return const std::string
-     */
     const std::string name() const { return name_; }
 
     /**
@@ -101,6 +94,18 @@ class Constraint {
     void UpdateBounds(const BoundsType &type) {
         bounds_type_ = type;
         SetBounds(ub_, lb_, bounds_type_);
+    }
+
+    /**
+     * @brief Sets constaint bounds to a custom interval
+     *
+     * @param lb
+     * @param ub
+     */
+    void UpdateBounds(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub) {
+        bounds_type_ = BoundsType::kCustom;
+        lb_ = lb;
+        ub_ = ub;
     }
 
     /**
@@ -300,11 +305,37 @@ class LinearConstraint : public Constraint {
      *
      * @return const Eigen::VectorXd&
      */
-    const Eigen::VectorXd &b() { return ConstraintFunction().getOutput(1); }
+    const Eigen::MatrixXd &b() { return ConstraintFunction().getOutput(1); }
 
    private:
     Eigen::MatrixXd A_;
     Eigen::VectorXd b_;
+};
+
+class BoundingBoxConstraint : public Constraint {
+   public:
+    BoundingBoxConstraint(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
+                          const std::string &name = "")
+        : Constraint(name) {
+        assert(lb.rows() == ub.rows() && "lb and ub must be same dimension!");
+
+        int n = lb.rows();
+        // Resize the constraint
+        Resize(n, n, 0);
+        // Update bounds
+        UpdateBounds(lb, ub);
+
+        casadi::SX x = casadi::SX::sym("x", n);
+
+        casadi::Function f = casadi::Function(this->name(), {x}, {x});
+        casadi::Function fjac =
+            casadi::Function(this->name() + "_jac", {x}, {jacobian(x, x)});
+
+        SetConstraintFunction(f);
+        SetJacobianFunction(fjac);
+    }
+
+   private:
 };
 
 }  // namespace optimisation

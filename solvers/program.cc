@@ -44,6 +44,11 @@ void Program::SetDecisionVariableVector() {
         // Increment the start index
         start_idx += decision_variables_[i].size();
     }
+
+    // Create default variable bounds
+    double inf = std::numeric_limits<double>::infinity();
+    lbx_ = -inf * Eigen::VectorXd::Ones(NumberOfDecisionVariables());
+    ubx_ = inf * Eigen::VectorXd::Ones(NumberOfDecisionVariables());
 }
 
 bool Program::SetDecisionVariableVector(
@@ -69,6 +74,11 @@ bool Program::SetDecisionVariableVector(
         }
     }
 
+    // Create default variable bounds
+    double inf = std::numeric_limits<double>::infinity();
+    lbx_ = -inf * Eigen::VectorXd::Ones(NumberOfDecisionVariables());
+    ubx_ = inf * Eigen::VectorXd::Ones(NumberOfDecisionVariables());
+
     return true;
 }
 
@@ -92,8 +102,8 @@ Eigen::Ref<const Eigen::MatrixXd> Program::AddParameters(
     // Check if parameter already exists
     auto it = parameters_.find(name);
     if (it != parameters_.end()) {
-        std::cout << "Parameters with name " << name
-                  << " already added to program!";
+        throw std::runtime_error("Parameters with name " + name +
+                                 " already in the program!");
     } else {
         parameters_[name] = Eigen::MatrixXd::Zero(n, m);
         return parameters_[name];
@@ -104,8 +114,8 @@ Eigen::Ref<const Eigen::MatrixXd> Program::GetParameters(
     const std::string &name) {
     auto it = parameters_.find(name);
     if (it == parameters_.end()) {
-        std::cout << "Parameters with name " << name
-                  << " is not in the program!";
+        throw std::runtime_error("Parameters with name " + name +
+                                 " is not in the program!");
     } else {
         return parameters_[name];
     }
@@ -115,8 +125,8 @@ void Program::SetParameters(const std::string &name,
                             Eigen::Ref<const Eigen::MatrixXd> val) {
     auto it = parameters_.find(name);
     if (it == parameters_.end()) {
-        std::cout << "Parameters with name " << name
-                  << " is not in the program!";
+        throw std::runtime_error("Parameters with name " + name +
+                                 " is not in the program!");
     } else {
         parameters_[name] = val;
     }
@@ -133,11 +143,10 @@ void Program::RemoveParameters(const std::string &name) {
     }
 }
 
-Binding<Cost> Program::AddCost(const sym::Expression &cost,
+Binding<Cost> Program::AddCost(const std::shared_ptr<Cost> &cost,
                                const sym::VariableRefVector &x,
                                const sym::ParameterRefVector &p) {
-    std::shared_ptr<Cost> c = std::make_shared<Cost>(cost, true, false);
-    Binding<Cost> binding(c, x, p);
+    Binding<Cost> binding(cost, x, p);
     costs_.push_back(binding);
     return costs_.back();
 }
@@ -148,6 +157,25 @@ Binding<LinearConstraint> Program::AddLinearConstraint(
     linear_constraints_.push_back(Binding<LinearConstraint>(con, x, p));
     n_constraints_ += con->Dimension();
     return linear_constraints_.back();
+}
+
+Binding<BoundingBoxConstraint> Program::AddBoundingBoxConstraint(
+    const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
+    const sym::VariableVector &x) {
+    std::shared_ptr<BoundingBoxConstraint> con =
+        std::make_shared<BoundingBoxConstraint>(lb, ub);
+    bounding_box_constraints_.push_back(
+        Binding<BoundingBoxConstraint>(con, {x}));
+    return bounding_box_constraints_.back();
+}
+
+Binding<BoundingBoxConstraint> Program::AddBoundingBoxConstraint(const double &lb, const double &ub,
+                                       const sym::VariableVector &x) {
+    
+    Eigen::VectorXd lbv(x.size()), ubv(x.size());
+    lbv.setConstant(lb);
+    ubv.setConstant(ub);
+    return AddBoundingBoxConstraint(lbv, ubv, x);
 }
 
 Binding<Constraint> Program::AddConstraint(
@@ -180,6 +208,9 @@ void Program::ListParameters() {
     std::cout << "----------------------\n";
     std::cout << "Parameter\tCurrent Value\n";
     std::cout << "----------------------\n";
+    for (const auto &p : parameters_) {
+        std::cout << p.first << '\t' << p.second << '\n';
+    }
 }
 
 void Program::ListVariables() {

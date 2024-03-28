@@ -111,7 +111,7 @@ class Program {
      */
     void RemoveParameters(const std::string &name);
 
-    Binding<Cost> AddCost(const sym::Expression &cost,
+    Binding<Cost> AddCost(const std::shared_ptr<Cost> &cost,
                           const sym::VariableRefVector &x,
                           const sym::ParameterRefVector &p);
 
@@ -120,6 +120,13 @@ class Program {
     Binding<LinearConstraint> AddLinearConstraint(
         const std::shared_ptr<LinearConstraint> &con,
         const sym::VariableRefVector &x, const sym::ParameterRefVector &p);
+
+    Binding<BoundingBoxConstraint> AddBoundingBoxConstraint(
+        const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
+        const sym::VariableVector &x);
+
+    Binding<BoundingBoxConstraint> AddBoundingBoxConstraint(
+        const double &lb, const double &ub, const sym::VariableVector &x);
 
     /**
      * @brief Add a constraint to the program that uses the variables
@@ -233,7 +240,7 @@ class Program {
      *
      * @return std::vector<Binding<LinearConstraint>>&
      */
-    std::vector<Binding<LinearConstraint>>& GetLinearConstraintBindings() {
+    std::vector<Binding<LinearConstraint>> &GetLinearConstraintBindings() {
         // Create constraints
         return linear_constraints_;
     }
@@ -308,6 +315,7 @@ class Program {
     // Constraints
     std::vector<Binding<Constraint>> constraints_;
     std::vector<Binding<LinearConstraint>> linear_constraints_;
+    std::vector<Binding<BoundingBoxConstraint>> bounding_box_constraints_;
 
     // Costs
     std::vector<Binding<Cost>> costs_;
@@ -316,4 +324,4 @@ class Program {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* SOLVERS_PROGRAM_H */
+#endif /* SOLVERS_PROGRAM_H */

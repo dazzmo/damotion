@@ -84,8 +84,12 @@ TEST(Program, AddLinearConstraint) {
     A.setRandom();
     b.setRandom();
 
+    std::cout << A << std::endl;
+    std::cout << b << std::endl;
+
     std::shared_ptr<opt::LinearConstraint> con =
-        std::make_shared<opt::LinearConstraint>(A, b, opt::BoundsType::kEquality, "lin");
+        std::make_shared<opt::LinearConstraint>(
+            A, b, opt::BoundsType::kEquality, "lin");
 
     program.AddDecisionVariables(x);
     program.AddDecisionVariables(y);
@@ -93,11 +97,18 @@ TEST(Program, AddLinearConstraint) {
     program.AddLinearConstraint(con, {x}, {});
     program.AddLinearConstraint(con, {y}, {});
 
+    program.AddParameters("a", 2);
+
     // Create optimisation vector
     program.SetDecisionVariableVector();
 
+    program.AddBoundingBoxConstraint(-1.0, 1.0, x);
+
     program.UpdateBindings();
 
+    program.ListVariables();  // ! Name this decision variables
+    program.ListParameters();
+    program.ListCosts();
     program.ListConstraints();
 
     // Create QPOASES solver and test if constraint jacobian gets created

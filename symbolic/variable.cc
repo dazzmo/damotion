@@ -51,11 +51,9 @@ std::ostream &operator<<(std::ostream &os, damotion::symbolic::Variable var) {
 std::ostream &operator<<(std::ostream &os,
                          damotion::symbolic::VariableVector vector) {
     std::ostringstream oss;
-    oss << "{\n";
     for (int i = 0; i < vector.size(); i++) {
-        oss << '\t' << vector[i] << '\n';
+        oss << vector[i] << '\n';
     }
-    oss << "}\n";
     return os << oss.str();
 }
 

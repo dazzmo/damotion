@@ -52,6 +52,9 @@ class QPOASESSolverInstance : public SolverBase {
         // Number of decision variables in the program
         int n = GetCurrentProgram().NumberOfDecisionVariables();
 
+        ubA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
+        lbA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
+
         // // Dummy decision variable input
         // Eigen::VectorXd x(n);
         // x.setZero();
@@ -68,6 +71,8 @@ class QPOASESSolverInstance : public SolverBase {
              GetCurrentProgram().GetLinearConstraintBindings()) {
             // Get linear constraint
             LinearConstraint& c = binding.Get();
+            // Compute constraint
+            c.ConstraintFunction().call();
             if (!c.HasJacobian()) {
                 throw std::runtime_error("Constraint " + c.name() +
                                          " does not have a Jacobian!");

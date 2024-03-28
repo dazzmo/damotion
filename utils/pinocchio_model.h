@@ -89,9 +89,9 @@ class PinocchioModelWrapper {
      * vector
      *
      * @param name Name of the end effector
-     * @return const int&
+     * @return const int
      */
-    const int &end_effector_idx(const std::string &name) {
+    const int end_effector_idx(const std::string &name) {
         if (ee_idx_.find(name) == ee_idx_.end()) {
             std::cout << "End effector with name " << name
                       << " is not included in this model!\n";
