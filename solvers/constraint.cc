@@ -3,25 +3,27 @@
 namespace damotion {
 namespace optimisation {
 
-Constraint::Constraint(const symbolic::Expression &c,
-               const BoundsType &bounds, bool jac, bool hes) {
-    // Create functions of the form f(x, p)
+Constraint::Constraint(const symbolic::Expression &c, const BoundsType &bounds,
+                       const std::string &name, bool jac, bool hes) {
+    // Set default name for constraint
+    if (name != "") {
+        name_ = name;
+    } else {
+        name_ = "c" + std::to_string(CreateID());
+    }
 
-    // Get input sizes
-    nx_ = c.Variables().size();
-    np_ = c.Parameters().size();
+    // Resize the constraint
+    Resize(c.size1(), c.Variables().size(), c.Parameters().size());
+
     // Create functions to compute the constraint and derivatives given the
     // variables and parameters
-
-    // Input vectors {x, p}
     casadi::SXVector in = c.Variables();
     for (const casadi::SX &pi : c.Parameters()) {
         in.push_back(pi);
     }
 
-    // Create functions for each and wrap them
     // Constraint
-    SetConstraintFunction(casadi::Function("con", in, {c}));
+    SetConstraintFunction(casadi::Function(name_, in, {c}));
 
     // Jacobian
     if (jac) {
@@ -30,15 +32,24 @@ Constraint::Constraint(const symbolic::Expression &c,
             jacobians.push_back(jacobian(c, xi));
         }
         // Wrap the functions
-        SetJacobianFunction(casadi::Function("con_jac", in, jacobians));
+        SetJacobianFunction(casadi::Function(name_ + "_jac", in, jacobians));
     }
 
     if (hes) {
         // TODO - Hessians
     }
 
-    // Set bounds for the constraint
-    SetBounds(ub(), lb(), bounds);
+    // Update bounds for the constraint
+    UpdateBounds(bounds);
+}
+
+Constraint::Constraint(const std::string &name) {
+    // Set default name for constraint
+    if (name != "") {
+        name_ = name;
+    } else {
+        name_ = "c" + std::to_string(CreateID());
+    }
 }
 
 }  // namespace optimisation

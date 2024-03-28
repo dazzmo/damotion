@@ -214,8 +214,8 @@ optimisation::Constraint LinearisedFrictionConstraint() {
     cone(3) = -sqrt(2.0) * l_y - mu * l_z;
 
     cone.SetInputs({lambda}, {mu});
-    return optimisation::Constraint(cone, opt::BoundsType::kPositive, true,
-                                    true);
+    return optimisation::Constraint(cone, opt::BoundsType::kPositive,
+                                    "friction_cone");
 }
 
 sym::Expression ComputeConstrainedDynamics(

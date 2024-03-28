@@ -93,7 +93,7 @@ void SolverBase::EvaluateConstraint(Binding<Constraint>& b,
     Constraint& constraint = b.Get();
 
     // Get size of constraint
-    int m = constraint.dim();
+    int m = constraint.Dimension();
 
     // Evaluate the objective
     for (int i = 0; i < b.NumberOfVariables(); ++i) {

@@ -85,7 +85,7 @@ TEST(Program, AddLinearConstraint) {
     b.setRandom();
 
     std::shared_ptr<opt::LinearConstraint> con =
-        std::make_shared<opt::LinearConstraint>(A, b);
+        std::make_shared<opt::LinearConstraint>(A, b, opt::BoundsType::kEquality, "lin");
 
     program.AddDecisionVariables(x);
     program.AddDecisionVariables(y);

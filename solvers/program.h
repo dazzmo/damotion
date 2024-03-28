@@ -118,16 +118,8 @@ class Program {
     // TODO - Remove cost or constraint
 
     Binding<LinearConstraint> AddLinearConstraint(
-        const Eigen::MatrixXd &A, const Eigen::VectorXd &b,
-        const sym::VariableRefVector &x);
-
-    Binding<LinearConstraint> AddLinearConstraint(
         const std::shared_ptr<LinearConstraint> &con,
         const sym::VariableRefVector &x, const sym::ParameterRefVector &p);
-
-    Binding<Constraint> AddGenericConstraint(const sym::Expression &c,
-                                             const sym::VariableRefVector &x,
-                                             const sym::ParameterRefVector &p);
 
     /**
      * @brief Add a constraint to the program that uses the variables

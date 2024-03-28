@@ -143,26 +143,16 @@ Binding<Cost> Program::AddCost(const sym::Expression &cost,
 }
 
 Binding<LinearConstraint> Program::AddLinearConstraint(
-    const Eigen::MatrixXd &A, const Eigen::VectorXd &b,
-    const sym::VariableRefVector &x) {
-    std::shared_ptr<LinearConstraint> p =
-        std::make_shared<LinearConstraint>(A, b);
-    linear_constraints_.push_back(Binding<LinearConstraint>(p, x));
-    n_constraints_ += A.rows();
-    return linear_constraints_.back();
-}
-
-Binding<LinearConstraint> Program::AddLinearConstraint(
     const std::shared_ptr<LinearConstraint> &con,
     const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
     linear_constraints_.push_back(Binding<LinearConstraint>(con, x, p));
-    n_constraints_ += con->dim();
+    n_constraints_ += con->Dimension();
     return linear_constraints_.back();
 }
 
-Binding<Constraint> Program::AddConstraint(const std::shared_ptr<Constraint> &c,
-                                           const sym::VariableRefVector &x,
-                                           const sym::ParameterRefVector &p) {
+Binding<Constraint> Program::AddConstraint(
+    const std::shared_ptr<Constraint> &con, const sym::VariableRefVector &x,
+    const sym::ParameterRefVector &p) {
     // Check bound variables and parameters exist
     for (const sym::VariableVector &v : x) {
         for (int i = 0; i < v.size(); i++) {
@@ -173,25 +163,16 @@ Binding<Constraint> Program::AddConstraint(const std::shared_ptr<Constraint> &c,
     }
 
     // Create a binding for the constraint
-    constraints_.push_back(Binding<Constraint>(c, x, p));
-    n_constraints_ += c->dim();
-    return constraints_.back();
-}
-
-Binding<Constraint> Program::AddGenericConstraint(
-    const sym::Expression &c, const sym::VariableRefVector &x,
-    const sym::ParameterRefVector &p) {
-    std::shared_ptr<Constraint> con = std::make_shared<Constraint>(c);
     constraints_.push_back(Binding<Constraint>(con, x, p));
-    n_constraints_ += c.size1();
+    n_constraints_ += con->Dimension();
     return constraints_.back();
 }
 
 Binding<Constraint> Program::AddGenericConstraint(
-    std::shared_ptr<Constraint> &c, const sym::VariableRefVector &x,
+    std::shared_ptr<Constraint> &con, const sym::VariableRefVector &x,
     const sym::ParameterRefVector &p) {
-    constraints_.push_back(Binding<Constraint>(c, x, p));
-    n_constraints_ += c->dim();
+    constraints_.push_back(Binding<Constraint>(con, x, p));
+    n_constraints_ += con->Dimension();
     return constraints_.back();
 }
 
@@ -212,16 +193,23 @@ void Program::ListVariables() {
 
 void Program::ListConstraints() {
     std::cout << "----------------------\n";
+    std::cout << "Constraint\tSize\tUpper Bound\tLower Bound\n";
+    std::cout << "----------------------\n";
     // Get all constraints
     std::vector<Binding<Constraint>> constraints = GetAllConstraints();
-    for(Binding<Constraint> &b : constraints) {
-        std::cout << b.Get().dim() << ",\t" << b.VariableStartIndices().size() << std::endl;
+    for (Binding<Constraint> &b : constraints) {
+        std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
+        for (int i = 0; i < b.Get().Dimension(); ++i) {
+            std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
+                      << b.Get().UpperBound()[i] << "\t"
+                      << b.Get().LowerBound()[i] << "\n";
+        }
     }
 }
 
 void Program::ListCosts() {
     std::cout << "----------------------\n";
-    std::cout << "Cost\tWeigting\n";
+    std::cout << "Cost\tWeighting\n";
     std::cout << "----------------------\n";
 }
 

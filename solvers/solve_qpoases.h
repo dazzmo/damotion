@@ -62,27 +62,35 @@ class QPOASESSolverInstance : public SolverBase {
         // 0.5 x^T Q x + g^T x
         // lagrangian_hes_cache_ *= 2.0;
 
-        // Evaluate the linear constraints
+        // Evaluate only the linear constraints of the program
         int idx = 0;
-
-        for (Binding<LinearConstraint>& c :
+        for (Binding<LinearConstraint>& binding :
              GetCurrentProgram().GetLinearConstraintBindings()) {
-            // Evaluate the constraint with current program parameters
-            c.Get().JacobianFunction().call();
-
-            std::cout << c.Get().JacobianFunction().getOutput(0) << std::endl;
-
-            // Populate the constraint Jacobian
-            Eigen::Block<Eigen::MatrixXd> J =
-                constraint_jacobian_cache_.middleRows(idx, c.Get().dim());
-
-            for (int i = 0; i < c.NumberOfVariables(); ++i) {
-                J.middleCols(c.VariableStartIndices()[i],
-                             c.GetVariable(i).size()) =
-                    c.Get().JacobianFunction().getOutput(i);
+            // Get linear constraint
+            LinearConstraint& c = binding.Get();
+            if (!c.HasJacobian()) {
+                throw std::runtime_error("Constraint " + c.name() +
+                                         " does not have a Jacobian!");
             }
+            // Evaluate the constraint with current program parameters
+            c.JacobianFunction().call();
+
+            // Get constraint rows within Jacobian
+            Eigen::Block<Eigen::MatrixXd> J =
+                constraint_jacobian_cache_.middleRows(idx, c.Dimension());
+            // Set all jacobian blocks for the binding
+            for (int i = 0; i < binding.NumberOfVariables(); ++i) {
+                J.middleCols(binding.VariableStartIndices()[i],
+                             binding.GetVariable(i).size()) =
+                    c.JacobianFunction().getOutput(i);
+            }
+
+            // Add bounds for the constraint
+            ubA_.middleRows(idx, c.Dimension()) = c.UpperBound() - c.b();
+            lbA_.middleRows(idx, c.Dimension()) = c.LowerBound() - c.b();
+
             // Increase constraint index
-            idx += c.Get().dim();
+            idx += c.Dimension();
         }
 
         // TODO - Map to row major
@@ -122,6 +130,9 @@ class QPOASESSolverInstance : public SolverBase {
     std::unique_ptr<qpOASES::SymSparseMat> H_;
     std::unique_ptr<qpOASES::SparseMatrix> A_;
     std::unique_ptr<qpOASES::SQProblem> qp_;
+
+    Eigen::VectorXd lbA_;
+    Eigen::VectorXd ubA_;
 };
 
 class QPOASESSolver {

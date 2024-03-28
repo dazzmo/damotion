@@ -104,7 +104,9 @@ class Binding {
     int np_ = 0;
 
     std::shared_ptr<T> c_;
+    // Vector of variables bound to the constraint
     std::vector<sym::VariableVector> x_ = {};
+    // Vector of pointers to references to parameters bound to the constraint
     std::vector<const double *> p_ = {};
 
     // Starting indices of the decision variables in x
