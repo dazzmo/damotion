@@ -241,7 +241,7 @@ class Program {
      *
      * @return std::vector<Binding<LinearConstraint>>&
      */
-    std::vector<Binding<LinearConstraint>> GetLinearConstraintBindings() {
+    std::vector<Binding<LinearConstraint>>& GetLinearConstraintBindings() {
         // Create constraints
         return linear_constraints_;
     }
@@ -254,7 +254,6 @@ class Program {
     // Update all bindings and indices
     void UpdateBindings() {
         // Go through all types of constraints to update
-
         for (Binding<LinearConstraint> &b : GetLinearConstraintBindings()) {
             // Update indexing based on current decision variable and parameter
             // vectors
@@ -263,7 +262,6 @@ class Program {
                 xi.push_back(GetDecisionVariableStartIndex(b.GetVariable(i)));
             }
             b.SetVariableStartIndices(xi);
-            // ! Set bindings to parameters
         }
 
         for (Binding<Cost> &b : GetCostBindings()) {
@@ -326,4 +324,4 @@ class Program {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* SOLVERS_PROGRAM_H */
+#endif/* SOLVERS_PROGRAM_H */

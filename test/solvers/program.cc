@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include "solvers/solve_qpoases.h"
+
 namespace sym = damotion::symbolic;
 namespace opt = damotion::optimisation;
 
@@ -84,12 +86,22 @@ TEST(Program, AddLinearConstraint) {
 
     std::shared_ptr<opt::LinearConstraint> con =
         std::make_shared<opt::LinearConstraint>(A, b);
-    
+
+    program.AddDecisionVariables(x);
+    program.AddDecisionVariables(y);
+
     program.AddLinearConstraint(con, {x}, {});
     program.AddLinearConstraint(con, {y}, {});
 
+    // Create optimisation vector
+    program.SetDecisionVariableVector();
+
     program.UpdateBindings();
-    
+
     program.ListConstraints();
 
+    // Create QPOASES solver and test if constraint jacobian gets created
+    opt::solvers::QPOASESSolverInstance solver(program);
+
+    solver.Solve();
 }

@@ -88,6 +88,9 @@ class Constraint {
         return c_norm <= eps;
     }
 
+   protected:
+    void SetDimension(const int &dim) { dim_ = dim; }
+
    private:
     // Dimension of the constraint
     int dim_ = 0;
@@ -130,6 +133,8 @@ class LinearConstraint : public Constraint {
         casadi::Function fjac = casadi::Function("lin_con_jac", {x}, {Asx});
         SetConstraintFunction(f);
         SetJacobianFunction(fjac);
+
+        SetDimension(A.rows());
     }
 
     LinearConstraint(const casadi::SX &A, const casadi::SX &b,
@@ -151,6 +156,8 @@ class LinearConstraint : public Constraint {
         casadi::Function fjac = casadi::Function("lin_con_jac", in, {A});
         SetConstraintFunction(f);
         SetJacobianFunction(fjac);
+
+        SetDimension(A.rows());
     }
 
     const Eigen::MatrixXd &A() { return JacobianFunction().getOutput(0); }

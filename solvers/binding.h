@@ -69,7 +69,7 @@ class Binding {
             typename std::enable_if_t<std::is_convertible_v<
                 std::shared_ptr<U>, std::shared_ptr<T>>> * = nullptr)
         : Binding(b.GetPtr(), b.GetVariables(), b.GetParameters(),
-                  b.GetVariableStartIndices(), b.GetVariableJacobianIndices()) {}
+                  b.VariableStartIndices(), b.SparseJacobianIndices()) {}
 
     const int &NumberOfVariables() const { return nx_; }
     const int &NumberOfParameters() const { return np_; }
@@ -84,10 +84,6 @@ class Binding {
 
     const std::vector<sym::VariableVector> GetVariables() const { return x_; }
     const std::vector<const double *> GetParameters() const { return p_; }
-    const std::vector<int> GetVariableStartIndices() const { return x_idx_; }
-    const std::vector<std::vector<int>> GetVariableJacobianIndices() const {
-        return jac_idx_;
-    }
 
     const sym::VariableVector &GetVariable(const int &i) const { return x_[i]; }
     const double *GetParameterPointer(const int &i) const { return p_[i]; }
@@ -122,4 +118,4 @@ class Binding {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* SOLVERS_BINDING_H */
+#endif /* SOLVERS_BINDING_H */

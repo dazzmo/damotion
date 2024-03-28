@@ -16,9 +16,9 @@ class QPOASESSolverInstance : public SolverBase {
 
     QPOASESSolverInstance(Program& prog) : SolverBase(prog) {
         // Create problem
-        qp_ = std::make_unique<qpOASES::SQProblem>(
-            GetCurrentProgram().NumberOfDecisionVariables(),
-            GetCurrentProgram().NumberOfConstraints());
+        // qp_ = std::make_unique<qpOASES::SQProblem>(
+        //     GetCurrentProgram().NumberOfDecisionVariables(),
+        //     GetCurrentProgram().NumberOfConstraints());
 
         // Sparse Method
 
@@ -52,46 +52,64 @@ class QPOASESSolverInstance : public SolverBase {
         // Number of decision variables in the program
         int n = GetCurrentProgram().NumberOfDecisionVariables();
 
-        // Dummy decision variable input
-        Eigen::VectorXd x(n);
-        x.setZero();
+        // // Dummy decision variable input
+        // Eigen::VectorXd x(n);
+        // x.setZero();
 
-        EvaluateCosts(x, true, true);
+        // EvaluateCosts(x, true, true);
 
         // Double the values of the Hessian to accomodate for the quadratic form
         // 0.5 x^T Q x + g^T x
-        lagrangian_hes_cache_ *= 2.0;
+        // lagrangian_hes_cache_ *= 2.0;
 
-        // Constraints of the form c = A x + b
-        // Update constraint bounds
-        // lbA - b <= Ax <= ubA - b
-        Eigen::VectorXd lbA = GetCurrentProgram().ConstraintsLowerBound() -
-                              constraint_linearised_b_cache_;
-        Eigen::VectorXd ubA = GetCurrentProgram().ConstraintsUpperBound() -
-                              constraint_linearised_b_cache_;
+        // Evaluate the linear constraints
+        int idx = 0;
+
+        for (Binding<LinearConstraint>& c :
+             GetCurrentProgram().GetLinearConstraintBindings()) {
+            // Evaluate the constraint with current program parameters
+            c.Get().JacobianFunction().call();
+
+            std::cout << c.Get().JacobianFunction().getOutput(0) << std::endl;
+
+            // Populate the constraint Jacobian
+            Eigen::Block<Eigen::MatrixXd> J =
+                constraint_jacobian_cache_.middleRows(idx, c.Get().dim());
+
+            for (int i = 0; i < c.NumberOfVariables(); ++i) {
+                J.middleCols(c.VariableStartIndices()[i],
+                             c.GetVariable(i).size()) =
+                    c.Get().JacobianFunction().getOutput(i);
+            }
+            // Increase constraint index
+            idx += c.Get().dim();
+        }
 
         // TODO - Map to row major
 
+        std::cout << constraint_jacobian_cache_ << std::endl;
+
         // Solve
         int nWSR = 100;
-        if (n_solves_ == 0) {
-            qp_->init(lagrangian_hes_cache_.data(),
-                      objective_gradient_cache_.data(),
-                      constraint_jacobian_cache_.data(),
-                      GetCurrentProgram().DecisionVariablesLowerBound().data(),
-                      GetCurrentProgram().DecisionVariablesUpperBound().data(),
-                      lbA.data(), ubA.data(), nWSR);
-        } else {
-            qp_->hotstart(
-                lagrangian_hes_cache_.data(), objective_gradient_cache_.data(),
-                constraint_jacobian_cache_.data(),
-                GetCurrentProgram().DecisionVariablesLowerBound().data(),
-                GetCurrentProgram().DecisionVariablesUpperBound().data(),
-                lbA.data(), ubA.data(), nWSR);
-        }
+        // if (n_solves_ == 0) {
+        //     qp_->init(lagrangian_hes_cache_.data(),
+        //               objective_gradient_cache_.data(),
+        //               constraint_jacobian_cache_.data(),
+        //               GetCurrentProgram().DecisionVariablesLowerBound().data(),
+        //               GetCurrentProgram().DecisionVariablesUpperBound().data(),
+        //               lbA.data(), ubA.data(), nWSR);
+        // } else {
+        //     qp_->hotstart(
+        //         lagrangian_hes_cache_.data(),
+        //         objective_gradient_cache_.data(),
+        //         constraint_jacobian_cache_.data(),
+        //         GetCurrentProgram().DecisionVariablesLowerBound().data(),
+        //         GetCurrentProgram().DecisionVariablesUpperBound().data(),
+        //         lbA.data(), ubA.data(), nWSR);
+        // }
 
         // Get primal solution
-        qp_->getPrimalSolution(primal_solution_x_.data());
+        // qp_->getPrimalSolution(primal_solution_x_.data());
 
         // TODO: Handle Error
         n_solves_++;

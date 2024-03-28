@@ -148,6 +148,7 @@ Binding<LinearConstraint> Program::AddLinearConstraint(
     std::shared_ptr<LinearConstraint> p =
         std::make_shared<LinearConstraint>(A, b);
     linear_constraints_.push_back(Binding<LinearConstraint>(p, x));
+    n_constraints_ += A.rows();
     return linear_constraints_.back();
 }
 
@@ -155,6 +156,7 @@ Binding<LinearConstraint> Program::AddLinearConstraint(
     const std::shared_ptr<LinearConstraint> &con,
     const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
     linear_constraints_.push_back(Binding<LinearConstraint>(con, x, p));
+    n_constraints_ += con->dim();
     return linear_constraints_.back();
 }
 
@@ -172,6 +174,7 @@ Binding<Constraint> Program::AddConstraint(const std::shared_ptr<Constraint> &c,
 
     // Create a binding for the constraint
     constraints_.push_back(Binding<Constraint>(c, x, p));
+    n_constraints_ += c->dim();
     return constraints_.back();
 }
 
@@ -180,6 +183,7 @@ Binding<Constraint> Program::AddGenericConstraint(
     const sym::ParameterRefVector &p) {
     std::shared_ptr<Constraint> con = std::make_shared<Constraint>(c);
     constraints_.push_back(Binding<Constraint>(con, x, p));
+    n_constraints_ += c.size1();
     return constraints_.back();
 }
 
@@ -187,6 +191,7 @@ Binding<Constraint> Program::AddGenericConstraint(
     std::shared_ptr<Constraint> &c, const sym::VariableRefVector &x,
     const sym::ParameterRefVector &p) {
     constraints_.push_back(Binding<Constraint>(c, x, p));
+    n_constraints_ += c->dim();
     return constraints_.back();
 }
 
@@ -210,7 +215,7 @@ void Program::ListConstraints() {
     // Get all constraints
     std::vector<Binding<Constraint>> constraints = GetAllConstraints();
     for(Binding<Constraint> &b : constraints) {
-        std::cout << b.Get().dim() << ",\t" << b.GetVariable(0) << std::endl;
+        std::cout << b.Get().dim() << ",\t" << b.VariableStartIndices().size() << std::endl;
     }
 }
 
