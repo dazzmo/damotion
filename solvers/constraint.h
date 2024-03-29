@@ -124,6 +124,9 @@ class Constraint {
     const Eigen::VectorXd &UpperBound() const { return ub_; }
     Eigen::VectorXd &UpperBound() { return ub_; }
 
+    const int &NumberOfInputVariables() const { return nx_; }
+    const int &NumberOfInputParameters() const { return np_; }
+
     /**
      * @brief Tests whether the p-norm of the constraint is within
      * the threshold eps.
@@ -238,74 +241,157 @@ class Constraint {
 
 class LinearConstraint : public Constraint {
    public:
-    LinearConstraint(const Eigen::MatrixXd &A, const Eigen::VectorXd &b,
-                     const BoundsType &bounds, const std::string &name = "",
-                     bool jac = true)
+    LinearConstraint(const std::vector<Eigen::MatrixXd> &A,
+                     const Eigen::VectorXd &b, const BoundsType &bounds,
+                     const std::string &name = "", bool jac = true)
         : Constraint(name) {
-        assert(A.rows() == b.rows() && "A and b must be same dimension!");
+        casadi::SXVector in = {}, jacobians = {};
+        int nvar = 0;
+        // Constant vector b
+        casadi::DM bdm;
+        damotion::utils::casadi::toCasadi(b, bdm);
+        casadi::SX bsx = bdm;
+        casadi::SX linear_constraint = bsx;
+        for (const Eigen::MatrixXd &Ai : A) {
+            assert(Ai.rows() == b.rows() && "A and b must be same dimension!");
+
+            // Create constraints
+            casadi::DM Adm;
+            damotion::utils::casadi::toCasadi(Ai, Adm);
+            casadi::SX Asx = Adm;
+
+            casadi::SX xi = casadi::SX::sym("x", Ai.cols());
+            linear_constraint += mtimes(Asx, xi);
+            jacobians.push_back(Asx);
+            in.push_back(xi);
+            nvar += 1;
+        }
         // Resize the constraint
-        Resize(A.rows(), A.cols(), 0);
+        Resize(b.rows(), nvar, 0);
         // Update bounds
         UpdateBounds(bounds);
 
-        // Create constraints
-        casadi::DM Adm, bdm;
-        damotion::utils::casadi::toCasadi(A, Adm);
-        damotion::utils::casadi::toCasadi(b, bdm);
-
-        casadi::SX Asx = Adm, bsx = bdm;
-
-        // Create constraint, including the constant term b as well
-        casadi::SX x = casadi::SX::sym("x", A.cols());
-        casadi::SX c = casadi::SX::mtimes(Asx, x) + bsx;
         // Create the constraint
-        casadi::Function f = casadi::Function(this->name(), {x}, {c, bsx});
+        casadi::Function f =
+            casadi::Function(this->name(), in, {linear_constraint, bsx});
         casadi::Function fjac =
-            casadi::Function(this->name() + "_jac", {x}, {Asx});
+            casadi::Function(this->name() + "_jac", in, jacobians);
 
-        SetConstraintFunction(f);
-        SetJacobianFunction(fjac);
-    }
-
-    LinearConstraint(const casadi::SX &A, const casadi::SX &b,
-                     const casadi::SXVector &p, const BoundsType &bounds,
-                     const std::string &name = "", bool jac = true)
-        : Constraint(name) {
-        assert(A.rows() == b.rows() && "A and b must be same dimension!");
-        // Create constraint
-        Resize(A.rows(), A.columns(), p.size());
-        UpdateBounds(bounds);
-
-        casadi::SX x = casadi::SX::sym("x", A.columns());
-
-        casadi::SXVector in = {x};
-        // Add any parameters that define A and b
-        for (const casadi::SX &pi : p) {
-            in.push_back(pi);
-        }
-
-        casadi::SX linear_constraint = casadi::SX::mtimes(A, x) + b;
-
-        // Create the constraint, including the constant term b as well
-        casadi::Function f = casadi::Function(name, in, {linear_constraint, b});
-        casadi::Function fjac = casadi::Function(name + "_jac", in, {A});
         SetConstraintFunction(f);
         SetJacobianFunction(fjac);
     }
 
     /**
-     * @brief The coefficient matrix for the linear constraint A x + b
+     * @brief Construct a new Linear Constraint object of the form \f$ A x + b
+     * \f$
+     *
+     * @param A
+     * @param b
+     * @param p Parameters that A and b depend on
+     * @param bounds
+     * @param name
+     * @param jac
+     */
+    LinearConstraint(const Eigen::MatrixXd &A, const Eigen::VectorXd &b,
+                     const BoundsType &bounds, const std::string &name = "",
+                     bool jac = true)
+        : LinearConstraint(std::vector<Eigen::MatrixXd>({A}), b, bounds, name,
+                           jac) {}
+
+    /**
+     * @brief The i-th coefficient matrix for the linear constraint A_1 x_1 +
+     * A_2 x_2 + ... A_n x_n + b
      *
      * @return const Eigen::MatrixXd&
      */
-    const Eigen::MatrixXd &A() { return JacobianFunction().getOutput(0); }
+    const Eigen::MatrixXd &A(const int &i) {
+        return JacobianFunction().getOutput(i);
+    }
+
+    /**
+     * @brief Construct a new Linear Constraint object of the form \f$ A_0 x_0 +
+     * A_1 x_1 + \hdots + A_n x_n + b \f$
+     *
+     * @param A Vector of coefficient matrices
+     * @param b
+     * @param p Parameters that A and b depend on
+     * @param bounds
+     * @param name
+     * @param jac
+     */
+    LinearConstraint(const casadi::SXVector &A, const casadi::SX &b,
+                     const casadi::SXVector &p, const BoundsType &bounds,
+                     const std::string &name = "", bool jac = true)
+        : Constraint(name) {
+        casadi::SXVector in = {};
+        int nvar = 0;
+        casadi::SX linear_constraint = b;
+        // Add each coefficient matrix
+        for (casadi::SX Ai : A) {
+            assert(Ai.rows() == b.rows() && "A and b must be same dimension!");
+            // Create optimisation variables for each coefficient matrix
+            casadi::SX xi = casadi::SX::sym("x", Ai.columns());
+            in.push_back(xi);
+            // Add linear expression A_i x_i
+            linear_constraint += casadi::SX::mtimes(Ai, xi);
+        }
+        // Create constraint dimensions and update bounds
+        Resize(b.rows(), in.size(), p.size());
+        UpdateBounds(bounds);
+
+        // Add any parameters that define A and b
+        for (const casadi::SX &pi : p) {
+            in.push_back(pi);
+        }
+
+        // Create the constraint, including the constant term b as well
+        casadi::Function f = casadi::Function(name, in, {linear_constraint, b});
+        casadi::Function fjac = casadi::Function(name + "_jac", in, A);
+        SetConstraintFunction(f);
+        SetJacobianFunction(fjac);
+    }
+
+    /**
+     * @brief Construct a new Linear Constraint object of the form \f$ A x + b
+     * \f$
+     *
+     * @param A
+     * @param b
+     * @param p Parameters that A and b depend on
+     * @param bounds
+     * @param name
+     * @param jac
+     */
+    LinearConstraint(const casadi::SX &A, const casadi::SX &b,
+                     const casadi::SXVector &p, const BoundsType &bounds,
+                     const std::string &name = "", bool jac = true)
+        : LinearConstraint(casadi::SXVector({A}), b, p, bounds, name, jac) {}
+
+    /**
+     * @brief The i-th coefficient matrix for the linear constraint A_1 x_1 +
+     * A_2 x_2 + ... A_n x_n + b
+     *
+     * @return const Eigen::MatrixXd&
+     */
+    const Eigen::MatrixXd &A(const int &i) {
+        return JacobianFunction().getOutput(i);
+    }
+
+    /**
+     * @brief The coefficient matrix A for the expression A x + b.
+     *
+     * @return const Eigen::MatrixXd&
+     */
+    const Eigen::MatrixXd &A() { return A(0); }
 
     /**
      * @brief The constant vector for the linear constraint A x + b
      *
      * @return const Eigen::VectorXd&
      */
-    const Eigen::MatrixXd &b() { return ConstraintFunction().getOutput(1); }
+    const Eigen::MatrixXd &b() {
+        return ConstraintFunction().getOutput(NumberOfInputVariables());
+    }
 
    private:
     Eigen::MatrixXd A_;

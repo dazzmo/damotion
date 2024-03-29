@@ -3,6 +3,20 @@
 namespace damotion {
 namespace optimisation {
 
+void Program::AddDecisionVariable(const sym::Variable &var) {
+    if (!IsDecisionVariable(var)) {
+        // Add to decision variable id to keep track of variables
+        decision_variable_id_.push_back(var.id());
+        // Add to variable vector
+        decision_variables_.push_back(sym::VariableVector(var));
+        // Increase count of decision variables
+        n_decision_variables_++;
+    } else {
+        // Variable already added to program!
+        std::cout << var << " is already added to program!\n";
+    }
+}
+
 void Program::AddDecisionVariables(const Eigen::Ref<sym::VariableMatrix> &var) {
     std::vector<sym::Variable> v;
     // Append to our map
@@ -169,9 +183,8 @@ Binding<BoundingBoxConstraint> Program::AddBoundingBoxConstraint(
     return bounding_box_constraints_.back();
 }
 
-Binding<BoundingBoxConstraint> Program::AddBoundingBoxConstraint(const double &lb, const double &ub,
-                                       const sym::VariableVector &x) {
-    
+Binding<BoundingBoxConstraint> Program::AddBoundingBoxConstraint(
+    const double &lb, const double &ub, const sym::VariableVector &x) {
     Eigen::VectorXd lbv(x.size()), ubv(x.size());
     lbv.setConstant(lb);
     ubv.setConstant(ub);

@@ -81,6 +81,14 @@ class Program {
     void AddDecisionVariables(const Eigen::Ref<sym::VariableMatrix> &var);
 
     /**
+     * @brief Adds a single decision variable to the program
+     * 
+     * @param var 
+     */
+    void AddDecisionVariable(const sym::Variable &var);
+
+
+    /**
      * @brief Removes variables currently considered by the program.
      *
      * @param var
@@ -245,6 +253,18 @@ class Program {
         return linear_constraints_;
     }
 
+    /**
+     * @brief Get the vector of current BoundingBoxConstraint objects within the
+     * program.
+     *
+     * @return std::vector<Binding<BoundingBoxConstraint>>&
+     */
+    std::vector<Binding<BoundingBoxConstraint>> &
+    GetBoundingBoxConstraintBindings() {
+        // Create constraints
+        return bounding_box_constraints_;
+    }
+
     std::vector<Binding<Cost>> &GetCostBindings() {
         // TODO - Look at different classes of costs
         return costs_;
@@ -254,6 +274,17 @@ class Program {
     void UpdateBindings() {
         // Go through all types of constraints to update
         for (Binding<LinearConstraint> &b : GetLinearConstraintBindings()) {
+            // Update indexing based on current decision variable and parameter
+            // vectors
+            std::vector<int> xi = {};
+            for (int i = 0; i < b.NumberOfVariables(); ++i) {
+                xi.push_back(GetDecisionVariableStartIndex(b.GetVariable(i)));
+            }
+            b.SetVariableStartIndices(xi);
+        }
+
+        for (Binding<BoundingBoxConstraint> &b :
+             GetBoundingBoxConstraintBindings()) {
             // Update indexing based on current decision variable and parameter
             // vectors
             std::vector<int> xi = {};
@@ -324,4 +355,4 @@ class Program {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* SOLVERS_PROGRAM_H */
+#endif/* SOLVERS_PROGRAM_H */

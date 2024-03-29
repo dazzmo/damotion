@@ -3,6 +3,7 @@
 
 #include <qpOASES.hpp>
 
+#include "common/profiler.h"
 #include "solvers/program.h"
 #include "solvers/solver.h"
 
@@ -19,6 +20,25 @@ class QPOASESSolverInstance : public SolverBase {
         // qp_ = std::make_unique<qpOASES::SQProblem>(
         //     GetCurrentProgram().NumberOfDecisionVariables(),
         //     GetCurrentProgram().NumberOfConstraints());
+        lbx_ = Eigen::VectorXd::Zero(
+            GetCurrentProgram().NumberOfDecisionVariables());
+        ubx_ = Eigen::VectorXd::Zero(
+            GetCurrentProgram().NumberOfDecisionVariables());
+
+        // Create variable bounds from bounding box constraints
+        for (Binding<BoundingBoxConstraint>& binding :
+             GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
+            lbx_.middleRows(binding.VariableStartIndices()[0],
+                            binding.GetVariable(0).size()) =
+                binding.Get().LowerBound();
+            ubx_.middleRows(binding.VariableStartIndices()[0],
+                            binding.GetVariable(0).size()) =
+                binding.Get().UpperBound();
+        }
+
+        // Constraint bounds
+        ubA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
+        lbA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
 
         // Sparse Method
 
@@ -49,21 +69,64 @@ class QPOASESSolverInstance : public SolverBase {
     ~QPOASESSolverInstance() {}
 
     void Solve() {
+        common::Profiler profiler("QPOASESSolverInstance::Solve");
         // Number of decision variables in the program
         int n = GetCurrentProgram().NumberOfDecisionVariables();
 
-        ubA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
-        lbA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
+        // Evaluate costs
+        for (Binding<Cost>& binding : GetCurrentProgram().GetCostBindings()) {
+            // Get linear constraint
+            Cost& c = binding.Get();
+            // Compute constraint
+            if (!c.HasGradient()) {
+                throw std::runtime_error("Cost does not have a gradient!");
+            }
+            // Evaluate the constraint with current program parameters
+            c.GradientFunction().call();
 
-        // // Dummy decision variable input
-        // Eigen::VectorXd x(n);
-        // x.setZero();
+            // Add all gradients for the objective
+            for (int i = 0; i < binding.NumberOfVariables(); ++i) {
+                objective_gradient_cache_.middleRows(
+                    binding.VariableStartIndices()[i],
+                    binding.GetVariable(i).size()) +=
+                    c.GradientFunction().getOutput(i);
+            }
 
-        // EvaluateCosts(x, true, true);
+            // Compute hessian
+            if (!c.HasHessian()) {
+                throw std::runtime_error("Cost does not have a Hessian!");
+            }
+            // Evaluate the constraint with current program parameters
+            c.HessianFunction().call();
 
-        // Double the values of the Hessian to accomodate for the quadratic form
-        // 0.5 x^T Q x + g^T x
-        // lagrangian_hes_cache_ *= 2.0;
+            // Add all hessians
+            int cnt = 0;
+            for (int i = 0; i < binding.NumberOfVariables(); ++i) {
+                for (int j = i; j < binding.NumberOfVariables(); ++j) {
+                    // Get indices of hessian block
+                    int idx_i = binding.VariableStartIndices()[i],
+                        idx_j = binding.VariableStartIndices()[j];
+                    int sz_i = binding.GetVariable(i).size(),
+                        sz_j = binding.GetVariable(j).size();
+
+                    // Only populate lower triangle of hessian
+                    if (idx_i >= idx_j) {
+                        lagrangian_hes_cache_.block(idx_i, idx_j, sz_i, sz_j) =
+                            c.HessianFunction().getOutput(cnt);
+                    } else {
+                        lagrangian_hes_cache_.block(idx_j, idx_i, sz_j, sz_i) =
+                            c.HessianFunction().getOutput(cnt).transpose();
+                    }
+                    cnt++;
+                }
+            }
+        }
+
+        std::cout << objective_gradient_cache_ << std::endl;
+        std::cout << lagrangian_hes_cache_ << std::endl;
+
+        // Double the values of the Hessian to accomodate for the quadratic
+        // form 0.5 x^T Q x + g^T x lagrangian_hes_cache_ *= 2.0;
 
         // Evaluate only the linear constraints of the program
         int idx = 0;
@@ -135,6 +198,9 @@ class QPOASESSolverInstance : public SolverBase {
     std::unique_ptr<qpOASES::SymSparseMat> H_;
     std::unique_ptr<qpOASES::SparseMatrix> A_;
     std::unique_ptr<qpOASES::SQProblem> qp_;
+
+    Eigen::VectorXd lbx_;
+    Eigen::VectorXd ubx_;
 
     Eigen::VectorXd lbA_;
     Eigen::VectorXd ubA_;

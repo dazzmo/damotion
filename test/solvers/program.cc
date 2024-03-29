@@ -79,25 +79,35 @@ TEST(Program, AddLinearConstraint) {
 
     opt::Program program;
 
-    Eigen::Matrix2d A;
-    Eigen::Vector2d b;
-    A.setRandom();
-    b.setRandom();
-
-    std::cout << A << std::endl;
-    std::cout << b << std::endl;
+    // Create constraint x0 + 2 y1 + 3 = 0
+    Eigen::Matrix<double, 1, 2> Ax, Ay;
+    Ax << 1.0, 0.0;
+    Ay << 0.0, 2.0;
+    Eigen::Vector<double, 1> b(3.0);
 
     std::shared_ptr<opt::LinearConstraint> con =
         std::make_shared<opt::LinearConstraint>(
-            A, b, opt::BoundsType::kEquality, "lin");
+            std::vector<Eigen::MatrixXd>({Ax, Ay}), b,
+            opt::BoundsType::kEquality, "lin");
 
     program.AddDecisionVariables(x);
     program.AddDecisionVariables(y);
 
-    program.AddLinearConstraint(con, {x}, {});
-    program.AddLinearConstraint(con, {y}, {});
+    program.AddLinearConstraint(con, {x, y}, {});
 
     program.AddParameters("a", 2);
+
+    // Create random cost
+    casadi::SX xx = casadi::SX::sym("x", 2);
+    casadi::SX yy = casadi::SX::sym("y", 2);
+
+    sym::Expression J = xx(0) + yy(0);
+    J.SetInputs({xx, yy}, {});
+
+    std::shared_ptr<opt::Cost> c =
+        std::make_shared<opt::Cost>(J, "sum_squares", true, true);
+
+    program.AddCost(c, {x, y}, {});
 
     // Create optimisation vector
     program.SetDecisionVariableVector();
