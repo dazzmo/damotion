@@ -68,10 +68,21 @@ class SolverBase {
 
    private:
     Program& prog_;
+
+    // Calculate binding inputs for the problem
+    void CalculateBindingInputs();
+
+    std::unordered_map<Binding<Constraint>::Id, int> constraint_binding_idx;
+    std::unordered_map<Binding<Cost>::Id, int> cost_binding_idx;
+
+    std::vector<std::vector<bool>> constraint_binding_continuous_input_;
+    std::vector<std::vector<bool>> cost_binding_continuous_input_;
+
+    bool IsContiguousInDecisionVariableVector(const sym::VariableVector &var);
 };
 
 }  // namespace solvers
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* SOLVERS_SOLVER_H */
+#endif/* SOLVERS_SOLVER_H */

@@ -5,10 +5,8 @@ namespace optimisation {
 
 void Program::AddDecisionVariable(const sym::Variable &var) {
     if (!IsDecisionVariable(var)) {
-        // Add to decision variable id to keep track of variables
-        decision_variable_id_.push_back(var.id());
         // Add to variable vector
-        decision_variables_.push_back(sym::VariableVector(var));
+        decision_variables_.push_back(var);
         // Increase count of decision variables
         n_decision_variables_++;
     } else {
@@ -22,41 +20,26 @@ void Program::AddDecisionVariables(const Eigen::Ref<sym::VariableMatrix> &var) {
     // Append to our map
     for (int i = 0; i < var.rows(); ++i) {
         for (int j = 0; j < var.cols(); ++j) {
-            // Check if variable is already been included
-            if (!IsDecisionVariable(var(i, j))) {
-                // Add to decision variable id to keep track of variables
-                decision_variable_id_.push_back(var(i, j).id());
-                // Add to variable vector
-                v.push_back(var(i, j));
-                // Increase count of decision variables
-                n_decision_variables_++;
-            } else {
-                // Variable already added to program!
-                std::cout << var(i, j) << " is already added to program!\n";
-            }
+            AddDecisionVariable(var(i, j));
         }
     }
-
-    // Add decision variables to problem
-    decision_variables_.push_back(
-        Eigen::Map<sym::VariableVector>(v.data(), v.size()));
 }
 
 bool Program::IsDecisionVariable(const sym::Variable &var) {
     // Check if variable is already added to the program
-    return std::find(decision_variable_id_.begin(), decision_variable_id_.end(),
-                     var.id()) != decision_variable_id_.end();
+    return std::find(decision_variables_.begin(), decision_variables_.end(),
+                     var) != decision_variables_.end();
 }
 
 void Program::SetDecisionVariableVector() {
     // Set indices by order in the decision variable vector
-    int start_idx = 0;
+    int idx = 0;
     for (int i = 0; i < decision_variables_.size(); ++i) {
         // Set start index of variables
-        sym::Variable::Id id = decision_variables_[i].data()[0].id();
-        decision_variable_start_idx_[id] = start_idx;
+        sym::Variable::Id id = decision_variables_[i].id();
+        decision_variable_idx_[id] = idx;
         // Increment the start index
-        start_idx += decision_variables_[i].size();
+        idx++;
     }
 
     // Create default variable bounds
@@ -70,10 +53,10 @@ bool Program::SetDecisionVariableVector(
     assert(var.size() == NumberOfDecisionVariables() && "Incorrect input!");
 
     // Set indices by order in the decision variable vector
-    for (sym::VariableVector &v : decision_variables_) {
+    for (sym::Variable &v : decision_variables_) {
         // Find starting point of v within var
         int idx = 0;
-        sym::Variable::Id id = v[0].id();
+        sym::Variable::Id id = v.id();
         for (int i = 0; i < var.size(); ++i) {
             if (var[idx].id() == id) break;
             idx++;
@@ -84,7 +67,7 @@ bool Program::SetDecisionVariableVector(
                          "variable vector!\n";
             return false;
         } else {
-            decision_variable_start_idx_[id] = idx;
+            decision_variable_idx_[id] = idx;
         }
     }
 
@@ -101,9 +84,9 @@ void Program::RemoveDecisionVariables(
     // TODO - Implement
 }
 
-int Program::GetDecisionVariableStartIndex(const sym::VariableVector &v) {
-    auto it = decision_variable_start_idx_.find(v[0].id());
-    if (it != decision_variable_start_idx_.end()) {
+int Program::GetDecisionVariableIndex(const sym::Variable &v) {
+    auto it = decision_variable_idx_.find(v.id());
+    if (it != decision_variable_idx_.end()) {
         return it->second;
     } else {
         std::cout << v << " is not a variable within this program!\n";
@@ -230,7 +213,7 @@ void Program::ListVariables() {
     std::cout << "----------------------\n";
     std::cout << "Variable\tCurrent Value\n";
     std::cout << "----------------------\n";
-    for (sym::VariableVector &v : decision_variables_) {
+    for (sym::Variable &v : decision_variables_) {
         std::cout << v << '\n';
     }
 }

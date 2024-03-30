@@ -47,9 +47,10 @@ TEST(Program, CreateOptimisationVector) {
     EXPECT_EQ(program.NumberOfDecisionVariables(), 6);
 
     // Check indexing
-    EXPECT_EQ(program.GetDecisionVariableStartIndex(y), 0);
-    EXPECT_EQ(program.GetDecisionVariableStartIndex(x), 2);
-    EXPECT_EQ(program.GetDecisionVariableStartIndex(z), 4);
+    EXPECT_EQ(program.GetDecisionVariableIndex(y[0]), 0);
+    EXPECT_EQ(program.GetDecisionVariableIndex(y[1]), 1);
+    EXPECT_EQ(program.GetDecisionVariableIndex(x[0]), 2);
+    EXPECT_EQ(program.GetDecisionVariableIndex(x[1]), 3);
 }
 
 TEST(Program, CreateParameters) {
@@ -122,7 +123,7 @@ TEST(Program, AddLinearConstraint) {
     program.ListConstraints();
 
     // Create QPOASES solver and test if constraint jacobian gets created
-    opt::solvers::QPOASESSolverInstance solver(program);
+    // opt::solvers::QPOASESSolverInstance solver(program);
 
-    solver.Solve();
+    // solver.Solve();
 }

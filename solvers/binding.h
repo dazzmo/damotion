@@ -14,8 +14,12 @@ namespace optimisation {
 template <typename T>
 class Binding {
    public:
+    typedef int Id;
+
     Binding() = default;
     ~Binding() = default;
+
+    const Id &id() const { return id_; }
 
     /**
      * @brief
@@ -43,16 +47,11 @@ class Binding {
 
     Binding(const std::shared_ptr<T> &c,
             const std::vector<sym::VariableVector> &variables,
-            const std::vector<const double *> &parameters,
-            const std::vector<int> &variable_start_indices,
-            const std::vector<std::vector<int>> &variable_jacobian_indices) {
+            const std::vector<const double *> &parameters) {
         c_ = c;
 
         x_ = variables;
         p_ = parameters;
-
-        x_idx_ = variable_start_indices;
-        jac_idx_ = variable_jacobian_indices;
 
         nx_ = variables.size();
         np_ = parameters.size();
@@ -68,8 +67,7 @@ class Binding {
     Binding(const Binding<U> &b,
             typename std::enable_if_t<std::is_convertible_v<
                 std::shared_ptr<U>, std::shared_ptr<T>>> * = nullptr)
-        : Binding(b.GetPtr(), b.GetVariables(), b.GetParameters(),
-                  b.VariableStartIndices(), b.SparseJacobianIndices()) {}
+        : Binding(b.GetPtr(), b.GetVariables(), b.GetParameters()) {}
 
     const int &NumberOfVariables() const { return nx_; }
     const int &NumberOfParameters() const { return np_; }
@@ -88,18 +86,9 @@ class Binding {
     const sym::VariableVector &GetVariable(const int &i) const { return x_[i]; }
     const double *GetParameterPointer(const int &i) const { return p_[i]; }
 
-    void SetVariableStartIndices(const std::vector<int> &indices) {
-        assert(indices.size() == x_.size() &&
-               "Incorrect number of indices provided\n");
-        x_idx_ = indices;
-    }
-
-    const std::vector<int> &VariableStartIndices() const { return x_idx_; }
-    const std::vector<std::vector<int>> &SparseJacobianIndices() const {
-        return jac_idx_;
-    }
-
    private:
+    Id id_;
+
     int nx_ = 0;
     int np_ = 0;
 
@@ -108,13 +97,6 @@ class Binding {
     std::vector<sym::VariableVector> x_ = {};
     // Vector of pointers to references to parameters bound to the constraint
     std::vector<const double *> p_ = {};
-
-    // Starting indices of the decision variables in x
-    std::vector<int> x_idx_;
-
-    // Indices of the jacobian data vectors within the sparse constraint
-    // jacobian data vector
-    std::vector<std::vector<int>> jac_idx_;
 };
 
 }  // namespace optimisation

@@ -31,6 +31,9 @@ class Variable {
     const Id &id() const { return id_; }
     const std::string &name() const { return name_; }
 
+    bool operator<(const Variable &v) const { return id() < v.id(); }
+    bool operator==(const Variable &v) const { return id() == v.id(); }
+
    private:
     Id id_;
     std::string name_;

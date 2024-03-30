@@ -82,11 +82,10 @@ class Program {
 
     /**
      * @brief Adds a single decision variable to the program
-     * 
-     * @param var 
+     *
+     * @param var
      */
     void AddDecisionVariable(const sym::Variable &var);
-
 
     /**
      * @brief Removes variables currently considered by the program.
@@ -95,7 +94,7 @@ class Program {
      */
     void RemoveDecisionVariables(const Eigen::Ref<sym::VariableMatrix> &var);
 
-    int GetDecisionVariableStartIndex(const sym::VariableVector &v);
+    int GetDecisionVariableIndex(const sym::Variable &v);
 
     bool IsDecisionVariable(const sym::Variable &var);
 
@@ -177,15 +176,6 @@ class Program {
      * @return const Eigen::VectorXd &
      */
     const Eigen::VectorXd &DecisionVariableVector() const { return x_; }
-
-    Eigen::Ref<Eigen::VectorXd> GetDecisionVariablesLowerBound(
-        const sym::VariableVector &v) {
-        return lbx_.middleRows(GetDecisionVariableStartIndex(v), v.size());
-    }
-    Eigen::Ref<Eigen::VectorXd> GetDecisionVariablesUpperBound(
-        const sym::VariableVector &v) {
-        return ubx_.middleRows(GetDecisionVariableStartIndex(v), v.size());
-    }
 
     Eigen::VectorXd &DecisionVariablesLowerBound() { return lbx_; }
     Eigen::VectorXd &DecisionVariablesUpperBound() { return ubx_; }
@@ -273,35 +263,6 @@ class Program {
     // Update all bindings and indices
     void UpdateBindings() {
         // Go through all types of constraints to update
-        for (Binding<LinearConstraint> &b : GetLinearConstraintBindings()) {
-            // Update indexing based on current decision variable and parameter
-            // vectors
-            std::vector<int> xi = {};
-            for (int i = 0; i < b.NumberOfVariables(); ++i) {
-                xi.push_back(GetDecisionVariableStartIndex(b.GetVariable(i)));
-            }
-            b.SetVariableStartIndices(xi);
-        }
-
-        for (Binding<BoundingBoxConstraint> &b :
-             GetBoundingBoxConstraintBindings()) {
-            // Update indexing based on current decision variable and parameter
-            // vectors
-            std::vector<int> xi = {};
-            for (int i = 0; i < b.NumberOfVariables(); ++i) {
-                xi.push_back(GetDecisionVariableStartIndex(b.GetVariable(i)));
-            }
-            b.SetVariableStartIndices(xi);
-        }
-
-        for (Binding<Cost> &b : GetCostBindings()) {
-            std::vector<int> xi = {};
-            for (int i = 0; i < b.NumberOfVariables(); ++i) {
-                xi.push_back(GetDecisionVariableStartIndex(b.GetVariable(i)));
-            }
-
-            b.SetVariableStartIndices(xi);
-        }
 
         // Add Sparse Jacobian stuff here as well
     }
@@ -334,11 +295,8 @@ class Program {
     Parameter p_;
 
     // Decision variables
-    std::unordered_map<sym::Variable::Id, int> decision_variable_start_idx_;
-    std::vector<sym::VariableVector> decision_variables_;
-
-    // ID of each decision variable within the program
-    std::vector<sym::Variable::Id> decision_variable_id_;
+    std::unordered_map<sym::Variable::Id, int> decision_variable_idx_;
+    std::vector<sym::Variable> decision_variables_;
 
     // Parameters
     std::unordered_map<std::string, Eigen::MatrixXd> parameters_;
@@ -355,4 +313,4 @@ class Program {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* SOLVERS_PROGRAM_H */
+#endif /* SOLVERS_PROGRAM_H */

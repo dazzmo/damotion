@@ -367,15 +367,6 @@ class LinearConstraint : public Constraint {
                      const std::string &name = "", bool jac = true)
         : LinearConstraint(casadi::SXVector({A}), b, p, bounds, name, jac) {}
 
-    /**
-     * @brief The i-th coefficient matrix for the linear constraint A_1 x_1 +
-     * A_2 x_2 + ... A_n x_n + b
-     *
-     * @return const Eigen::MatrixXd&
-     */
-    const Eigen::MatrixXd &A(const int &i) {
-        return JacobianFunction().getOutput(i);
-    }
 
     /**
      * @brief The coefficient matrix A for the expression A x + b.
