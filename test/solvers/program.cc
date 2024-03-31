@@ -1,3 +1,4 @@
+#define DAMOTION_USE_PROFILING
 #include "solvers/program.h"
 
 #include <gtest/gtest.h>
@@ -81,20 +82,21 @@ TEST(Program, AddLinearConstraint) {
     opt::Program program;
 
     // Create constraint x0 + 2 y1 + 3 = 0
-    Eigen::Matrix<double, 1, 2> Ax, Ay;
-    Ax << 1.0, 0.0;
-    Ay << 0.0, 2.0;
+    Eigen::Matrix<double, 1, 2> A;
+    A << 1.0, 2.0;
     Eigen::Vector<double, 1> b(3.0);
 
     std::shared_ptr<opt::LinearConstraint> con =
         std::make_shared<opt::LinearConstraint>(
-            std::vector<Eigen::MatrixXd>({Ax, Ay}), b,
-            opt::BoundsType::kEquality, "lin");
+            A, b, opt::BoundsType::kEquality, "lin");
 
     program.AddDecisionVariables(x);
     program.AddDecisionVariables(y);
 
-    program.AddLinearConstraint(con, {x, y}, {});
+    sym::VariableVector xy(2);
+    xy << x[0], y[1];
+
+    program.AddLinearConstraint(con, {xy}, {});
 
     program.AddParameters("a", 2);
 
@@ -102,7 +104,7 @@ TEST(Program, AddLinearConstraint) {
     casadi::SX xx = casadi::SX::sym("x", 2);
     casadi::SX yy = casadi::SX::sym("y", 2);
 
-    sym::Expression J = xx(0) + yy(0);
+    sym::Expression J = dot(xx, xx) + dot(xx, yy);
     J.SetInputs({xx, yy}, {});
 
     std::shared_ptr<opt::Cost> c =
@@ -114,6 +116,7 @@ TEST(Program, AddLinearConstraint) {
     program.SetDecisionVariableVector();
 
     program.AddBoundingBoxConstraint(-1.0, 1.0, x);
+    program.AddBoundingBoxConstraint(-2.0, 2.0, y);
 
     program.UpdateBindings();
 
@@ -122,8 +125,12 @@ TEST(Program, AddLinearConstraint) {
     program.ListCosts();
     program.ListConstraints();
 
-    // Create QPOASES solver and test if constraint jacobian gets created
-    // opt::solvers::QPOASESSolverInstance solver(program);
+    // opt::solvers::SolverBase solver(program);
 
-    // solver.Solve();
+    // Create QPOASES solver and test if constraint jacobian gets created
+    opt::solvers::QPOASESSolverInstance solver(program);
+
+    solver.Solve();
+
+    damotion::common::Profiler summary;
 }

@@ -35,8 +35,10 @@ class SolverBase {
     void EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes);
 
     // Evaluates the constraint and updates the cache for the gradients
-    void EvaluateConstraint(Binding<Constraint>& b, const int& constraint_idx,
-                            const Eigen::VectorXd& x, bool jac);
+    void EvaluateConstraint(Constraint& c, const int& constraint_idx,
+                            const Eigen::VectorXd& x,
+                            const std::vector<sym::VariableVector>& var,
+                            const std::vector<bool>& continuous, bool jac);
 
     void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
 
@@ -66,6 +68,13 @@ class SolverBase {
     std::vector<Binding<Constraint>> constraints_;
     std::vector<Binding<Cost>> costs_;
 
+    template <typename T>
+    const std::vector<bool>& ConstraintBindingContinuousInputCheck(
+        const Binding<T>& binding) {
+        return constraint_binding_continuous_input_
+            [constraint_binding_idx[binding.id()]];
+    }
+
    private:
     Program& prog_;
 
@@ -78,11 +87,11 @@ class SolverBase {
     std::vector<std::vector<bool>> constraint_binding_continuous_input_;
     std::vector<std::vector<bool>> cost_binding_continuous_input_;
 
-    bool IsContiguousInDecisionVariableVector(const sym::VariableVector &var);
+    bool IsContiguousInDecisionVariableVector(const sym::VariableVector& var);
 };
 
 }  // namespace solvers
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* SOLVERS_SOLVER_H */
+#endif /* SOLVERS_SOLVER_H */

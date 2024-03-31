@@ -28,6 +28,8 @@ SolverBase::SolverBase(Program& prog) : prog_(prog) {
     // Dense constraint Hessian
     lagrangian_hes_cache_ = Eigen::MatrixXd::Zero(
         prog_.NumberOfDecisionVariables(), prog_.NumberOfDecisionVariables());
+
+    CalculateBindingInputs();
 }
 
 void SolverBase::EvaluateCost(Binding<Cost>& b, const Eigen::VectorXd& x,
@@ -72,6 +74,10 @@ void SolverBase::EvaluateCost(Binding<Cost>& b, const Eigen::VectorXd& x,
     objective_cache_ += cost.ObjectiveFunction().getOutput(0).data()[0];
 
     if (grd) {
+        if (!cost.HasGradient()) {
+            throw std::runtime_error("Cost does not have a Gradient!");
+        }
+
         // Evaluate the jacobians
         cost.GradientFunction().call();
 
@@ -95,15 +101,17 @@ void SolverBase::EvaluateCost(Binding<Cost>& b, const Eigen::VectorXd& x,
     }
 
     if (hes) {
-        // Evaluate the jacobians
+        if (!cost.HasHessian()) {
+            throw std::runtime_error("Cost does not have a Hessian!");
+        }
+        // Evaluate the hessians
         cost.HessianFunction().call();
 
         int cnt = 0;
-
+        std::cout << b.NumberOfVariables() << std::endl;
         for (int i = 0; i < b.NumberOfVariables(); ++i) {
-            for (int j = i; i < b.NumberOfVariables(); ++j) {
+            for (int j = i; j < b.NumberOfVariables(); ++j) {
                 // For each variable combination
-
                 if (is_continuous[i] && is_continuous[j]) {
                     // Block fill
                     lagrangian_hes_cache_.block(
@@ -147,74 +155,75 @@ void SolverBase::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
 }
 
 // Evaluates the constraint and updates the cache for the gradients
-void SolverBase::EvaluateConstraint(Binding<Constraint>& b,
-                                    const int& constraint_idx,
-                                    const Eigen::VectorXd& x, bool jac) {
-    Constraint& constraint = b.Get();
-
+void SolverBase::EvaluateConstraint(Constraint& c, const int& constraint_idx,
+                                    const Eigen::VectorXd& x,
+                                    const std::vector<sym::VariableVector>& var,
+                                    const std::vector<bool>& continuous,
+                                    bool jac) {
     // Get size of constraint
-    int m = constraint.Dimension();
-
-    // Get data for continuous memory
-    // TODO - Check it exists
-    std::vector<bool>& is_continuous =
-        constraint_binding_continuous_input_[b.id()];
+    int nc = c.Dimension();
+    int nv = var.size();
 
     // Create inputs to evaluate the function
-    std::vector<const double*> inputs(b.NumberOfVariables(), nullptr);
+    std::vector<const double*> inputs(nv, nullptr);
     // Optional creation of vectors for inputs to the functions (if vector
     // input is not continuous in optimisation vector)
     std::vector<Eigen::VectorXd> vecs = {};
 
     // Determine inputs to the function
-    for (int i = 0; i < b.NumberOfVariables(); ++i) {
-        if (is_continuous[i]) {
+    for (int i = 0; i < nv; ++i) {
+        const sym::VariableVector& v = var[i];
+        if (continuous[i]) {
             // Set input to the start of the vector input
-            inputs[0] = x.data() + GetCurrentProgram().GetDecisionVariableIndex(
-                                       b.GetVariable(i)[0]);
+            inputs[0] =
+                x.data() + GetCurrentProgram().GetDecisionVariableIndex(v[0]);
         } else {
             // Construct a vector for this input
-            Eigen::VectorXd xi(b.GetVariable(i).size());
-            for (int j = 0; j < b.GetVariable(i).size(); ++j) {
-                xi[j] = x[GetCurrentProgram().GetDecisionVariableIndex(
-                    b.GetVariable(i)[j])];
+            Eigen::VectorXd xi(var.size());
+            for (int j = 0; j < var.size(); ++j) {
+                xi[j] = x[GetCurrentProgram().GetDecisionVariableIndex(v[j])];
             }
             vecs.push_back(xi);
             inputs[i] = xi.data();
         }
     }
 
+    // Set vector inputs and evaluate necessary functions
     for (int i = 0; i < inputs.size(); ++i) {
-        constraint.ConstraintFunction().setInput(i, inputs[i]);
-        if (jac) constraint.JacobianFunction().setInput(i, inputs[i]);
+        c.ConstraintFunction().setInput(i, inputs[i]);
+        if (jac) c.JacobianFunction().setInput(i, inputs[i]);
     }
-    constraint.ConstraintFunction().call();
+    c.ConstraintFunction().call();
 
-    constraint_cache_.middleRows(constraint_idx, m) =
-        constraint.ConstraintFunction().getOutput(0);
+    constraint_cache_.middleRows(constraint_idx, nc) =
+        c.ConstraintFunction().getOutput(0);
 
     if (jac) {
+        if (!c.HasJacobian()) {
+            throw std::runtime_error("Constraint " + c.name() +
+                                     " does not have a Jacobian!");
+        }
+
         // Evaluate the jacobians
-        constraint.JacobianFunction().call();
+        c.JacobianFunction().call();
 
         // ! Currently a dense jacobian - Look into sparse work
         // Update Jacobian blocks
         Eigen::Block<Eigen::MatrixXd> J =
-            constraint_jacobian_cache_.middleRows(constraint_idx, m);
+            constraint_jacobian_cache_.middleRows(constraint_idx, nc);
 
-        for (int i = 0; i < b.NumberOfVariables(); ++i) {
-            if (is_continuous[i]) {
-                J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(
-                                 b.GetVariable(i)[0]),
-                             b.GetVariable(i).size()) =
-                    constraint.JacobianFunction().getOutput(i);
+        for (int i = 0; i < nv; ++i) {
+            const sym::VariableVector& v = var[i];
+
+            if (continuous[i]) {
+                J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(v[0]),
+                             var.size()) = c.JacobianFunction().getOutput(i);
             } else {
                 // For each variable, update the location in the Jacobian
-                for (int j = 0; j < b.GetVariable(i).size(); ++j) {
-                    int idx = GetCurrentProgram().GetDecisionVariableIndex(
-                        b.GetVariable(i)[j]);
-                    J.col(idx) =
-                        constraint.JacobianFunction().getOutput(i).col(j);
+                for (int j = 0; j < var.size(); ++j) {
+                    int idx =
+                        GetCurrentProgram().GetDecisionVariableIndex(v[j]);
+                    J.col(idx) = c.JacobianFunction().getOutput(i).col(j);
                 }
             }
         }
@@ -234,7 +243,8 @@ void SolverBase::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
 void SolverBase::CalculateBindingInputs() {
     Program& program = GetCurrentProgram();
     // Pre-compute variable look ups for speed
-    for (const auto& b : program.GetAllConstraints()) {
+    int id = 0;
+    for (auto& b : program.GetAllConstraints()) {
         // For each input, assess if memory is contiguous (allow for
         // optimisation of input)
         std::vector<bool> is_continuous(b.NumberOfVariables());
@@ -251,11 +261,25 @@ void SolverBase::CalculateBindingInputs() {
         // Include continuous data
         constraint_binding_continuous_input_.push_back(is_continuous);
     }
+
+    // Perform the same for the costs
+    for (auto& b : program.GetCostBindings()) {
+        // For each input, assess if memory is contiguous (allow for
+        // optimisation of input)
+        std::vector<bool> is_continuous(b.NumberOfVariables());
+        for (int i = 0; i < b.NumberOfVariables(); ++i) {
+            if (IsContiguousInDecisionVariableVector(b.GetVariable(i))) {
+                is_continuous[i] = true;
+            } else {
+                is_continuous[i] = false;
+            }
+        }
+        // Add index to map
+        cost_binding_idx[b.id()] = cost_binding_continuous_input_.size();
+        // Include continuous data
+        cost_binding_continuous_input_.push_back(is_continuous);
+    }
 }
-
-// void AssessContinuousInputsInBinding() {
-
-// }
 
 bool SolverBase::IsContiguousInDecisionVariableVector(
     const sym::VariableVector& var) {

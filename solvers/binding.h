@@ -43,6 +43,8 @@ class Binding {
 
         nx_ = x.size();
         np_ = p.size();
+
+        SetId();
     }
 
     Binding(const std::shared_ptr<T> &c,
@@ -55,10 +57,12 @@ class Binding {
 
         nx_ = variables.size();
         np_ = parameters.size();
+
+        SetId();
     }
 
     /**
-     * @brief Construct a new Binding object of a new type
+     * @brief Construct a new Binding object of a new type.
      *
      * @tparam U
      * @param b
@@ -67,7 +71,10 @@ class Binding {
     Binding(const Binding<U> &b,
             typename std::enable_if_t<std::is_convertible_v<
                 std::shared_ptr<U>, std::shared_ptr<T>>> * = nullptr)
-        : Binding(b.GetPtr(), b.GetVariables(), b.GetParameters()) {}
+        : Binding(b.GetPtr(), b.GetVariables(), b.GetParameters()) {
+        // Keep ID the same
+        id_ = b.id();
+    }
 
     const int &NumberOfVariables() const { return nx_; }
     const int &NumberOfParameters() const { return np_; }
@@ -97,6 +104,17 @@ class Binding {
     std::vector<sym::VariableVector> x_ = {};
     // Vector of pointers to references to parameters bound to the constraint
     std::vector<const double *> p_ = {};
+
+    /**
+     * @brief Set an ID for the binding, useful for distinguishing one binding
+     * from another.
+     *
+     * @param id
+     */
+    void SetId() {
+        static Id next_id = 0;
+        id_ = next_id++;
+    }
 };
 
 }  // namespace optimisation

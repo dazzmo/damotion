@@ -17,28 +17,36 @@ class QPOASESSolverInstance : public SolverBase {
 
     QPOASESSolverInstance(Program& prog) : SolverBase(prog) {
         // Create problem
-        // qp_ = std::make_unique<qpOASES::SQProblem>(
-        //     GetCurrentProgram().NumberOfDecisionVariables(),
-        //     GetCurrentProgram().NumberOfConstraints());
-        // lbx_ = Eigen::VectorXd::Zero(
-        //     GetCurrentProgram().NumberOfDecisionVariables());
-        // ubx_ = Eigen::VectorXd::Zero(
-        //     GetCurrentProgram().NumberOfDecisionVariables());
+        qp_ = std::make_unique<qpOASES::SQProblem>(
+            GetCurrentProgram().NumberOfDecisionVariables(),
+            GetCurrentProgram().NumberOfConstraints());
+        lbx_ = Eigen::VectorXd::Zero(
+            GetCurrentProgram().NumberOfDecisionVariables());
+        ubx_ = Eigen::VectorXd::Zero(
+            GetCurrentProgram().NumberOfDecisionVariables());
 
-        // // Create variable bounds from bounding box constraints
-        // for (Binding<BoundingBoxConstraint>& binding :
-        //      GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
-        //     lbx_.middleRows(binding.VariableStartIndices()[0],
-        //                     binding.GetVariable(0).size()) =
-        //         binding.Get().LowerBound();
-        //     ubx_.middleRows(binding.VariableStartIndices()[0],
-        //                     binding.GetVariable(0).size()) =
-        //         binding.Get().UpperBound();
-        // }
+        std::cout << lbx_ << std::endl;
+        std::cout << ubx_ << std::endl;
 
-        // // Constraint bounds
-        // ubA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
-        // lbA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
+        // Create variable bounds from bounding box constraints
+        for (Binding<BoundingBoxConstraint>& binding :
+             GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
+            // For each variable of the constraint
+            const sym::VariableVector& v = binding.GetVariable(0);
+            for (int i = 0; i < v.size(); ++i) {
+                lbx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
+                    binding.Get().LowerBound()[i];
+                ubx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
+                    binding.Get().UpperBound()[i];
+            }
+        }
+
+        std::cout << lbx_ << std::endl;
+        std::cout << ubx_ << std::endl;
+
+        // Constraint bounds
+        ubA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
+        lbA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
 
         // Sparse Method
 
@@ -71,99 +79,34 @@ class QPOASESSolverInstance : public SolverBase {
     void Solve() {
         common::Profiler profiler("QPOASESSolverInstance::Solve");
         // Number of decision variables in the program
-        // int n = GetCurrentProgram().NumberOfDecisionVariables();
 
-        // // Evaluate costs
-        // for (Binding<Cost>& binding : GetCurrentProgram().GetCostBindings()) {
-        //     // Get linear constraint
-        //     Cost& c = binding.Get();
-        //     // Compute constraint
-        //     if (!c.HasGradient()) {
-        //         throw std::runtime_error("Cost does not have a gradient!");
-        //     }
-        //     // Evaluate the constraint with current program parameters
-        //     c.GradientFunction().call();
+        // Evaluate costs
+        EvaluateCosts(primal_solution_x_, true, true);
 
-        //     // Add all gradients for the objective
-        //     for (int i = 0; i < binding.NumberOfVariables(); ++i) {
-        //         objective_gradient_cache_.middleRows(
-        //             binding.VariableStartIndices()[i],
-        //             binding.GetVariable(i).size()) +=
-        //             c.GradientFunction().getOutput(i);
-        //     }
+        // Double the values of the Hessian to accomodate for the quadratic
+        // form 0.5 x^T Q x + g^T x
+        lagrangian_hes_cache_ *= 2.0;
 
-        //     // Compute hessian
-        //     if (!c.HasHessian()) {
-        //         throw std::runtime_error("Cost does not have a Hessian!");
-        //     }
-        //     // Evaluate the constraint with current program parameters
-        //     c.HessianFunction().call();
+        // Evaluate only the linear constraints of the program
+        int idx = 0;
+        for (Binding<LinearConstraint>& binding :
+             GetCurrentProgram().GetLinearConstraintBindings()) {
+            // Compute the constraints
+            EvaluateConstraint(
+                binding.Get(), idx, primal_solution_x_, binding.GetVariables(),
+                ConstraintBindingContinuousInputCheck(binding), true);
 
-        //     // Add all hessians
-        //     int cnt = 0;
-        //     for (int i = 0; i < binding.NumberOfVariables(); ++i) {
-        //         for (int j = i; j < binding.NumberOfVariables(); ++j) {
-        //             // Get indices of hessian block
-        //             int idx_i = binding.VariableStartIndices()[i],
-        //                 idx_j = binding.VariableStartIndices()[j];
-        //             int sz_i = binding.GetVariable(i).size(),
-        //                 sz_j = binding.GetVariable(j).size();
+            // Adapt bounds for the linear constraints
+            ubA_.middleRows(idx, binding.Get().Dimension()) =
+                binding.Get().UpperBound() - binding.Get().b();
+            lbA_.middleRows(idx, binding.Get().Dimension()) =
+                binding.Get().LowerBound() - binding.Get().b();
 
-        //             // Only populate lower triangle of hessian
-        //             if (idx_i >= idx_j) {
-        //                 lagrangian_hes_cache_.block(idx_i, idx_j, sz_i, sz_j) =
-        //                     c.HessianFunction().getOutput(cnt);
-        //             } else {
-        //                 lagrangian_hes_cache_.block(idx_j, idx_i, sz_j, sz_i) =
-        //                     c.HessianFunction().getOutput(cnt).transpose();
-        //             }
-        //             cnt++;
-        //         }
-        //     }
-        // }
+            // Increase constraint index
+            idx += binding.Get().Dimension();
+        }
 
-        // std::cout << objective_gradient_cache_ << std::endl;
-        // std::cout << lagrangian_hes_cache_ << std::endl;
-
-        // // Double the values of the Hessian to accomodate for the quadratic
-        // // form 0.5 x^T Q x + g^T x lagrangian_hes_cache_ *= 2.0;
-
-        // // Evaluate only the linear constraints of the program
-        // int idx = 0;
-        // for (Binding<LinearConstraint>& binding :
-        //      GetCurrentProgram().GetLinearConstraintBindings()) {
-        //     // Get linear constraint
-        //     LinearConstraint& c = binding.Get();
-        //     // Compute constraint
-        //     c.ConstraintFunction().call();
-        //     if (!c.HasJacobian()) {
-        //         throw std::runtime_error("Constraint " + c.name() +
-        //                                  " does not have a Jacobian!");
-        //     }
-        //     // Evaluate the constraint with current program parameters
-        //     c.JacobianFunction().call();
-
-        //     // Get constraint rows within Jacobian
-        //     Eigen::Block<Eigen::MatrixXd> J =
-        //         constraint_jacobian_cache_.middleRows(idx, c.Dimension());
-        //     // Set all jacobian blocks for the binding
-        //     for (int i = 0; i < binding.NumberOfVariables(); ++i) {
-        //         J.middleCols(binding.VariableStartIndices()[i],
-        //                      binding.GetVariable(i).size()) =
-        //             c.JacobianFunction().getOutput(i);
-        //     }
-
-        //     // Add bounds for the constraint
-        //     ubA_.middleRows(idx, c.Dimension()) = c.UpperBound() - c.b();
-        //     lbA_.middleRows(idx, c.Dimension()) = c.LowerBound() - c.b();
-
-        //     // Increase constraint index
-        //     idx += c.Dimension();
-        // }
-
-        // // TODO - Map to row major
-
-        // std::cout << constraint_jacobian_cache_ << std::endl;
+        // TODO - Map to row major
 
         // Solve
         int nWSR = 100;
@@ -226,6 +169,7 @@ class QPOASESSolver {
     }
 
    private:
+    // Constraint bindings
     std::unique_ptr<QPOASESSolverInstance> qp_;
 };
 
