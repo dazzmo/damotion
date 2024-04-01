@@ -223,7 +223,7 @@ void Program::ListParameters() {
     }
 }
 
-void Program::ListVariables() {
+void Program::ListDecisionVariables() {
     std::cout << "----------------------\n";
     std::cout << "Variable\tCurrent Value\n";
     std::cout << "----------------------\n";

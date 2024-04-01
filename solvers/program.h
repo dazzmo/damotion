@@ -202,7 +202,7 @@ class Program {
      * screen
      *
      */
-    void ListVariables();
+    void ListDecisionVariables();
 
     /**
      * @brief Prints the current set of constraints for the program to the

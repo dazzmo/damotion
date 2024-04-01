@@ -257,9 +257,6 @@ void SolverBase::UpdateVectorAtVariableLocations(Eigen::VectorXd& res,
                                                  const Eigen::VectorXd& block,
                                                  const sym::VariableVector& var,
                                                  bool is_continuous) {
-    std::cout << var << std::endl;
-    std::cout << block << std::endl;
-    
     if (is_continuous) {
         res.middleRows(GetCurrentProgram().GetDecisionVariableIndex(var[0]),
                        var.size()) += block;

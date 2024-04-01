@@ -18,7 +18,7 @@ TEST(Program, AddVariables) {
     program.AddDecisionVariables(x);
     program.AddDecisionVariables(y);
 
-    program.ListVariables();
+    program.ListDecisionVariables();
 
     EXPECT_TRUE(true);
 }
@@ -102,7 +102,7 @@ TEST(Program, AddLinearConstraint) {
 
     // Create random cost
     casadi::SX xx = casadi::SX::sym("x", 4);
-    sym::Expression J = dot(xx, xx) + xx(0) + xx(1);
+    sym::Expression J = dot(xx, xx) + xx(0) + xx(0) * xx(2);
     J.SetInputs({xx}, {});
     std::shared_ptr<opt::QuadraticCost> cost =
         std::make_shared<opt::QuadraticCost>(J, "sum_squares");
@@ -119,7 +119,7 @@ TEST(Program, AddLinearConstraint) {
 
     program.UpdateBindings();
 
-    program.ListVariables();  // ! Name this decision variables
+    program.ListDecisionVariables();  // ! Name this decision variables
     program.ListParameters();
     program.ListCosts();
     program.ListConstraints();
