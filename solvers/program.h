@@ -262,7 +262,15 @@ class Program {
         return bounding_box_constraints_;
     }
 
-    std::vector<Binding<Cost>> &GetCostBindings() { return costs_; }
+    std::vector<Binding<Cost>> GetAllCostBindings() { 
+        std::vector<Binding<Cost>> costs;
+        costs.insert(costs.begin(), linear_costs_.begin(),
+                           linear_costs_.end());
+        costs.insert(costs.begin(), quadratic_costs_.begin(),
+                           quadratic_costs_.end());
+
+        // Return vector of all costs
+        return costs; }
 
     std::vector<Binding<LinearCost>> &GetLinearCostBindings() {
         return linear_costs_;

@@ -85,6 +85,22 @@ class SolverBase {
         return cost_binding_continuous_input_[cost_binding_idx[binding.id()]];
     }
 
+    void UpdateVectorAtVariableLocations(Eigen::VectorXd& res,
+                                         const Eigen::VectorXd& block,
+                                         const sym::VariableVector& var,
+                                         bool is_continuous);
+    void UpdateJacobianAtVariableLocations(Eigen::MatrixXd& jac, int row_idx,
+                                           const Eigen::MatrixXd& block,
+                                           const sym::VariableVector& var,
+                                           bool is_continuous);
+
+    void UpdateHessianAtVariableLocations(Eigen::MatrixXd& hes,
+                                          const Eigen::MatrixXd& block,
+                                          const sym::VariableVector& var_x,
+                                          const sym::VariableVector& var_y,
+                                          bool is_continuous_x,
+                                          bool is_continuous_y);
+
    private:
     Program& prog_;
 

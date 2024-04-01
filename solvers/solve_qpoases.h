@@ -47,6 +47,13 @@ class QPOASESSolverInstance : public SolverBase {
         std::cout << lbA_.transpose() << std::endl;
         std::cout << ubA_.transpose() << std::endl;
 
+        H_ = Eigen::MatrixXd::Zero(
+            GetCurrentProgram().NumberOfDecisionVariables(),
+            GetCurrentProgram().NumberOfDecisionVariables());
+
+        g_ = Eigen::VectorXd::Zero(
+            GetCurrentProgram().NumberOfDecisionVariables());
+
         // Sparse Method
 
         // /* Construct sparse symmetric Hessian in qpOASES environment  */
@@ -82,38 +89,54 @@ class QPOASESSolverInstance : public SolverBase {
         int nc = GetCurrentProgram().NumberOfConstraints();
 
         // Linear costs
+        std::cout << "Linear cost\n";
         for (Binding<LinearCost>& binding :
              GetCurrentProgram().GetLinearCostBindings()) {
             const std::vector<bool>& continuous =
                 CostBindingContinuousInputCheck(binding);
 
-            // Evaluate the constraint
-            
+            // Evaluate the cost
+            EvaluateCost(binding.Get(), primal_solution_x_,
+                         binding.GetVariables(), continuous, true, true, false);
 
-            // Insert into cost gradient
-            if () {
-                objective_gradient_cache_.middleRows(1, 5) += binding.Get().c();
-            } else {
+            // Update the gradient
+            for (int i = 0; i < binding.GetVariables().size(); ++i) {
+                UpdateVectorAtVariableLocations(g_, binding.Get().c(),
+                                                binding.GetVariable(i),
+                                                continuous[i]);
             }
         }
         // Quadratic costs
+        std::cout << "Quadratic cost\n";
         for (Binding<QuadraticCost>& binding :
              GetCurrentProgram().GetQuadraticCostBindings()) {
             const std::vector<bool>& continuous =
                 CostBindingContinuousInputCheck(binding);
 
-            // Insert into cost gradient
-            if () {
-                lagrangian_hes_cache_.middleRows(1, 5) += binding.Get().Q();
-                lagrangian_hes_cache_.middleRows(1, 5) += binding.Get().g();
-            } else {
+            // Evaluate the cost
+            std::cout << "Eval\n";
+            EvaluateCost(binding.Get(), primal_solution_x_,
+                         binding.GetVariables(), continuous, true, true, false);
+
+            std::cout << "Gradient\n";
+            // Update the gradient
+            for (int i = 0; i < binding.GetVariables().size(); ++i) {
+                UpdateVectorAtVariableLocations(g_, binding.Get().g(),
+                                                binding.GetVariable(i),
+                                                continuous[i]);
+            }
+            std::cout << "Hessian\n";
+            // Update the hessian
+            for (int i = 0; i < binding.GetVariables().size(); ++i) {
+                for (int j = i; j < binding.GetVariables().size(); ++j) {
+                    UpdateHessianAtVariableLocations(
+                        H_, 2.0 * binding.Get().Q(), binding.GetVariable(i),
+                        binding.GetVariable(j), continuous[i], continuous[j]);
+                }
             }
         }
 
-        // Double the values of the Hessian to accomodate for the quadratic
-        // form 0.5 x^T Q x + g^T x
-        lagrangian_hes_cache_ *= 2.0;
-
+        std::cout << "Linear constraints\n";
         // Evaluate only the linear constraints of the program
         int idx = 0;
         for (Binding<LinearConstraint>& binding :
@@ -134,15 +157,14 @@ class QPOASESSolverInstance : public SolverBase {
         }
 
         std::cout << objective_cache_ << std::endl;
-        std::cout << objective_gradient_cache_ << std::endl;
-        std::cout << lagrangian_hes_cache_ << std::endl;
+        std::cout << g_ << std::endl;
+        std::cout << H_ << std::endl;
 
         // TODO - Map to row major
         typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
                               Eigen::RowMajor>
             RowMajorMatrixXd;
-        RowMajorMatrixXd H =
-            Eigen::Map<RowMajorMatrixXd>(lagrangian_hes_cache_.data(), nx, nx);
+        RowMajorMatrixXd H = Eigen::Map<RowMajorMatrixXd>(H_.data(), nx, nx);
 
         RowMajorMatrixXd A = Eigen::Map<RowMajorMatrixXd>(
             constraint_jacobian_cache_.data(), nc, nx);
@@ -170,9 +192,12 @@ class QPOASESSolverInstance : public SolverBase {
     int n_solves_ = 0;
 
     // Sparse method
-    std::unique_ptr<qpOASES::SymSparseMat> H_;
-    std::unique_ptr<qpOASES::SparseMatrix> A_;
+    // std::unique_ptr<qpOASES::SymSparseMat> H_;
+    // std::unique_ptr<qpOASES::SparseMatrix> A_;
     std::unique_ptr<qpOASES::SQProblem> qp_;
+
+    Eigen::MatrixXd H_;
+    Eigen::VectorXd g_;
 
     Eigen::VectorXd lbx_;
     Eigen::VectorXd ubx_;

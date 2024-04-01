@@ -234,7 +234,7 @@ class QuadraticCost : public Cost {
 
         SetObjectiveFunction(f);
         SetGradientFunction(fg);
-        SetGradientFunction(fh);
+        SetHessianFunction(fh);
     }
 
     QuadraticCost(const sym::Expression &ex, const std::string &name = "",
@@ -259,7 +259,7 @@ class QuadraticCost : public Cost {
 
         SetObjectiveFunction(f);
         SetGradientFunction(fg);
-        SetGradientFunction(fh);
+        SetHessianFunction(fh);
     }
 
     const double &c() { return ObjectiveFunction().getOutput(1).data()[0]; }
