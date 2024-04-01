@@ -151,6 +151,16 @@ class Constraint {
         return c_norm <= eps;
     }
 
+    /**
+     * @brief Indicates that the constraint does not change subject to variable
+     * or parameter changes
+     *
+     * @param is_invariant
+     */
+    void SetInvariant(bool is_invariant) { invariant_ = is_invariant; }
+    
+    const bool &IsInvariant() const { return invariant_; }
+
    protected:
     /**
      * @brief Resizes the constraint dimensions.
@@ -225,6 +235,10 @@ class Constraint {
     int nx_ = 0;
     // Number of parameter inputs
     int np_ = 0;
+
+    // Flag to indicate if constraint needs updating after creation (i.e.
+    // subject to variable or parameter changes)
+    bool invariant_ = false;
 
     /**
      * @brief Creates a unique id for each constraint
@@ -366,7 +380,6 @@ class LinearConstraint : public Constraint {
                      const casadi::SXVector &p, const BoundsType &bounds,
                      const std::string &name = "", bool jac = true)
         : LinearConstraint(casadi::SXVector({A}), b, p, bounds, name, jac) {}
-
 
     /**
      * @brief The coefficient matrix A for the expression A x + b.

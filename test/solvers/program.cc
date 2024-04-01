@@ -101,16 +101,15 @@ TEST(Program, AddLinearConstraint) {
     program.AddParameters("a", 2);
 
     // Create random cost
-    casadi::SX xx = casadi::SX::sym("x", 2);
-    casadi::SX yy = casadi::SX::sym("y", 2);
+    casadi::SX xx = casadi::SX::sym("x", 4);
+    sym::Expression J = dot(xx, xx) + xx(0) + xx(1);
+    J.SetInputs({xx}, {});
+    std::shared_ptr<opt::QuadraticCost> cost =
+        std::make_shared<opt::QuadraticCost>(J, "sum_squares");
 
-    sym::Expression J = dot(xx, xx) + dot(xx, yy);
-    J.SetInputs({xx, yy}, {});
-
-    std::shared_ptr<opt::Cost> c =
-        std::make_shared<opt::Cost>(J, "sum_squares", true, true);
-
-    program.AddCost(c, {x, y}, {});
+    sym::VariableVector xxyy(4);
+    xxyy << x, y;
+    program.AddQuadraticCost(cost, {xxyy}, {});
 
     // Create optimisation vector
     program.SetDecisionVariableVector();
@@ -130,6 +129,7 @@ TEST(Program, AddLinearConstraint) {
     // Create QPOASES solver and test if constraint jacobian gets created
     opt::solvers::QPOASESSolverInstance solver(program);
 
+    solver.Solve();
     solver.Solve();
 
     damotion::common::Profiler summary;

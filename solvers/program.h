@@ -122,6 +122,13 @@ class Program {
                           const sym::VariableRefVector &x,
                           const sym::ParameterRefVector &p);
 
+    Binding<LinearCost> AddLinearCost(const std::shared_ptr<LinearCost> &cost,
+                                      const sym::VariableRefVector &x,
+                                      const sym::ParameterRefVector &p);
+    Binding<QuadraticCost> AddQuadraticCost(
+        const std::shared_ptr<QuadraticCost> &cost,
+        const sym::VariableRefVector &x, const sym::ParameterRefVector &p);
+
     // TODO - Remove cost or constraint
 
     Binding<LinearConstraint> AddLinearConstraint(
@@ -255,9 +262,14 @@ class Program {
         return bounding_box_constraints_;
     }
 
-    std::vector<Binding<Cost>> &GetCostBindings() {
-        // TODO - Look at different classes of costs
-        return costs_;
+    std::vector<Binding<Cost>> &GetCostBindings() { return costs_; }
+
+    std::vector<Binding<LinearCost>> &GetLinearCostBindings() {
+        return linear_costs_;
+    }
+
+    std::vector<Binding<QuadraticCost>> &GetQuadraticCostBindings() {
+        return quadratic_costs_;
     }
 
     // Update all bindings and indices
@@ -308,6 +320,8 @@ class Program {
 
     // Costs
     std::vector<Binding<Cost>> costs_;
+    std::vector<Binding<LinearCost>> linear_costs_;
+    std::vector<Binding<QuadraticCost>> quadratic_costs_;
 };
 
 }  // namespace optimisation

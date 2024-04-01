@@ -30,15 +30,19 @@ class SolverBase {
      */
     void UpdateProgram(Program& program) { prog_ = program; }
 
-    void EvaluateCost(Binding<Cost>& b, const Eigen::VectorXd& x, bool grd,
-                      bool hes);
-    void EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes);
+    void EvaluateCost(Cost& c, const Eigen::VectorXd& x,
+                      const std::vector<sym::VariableVector>& var,
+                      const std::vector<bool>& continuous, bool grd, bool hes,
+                      bool update_cache = true);
+
+    void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes);
 
     // Evaluates the constraint and updates the cache for the gradients
     void EvaluateConstraint(Constraint& c, const int& constraint_idx,
                             const Eigen::VectorXd& x,
                             const std::vector<sym::VariableVector>& var,
-                            const std::vector<bool>& continuous, bool jac);
+                            const std::vector<bool>& continuous, bool jac,
+                            bool update_cache = true);
 
     void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
 
@@ -73,6 +77,12 @@ class SolverBase {
         const Binding<T>& binding) {
         return constraint_binding_continuous_input_
             [constraint_binding_idx[binding.id()]];
+    }
+
+    template <typename T>
+    const std::vector<bool>& CostBindingContinuousInputCheck(
+        const Binding<T>& binding) {
+        return cost_binding_continuous_input_[cost_binding_idx[binding.id()]];
     }
 
    private:

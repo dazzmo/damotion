@@ -148,6 +148,20 @@ Binding<Cost> Program::AddCost(const std::shared_ptr<Cost> &cost,
     return costs_.back();
 }
 
+Binding<LinearCost> Program::AddLinearCost(
+    const std::shared_ptr<LinearCost> &cost, const sym::VariableRefVector &x,
+    const sym::ParameterRefVector &p) {
+    linear_costs_.push_back(Binding<LinearCost>(cost, x, p));
+    return linear_costs_.back();
+}
+
+Binding<QuadraticCost> Program::AddQuadraticCost(
+    const std::shared_ptr<QuadraticCost> &cost, const sym::VariableRefVector &x,
+    const sym::ParameterRefVector &p) {
+    quadratic_costs_.push_back(Binding<QuadraticCost>(cost, x, p));
+    return quadratic_costs_.back();
+}
+
 Binding<LinearConstraint> Program::AddLinearConstraint(
     const std::shared_ptr<LinearConstraint> &con,
     const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {

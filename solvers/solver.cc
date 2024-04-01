@@ -32,32 +32,29 @@ SolverBase::SolverBase(Program& prog) : prog_(prog) {
     CalculateBindingInputs();
 }
 
-void SolverBase::EvaluateCost(Binding<Cost>& b, const Eigen::VectorXd& x,
-                              bool grd, bool hes) {
-    Cost& cost = b.Get();
-
-    // Get data for continuous memory
-    // TODO - Check it exists
-    std::vector<bool>& is_continuous = cost_binding_continuous_input_[b.id()];
-
+void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
+                              const std::vector<sym::VariableVector>& var,
+                              const std::vector<bool>& continuous, bool grd,
+                              bool hes, bool update_cache) {
+    int nx = var.size();
     // Create inputs to evaluate the function
-    std::vector<const double*> inputs(b.NumberOfVariables(), nullptr);
+    std::vector<const double*> inputs(nx, nullptr);
     // Optional creation of vectors for inputs to the functions (if vector input
     // is not continuous in optimisation vector)
     std::vector<Eigen::VectorXd> vecs = {};
 
     // Determine inputs to the function
-    for (int i = 0; i < b.NumberOfVariables(); ++i) {
-        if (is_continuous[i]) {
+    for (int i = 0; i < nx; ++i) {
+        if (continuous[i]) {
             // Set input to the start of the vector input
-            inputs[0] = x.data() + GetCurrentProgram().GetDecisionVariableIndex(
-                                       b.GetVariable(i)[0]);
+            inputs[0] = x.data() +
+                        GetCurrentProgram().GetDecisionVariableIndex(var[i][0]);
         } else {
             // Construct a vector for this input
-            Eigen::VectorXd xi(b.GetVariable(i).size());
-            for (int ii = 0; ii < b.GetVariable(i).size(); ++ii) {
-                xi[ii] = x[GetCurrentProgram().GetDecisionVariableIndex(
-                    b.GetVariable(i)[ii])];
+            Eigen::VectorXd xi(var[i].size());
+            for (int ii = 0; ii < var[i].size(); ++ii) {
+                xi[ii] =
+                    x[GetCurrentProgram().GetDecisionVariableIndex(var[i][ii])];
             }
             vecs.push_back(xi);
             inputs[i] = xi.data();
@@ -71,8 +68,6 @@ void SolverBase::EvaluateCost(Binding<Cost>& b, const Eigen::VectorXd& x,
     }
 
     cost.ObjectiveFunction().call();
-    objective_cache_ += cost.ObjectiveFunction().getOutput(0).data()[0];
-
     if (grd) {
         if (!cost.HasGradient()) {
             throw std::runtime_error("Cost does not have a Gradient!");
@@ -80,19 +75,30 @@ void SolverBase::EvaluateCost(Binding<Cost>& b, const Eigen::VectorXd& x,
 
         // Evaluate the jacobians
         cost.GradientFunction().call();
+    }
+    if (hes) {
+        if (!cost.HasHessian()) {
+            throw std::runtime_error("Cost does not have a Hessian!");
+        }
+        // Evaluate the hessians
+        cost.HessianFunction().call();
+    }
 
-        for (int i = 0; i < b.NumberOfVariables(); ++i) {
-            if (is_continuous[i]) {
+    if (update_cache == false) return;
+
+    objective_cache_ += cost.ObjectiveFunction().getOutput(0).data()[0];
+
+    if (grd) {
+        for (int i = 0; i < nx; ++i) {
+            if (continuous[i]) {
                 objective_gradient_cache_.middleRows(
-                    GetCurrentProgram().GetDecisionVariableIndex(
-                        b.GetVariable(i)[0]),
-                    b.GetVariable(i).size()) +=
-                    cost.GradientFunction().getOutput(i);
+                    GetCurrentProgram().GetDecisionVariableIndex(var[i][0]),
+                    var[i].size()) += cost.GradientFunction().getOutput(i);
             } else {
                 // For each variable, update the location in the Jacobian
-                for (int j = 0; j < b.GetVariable(i).size(); ++j) {
-                    int idx = GetCurrentProgram().GetDecisionVariableIndex(
-                        b.GetVariable(i)[j]);
+                for (int j = 0; j < var[i].size(); ++j) {
+                    int idx =
+                        GetCurrentProgram().GetDecisionVariableIndex(var[i][j]);
                     objective_gradient_cache_[idx] +=
                         cost.GradientFunction().getOutput(i).data()[j];
                 }
@@ -101,39 +107,52 @@ void SolverBase::EvaluateCost(Binding<Cost>& b, const Eigen::VectorXd& x,
     }
 
     if (hes) {
-        if (!cost.HasHessian()) {
-            throw std::runtime_error("Cost does not have a Hessian!");
-        }
-        // Evaluate the hessians
-        cost.HessianFunction().call();
-
         int cnt = 0;
-        std::cout << b.NumberOfVariables() << std::endl;
-        for (int i = 0; i < b.NumberOfVariables(); ++i) {
-            for (int j = i; j < b.NumberOfVariables(); ++j) {
+        for (int i = 0; i < nx; ++i) {
+            for (int j = i; j < nx; ++j) {
                 // For each variable combination
-                if (is_continuous[i] && is_continuous[j]) {
-                    // Block fill
-                    lagrangian_hes_cache_.block(
-                        GetCurrentProgram().GetDecisionVariableIndex(
-                            b.GetVariable(i)[0]),
-                        GetCurrentProgram().GetDecisionVariableIndex(
-                            b.GetVariable(j)[0]),
-                        b.GetVariable(i).size(), b.GetVariable(j).size()) +=
-                        cost.HessianFunction().getOutput(cnt);
+                if (continuous[i] && continuous[j]) {
+                    int i_idx = GetCurrentProgram().GetDecisionVariableIndex(
+                            var[i][0]),
+                        j_idx = GetCurrentProgram().GetDecisionVariableIndex(
+                            var[j][0]);
+                    int i_sz = var[i].size(), j_sz = var[j].size();
+                    // Create lower triangular Hessian
+                    if (i_idx > j_idx) {
+                        // Block fill
+                        lagrangian_hes_cache_.block(i_idx, j_idx, i_sz, j_sz) +=
+                            cost.HessianFunction().getOutput(cnt);
+                    } else {
+                        lagrangian_hes_cache_.block(j_idx, i_idx, j_sz, i_sz) +=
+                            cost.HessianFunction().getOutput(cnt).transpose();
+                    }
+
                 } else {
                     // For each variable pair, populate the Hessian
-                    for (int ii = 0; ii < b.GetVariable(i).size(); ++ii) {
-                        for (int jj = 0; jj < b.GetVariable(j).size(); ++jj) {
-                            lagrangian_hes_cache_(
-                                GetCurrentProgram().GetDecisionVariableIndex(
-                                    b.GetVariable(i)[ii]),
-                                GetCurrentProgram().GetDecisionVariableIndex(
-                                    b.GetVariable(j)[jj])) +=
-                                cost.HessianFunction().getOutput(cnt)(ii, jj);
+                    for (int ii = 0; ii < var[i].size(); ++ii) {
+                        for (int jj = 0; jj < var[j].size(); ++jj) {
+                            int i_idx =
+                                    GetCurrentProgram()
+                                        .GetDecisionVariableIndex(var[i][ii]),
+                                j_idx =
+                                    GetCurrentProgram()
+                                        .GetDecisionVariableIndex(var[j][jj]);
+                            // Create lower triangular matrix
+                            if (i_idx > j_idx) {
+                                lagrangian_hes_cache_(i_idx, j_idx) +=
+                                    cost.HessianFunction().getOutput(cnt)(ii,
+                                                                          jj);
+                            } else {
+                                lagrangian_hes_cache_(j_idx, i_idx) +=
+                                    cost.HessianFunction().getOutput(cnt)(ii,
+                                                                          jj);
+                            }
                         }
                     }
                 }
+
+                // Increase the count for the Hessian
+                cnt++;
             }
         }
     }
@@ -148,10 +167,13 @@ void SolverBase::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
     if (grad) {
         objective_gradient_cache_.setZero();
     }
-    // Evaluate all costs in the program
-    for (Binding<Cost>& b : prog_.GetCostBindings()) {
-        EvaluateCost(b, x, grad, hes);
+    if (hes) {
+        lagrangian_hes_cache_.setZero();
     }
+    // // Evaluate all costs in the program
+    // for (Binding<Cost>& b : prog_.GetCostBindings()) {
+    //     EvaluateCost(b, x, grad, hes);
+    // }
 }
 
 // Evaluates the constraint and updates the cache for the gradients
@@ -159,7 +181,7 @@ void SolverBase::EvaluateConstraint(Constraint& c, const int& constraint_idx,
                                     const Eigen::VectorXd& x,
                                     const std::vector<sym::VariableVector>& var,
                                     const std::vector<bool>& continuous,
-                                    bool jac) {
+                                    bool jac, bool update_cache) {
     // Get size of constraint
     int nc = c.Dimension();
     int nv = var.size();
@@ -193,41 +215,41 @@ void SolverBase::EvaluateConstraint(Constraint& c, const int& constraint_idx,
         c.ConstraintFunction().setInput(i, inputs[i]);
         if (jac) c.JacobianFunction().setInput(i, inputs[i]);
     }
+
     c.ConstraintFunction().call();
-
-    constraint_cache_.middleRows(constraint_idx, nc) =
-        c.ConstraintFunction().getOutput(0);
-
     if (jac) {
         if (!c.HasJacobian()) {
             throw std::runtime_error("Constraint " + c.name() +
                                      " does not have a Jacobian!");
         }
-
-        // Evaluate the jacobians
         c.JacobianFunction().call();
+    }
 
-        // ! Currently a dense jacobian - Look into sparse work
-        // Update Jacobian blocks
-        Eigen::Block<Eigen::MatrixXd> J =
-            constraint_jacobian_cache_.middleRows(constraint_idx, nc);
+    if (update_cache == false) return;
 
-        for (int i = 0; i < nv; ++i) {
-            const sym::VariableVector& v = var[i];
+    constraint_cache_.middleRows(constraint_idx, nc) =
+        c.ConstraintFunction().getOutput(0);
 
-            if (continuous[i]) {
-                J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(v[0]),
-                             var.size()) = c.JacobianFunction().getOutput(i);
-            } else {
-                // For each variable, update the location in the Jacobian
-                for (int j = 0; j < var.size(); ++j) {
-                    int idx =
-                        GetCurrentProgram().GetDecisionVariableIndex(v[j]);
-                    J.col(idx) = c.JacobianFunction().getOutput(i).col(j);
-                }
+    // ! Currently a dense jacobian - Look into sparse work
+    // Update Jacobian blocks
+    Eigen::Block<Eigen::MatrixXd> J =
+        constraint_jacobian_cache_.middleRows(constraint_idx, nc);
+
+    for (int i = 0; i < nv; ++i) {
+        const sym::VariableVector& v = var[i];
+
+        if (continuous[i]) {
+            J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(v[0]),
+                         var.size()) = c.JacobianFunction().getOutput(i);
+        } else {
+            // For each variable, update the location in the Jacobian
+            for (int j = 0; j < var.size(); ++j) {
+                int idx = GetCurrentProgram().GetDecisionVariableIndex(v[j]);
+                J.col(idx) = c.JacobianFunction().getOutput(i).col(j);
             }
         }
     }
+}
 }
 
 void SolverBase::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {

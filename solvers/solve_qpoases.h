@@ -25,9 +25,6 @@ class QPOASESSolverInstance : public SolverBase {
         ubx_ = Eigen::VectorXd::Zero(
             GetCurrentProgram().NumberOfDecisionVariables());
 
-        std::cout << lbx_ << std::endl;
-        std::cout << ubx_ << std::endl;
-
         // Create variable bounds from bounding box constraints
         for (Binding<BoundingBoxConstraint>& binding :
              GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
@@ -41,12 +38,14 @@ class QPOASESSolverInstance : public SolverBase {
             }
         }
 
-        std::cout << lbx_ << std::endl;
-        std::cout << ubx_ << std::endl;
-
         // Constraint bounds
         ubA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
         lbA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
+
+        std::cout << lbx_.transpose() << std::endl;
+        std::cout << ubx_.transpose() << std::endl;
+        std::cout << lbA_.transpose() << std::endl;
+        std::cout << ubA_.transpose() << std::endl;
 
         // Sparse Method
 
@@ -79,9 +78,37 @@ class QPOASESSolverInstance : public SolverBase {
     void Solve() {
         common::Profiler profiler("QPOASESSolverInstance::Solve");
         // Number of decision variables in the program
+        int nx = GetCurrentProgram().NumberOfDecisionVariables();
+        int nc = GetCurrentProgram().NumberOfConstraints();
 
-        // Evaluate costs
-        EvaluateCosts(primal_solution_x_, true, true);
+        // Linear costs
+        for (Binding<LinearCost>& binding :
+             GetCurrentProgram().GetLinearCostBindings()) {
+            const std::vector<bool>& continuous =
+                CostBindingContinuousInputCheck(binding);
+
+            // Evaluate the constraint
+            
+
+            // Insert into cost gradient
+            if () {
+                objective_gradient_cache_.middleRows(1, 5) += binding.Get().c();
+            } else {
+            }
+        }
+        // Quadratic costs
+        for (Binding<QuadraticCost>& binding :
+             GetCurrentProgram().GetQuadraticCostBindings()) {
+            const std::vector<bool>& continuous =
+                CostBindingContinuousInputCheck(binding);
+
+            // Insert into cost gradient
+            if () {
+                lagrangian_hes_cache_.middleRows(1, 5) += binding.Get().Q();
+                lagrangian_hes_cache_.middleRows(1, 5) += binding.Get().g();
+            } else {
+            }
+        }
 
         // Double the values of the Hessian to accomodate for the quadratic
         // form 0.5 x^T Q x + g^T x
@@ -106,29 +133,34 @@ class QPOASESSolverInstance : public SolverBase {
             idx += binding.Get().Dimension();
         }
 
+        std::cout << objective_cache_ << std::endl;
+        std::cout << objective_gradient_cache_ << std::endl;
+        std::cout << lagrangian_hes_cache_ << std::endl;
+
         // TODO - Map to row major
+        typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                              Eigen::RowMajor>
+            RowMajorMatrixXd;
+        RowMajorMatrixXd H =
+            Eigen::Map<RowMajorMatrixXd>(lagrangian_hes_cache_.data(), nx, nx);
+
+        RowMajorMatrixXd A = Eigen::Map<RowMajorMatrixXd>(
+            constraint_jacobian_cache_.data(), nc, nx);
 
         // Solve
         int nWSR = 100;
-        // if (n_solves_ == 0) {
-        //     qp_->init(lagrangian_hes_cache_.data(),
-        //               objective_gradient_cache_.data(),
-        //               constraint_jacobian_cache_.data(),
-        //               GetCurrentProgram().DecisionVariablesLowerBound().data(),
-        //               GetCurrentProgram().DecisionVariablesUpperBound().data(),
-        //               lbA.data(), ubA.data(), nWSR);
-        // } else {
-        //     qp_->hotstart(
-        //         lagrangian_hes_cache_.data(),
-        //         objective_gradient_cache_.data(),
-        //         constraint_jacobian_cache_.data(),
-        //         GetCurrentProgram().DecisionVariablesLowerBound().data(),
-        //         GetCurrentProgram().DecisionVariablesUpperBound().data(),
-        //         lbA.data(), ubA.data(), nWSR);
-        // }
+        if (n_solves_ == 0) {
+            qp_->init(H.data(), objective_gradient_cache_.data(), A.data(),
+                      lbx_.data(), ubx_.data(), lbA_.data(), ubA_.data(), nWSR);
+        } else {
+            qp_->hotstart(H.data(), objective_gradient_cache_.data(), A.data(),
+                          lbx_.data(), ubx_.data(), lbA_.data(), ubA_.data(),
+                          nWSR);
+        }
 
         // Get primal solution
-        // qp_->getPrimalSolution(primal_solution_x_.data());
+        qp_->getPrimalSolution(primal_solution_x_.data());
+        std::cout << primal_solution_x_.transpose() << std::endl;
 
         // TODO: Handle Error
         n_solves_++;

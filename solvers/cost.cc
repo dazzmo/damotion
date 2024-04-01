@@ -28,7 +28,6 @@ Cost::Cost(const symbolic::Expression &ex, const std::string &name, bool grd,
     // Create functions for each and wrap them
     // Constraint
     SetObjectiveFunction(casadi::Function(name, in, {ex}));
-
     // Jacobian
     if (grd) {
         casadi::SXVector gradients;
