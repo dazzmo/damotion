@@ -359,8 +359,8 @@ class LinearConstraint : public Constraint {
         }
 
         // Create the constraint, including the constant term b as well
-        casadi::Function f = casadi::Function(name, in, {linear_constraint, b});
-        casadi::Function fjac = casadi::Function(name + "_jac", in, A);
+        casadi::Function f = casadi::Function(this->name(), in, {linear_constraint, b});
+        casadi::Function fjac = casadi::Function(this->name() + "_jac", in, A);
         SetConstraintFunction(f);
         SetJacobianFunction(fjac);
     }

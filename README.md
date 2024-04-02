@@ -14,9 +14,9 @@
 </div>
 
 <!-- TABLE OF CONTENTS -->
-<details>
-  <summary>Table of Contents</summary>
-  <ol>
+<navigation>
+  <summary><b>Table of Contents</b></summary>
+  <ul>
     <li>
       <a href="#about-the-project">About The Project</a>
     </li>
@@ -29,8 +29,8 @@
     </li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
-  </ol>
-</details>
+  </ul>
+</navigation>
 
 
 
@@ -38,7 +38,7 @@
 ## About The Project
 
 <p align="left">
-The Damotion library is built on a CasADi foundation, utilising the symbolic algebra capabilities to compute
+The Damotion library was designed for personal use in robotics projects. It is built around the CasADi library, utilising the symbolic algebra capabilities to compute and evaluate complicated expressions associated with robotics research areas such as control, optimisation and estimation. To furhter aid these computations, we utilises Pinocchio, a mature rigid-body dynamics library for use in computing these expressions. This library combines these two libraries to offer utilities in optimisation, control and estimation with an emphasis on efficient computations for real-time application.
 </p>
 <p align="right">(<a href="#readme-top">back to top</a>)
 </p>
@@ -52,8 +52,9 @@ Damotion requires the following third-party libraries in order to be built and i
 * [Eigen3]()
 * [CasADi](https://github.com/casadi/casadi)
 * [Pinocchio]()
+* [Boost]() (Version 1.70 or higher)
 
-For numeric solvers, we currently have:
+We also include interfaces to open-source solvers for numerical optimisation, we currently include:
 * [Ipopt]()
 * [QPOASES]()
 
@@ -78,21 +79,12 @@ For numeric solvers, we currently have:
     ```
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-<!-- ROADMAP -->
-## Roadmap
-
-See the [open issues](https://github.com/dazzmo/robotics-toolbox/issues) for a full list of proposed features (and known issues).
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 <!-- LICENSE -->
 ## License
 
 Distributed under the GNU LESSER GENERAL PUBLIC LICENSE License. See `LICENSE.txt` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- CONTACT -->
 ## Contact

@@ -24,10 +24,21 @@ namespace osc {
 
 class EndEffector : public sym::ExpressionVector {
    public:
-    EndEffector() { this->resize(3); }
+    typedef int Id;
+
+    /**
+     * @brief Unique ID of the end-effector
+     *
+     * @return const Id&
+     */
+    const Id &id() const { return id_; }
+
+    EndEffector(const std::string &name) : name_(name) {
+        id_ = CreateId();
+        this->resize(3);
+    }
     ~EndEffector() = default;
 
-    void SetName(const std::string &name) { name_ = name; }
     const std::string &name() const { return name_; }
 
     void SetDimension(const int &dim) { dim_ = dim; }
@@ -68,17 +79,37 @@ class EndEffector : public sym::ExpressionVector {
 
    private:
     enum Index { kPosition = 0, kVelocity, kAcceleration };
-
+    // Dimension of the end-effector
     int dim_ = 0;
+    // Name of the end-effector
     std::string name_;
+
+    Id id_;
+
+    Id CreateId() {
+        static Id next_id = 0;
+        Id id = next_id++;
+        return id;
+    }
 };
 
 class HolonomicConstraint : public sym::ExpressionVector {
    public:
-    HolonomicConstraint() { this->resize(3); }
+    typedef int Id;
+
+    /**
+     * @brief Unique ID of the end-effector
+     *
+     * @return const Id&
+     */
+    const Id &id() const { return id_; }
+
+    HolonomicConstraint(const std::string &name) : name_(name) {
+        id_ = CreateId();
+        this->resize(3);
+    }
     ~HolonomicConstraint() = default;
 
-    void SetName(const std::string &name) { name_ = name; }
     const std::string &name() const { return name_; }
 
     void SetDimension(const int &dim) { dim_ = dim; }
@@ -128,11 +159,22 @@ class HolonomicConstraint : public sym::ExpressionVector {
 
     int dim_ = 0;
     std::string name_;
+
+    Id id_;
+
+    Id CreateId() {
+        static Id next_id = 0;
+        Id id = next_id++;
+        return id;
+    }
 };
 
 struct TrackingTaskData {
     enum class Type { kTranslational, kRotational, kFull };
     Type type;
+
+    // ID of the end-effector the data is associated with
+    EndEffector::Id end_effector_id;
 
     // Tracking gains
     Eigen::DiagonalMatrix<double, Eigen::Dynamic> Kp;
@@ -155,6 +197,9 @@ struct TrackingTaskData {
 };
 
 struct ContactTaskData {
+    // ID of the end-effector the data is associated with
+    EndEffector::Id end_effector_id;
+
     // Error in pose
     Eigen::VectorXd e;
     Eigen::VectorXd de;

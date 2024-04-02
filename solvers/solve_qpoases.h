@@ -88,6 +88,10 @@ class QPOASESSolverInstance : public SolverBase {
         int nx = GetCurrentProgram().NumberOfDecisionVariables();
         int nc = GetCurrentProgram().NumberOfConstraints();
 
+        // Reset costs and gradients
+        g_.setZero();
+        H_.setZero();
+
         // Linear costs
         std::cout << "Linear cost\n";
         for (Binding<LinearCost>& binding :
@@ -168,6 +172,9 @@ class QPOASESSolverInstance : public SolverBase {
 
         RowMajorMatrixXd A = Eigen::Map<RowMajorMatrixXd>(
             constraint_jacobian_cache_.data(), nc, nx);
+
+        std::cout << "A:\n";
+        std::cout << A << '\n';
 
         // Solve
         int nWSR = 100;
