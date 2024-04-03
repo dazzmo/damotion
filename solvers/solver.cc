@@ -34,17 +34,19 @@ SolverBase::SolverBase(Program& prog) : prog_(prog) {
 
 void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
                               const std::vector<sym::VariableVector>& var,
+                              const std::vector<const double*>& par,
                               const std::vector<bool>& continuous, bool grd,
                               bool hes, bool update_cache) {
-    int nx = var.size();
+    int nv = var.size();
+    int np = par.size();
     // Create inputs to evaluate the function
-    std::vector<const double*> inputs(nx, nullptr);
+    std::vector<const double*> inputs(nv, nullptr);
     // Optional creation of vectors for inputs to the functions (if vector input
     // is not continuous in optimisation vector)
     std::vector<Eigen::VectorXd> vecs = {};
 
     // Determine inputs to the function
-    for (int i = 0; i < nx; ++i) {
+    for (int i = 0; i < nv; ++i) {
         if (continuous[i]) {
             // Set input to the start of the vector input
             inputs[i] = x.data() +
@@ -61,7 +63,8 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
         }
     }
 
-    for (int i = 0; i < inputs.size(); ++i) {
+    // Set variables
+    for (int i = 0; i < nv; ++i) {
         cost.ObjectiveFunction().setInput(i, inputs[i]);
         if (grd) {
             if (!cost.HasGradient()) {
@@ -76,6 +79,22 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
             cost.HessianFunction().setInput(i, inputs[i]);
         }
     }
+    // Set parameters
+    for (int i = 0; i < np; ++i) {
+        cost.ObjectiveFunction().setInput(nv + i, par[i]);
+        if (grd) {
+            if (!cost.HasGradient()) {
+                throw std::runtime_error("Cost does not have a Gradient!");
+            }
+            cost.GradientFunction().setInput(nv + i, par[i]);
+        }
+        if (hes) {
+            if (!cost.HasHessian()) {
+                throw std::runtime_error("Cost does not have a Hessian!");
+            }
+            cost.HessianFunction().setInput(nv + i, par[i]);
+        }
+    }
 
     cost.ObjectiveFunction().call();
     if (grd) cost.GradientFunction().call();
@@ -86,7 +105,7 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
     objective_cache_ += cost.ObjectiveFunction().getOutput(0).data()[0];
 
     if (grd) {
-        for (int i = 0; i < nx; ++i) {
+        for (int i = 0; i < nv; ++i) {
             UpdateVectorAtVariableLocations(
                 objective_gradient_cache_, cost.GradientFunction().getOutput(i),
                 var[i], continuous[i]);
@@ -95,8 +114,8 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
 
     if (hes) {
         int cnt = 0;
-        for (int i = 0; i < nx; ++i) {
-            for (int j = i; j < nx; ++j) {
+        for (int i = 0; i < nv; ++i) {
+            for (int j = i; j < nv; ++j) {
                 // Increase the count for the Hessian
                 UpdateHessianAtVariableLocations(
                     lagrangian_hes_cache_,
@@ -128,11 +147,13 @@ void SolverBase::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
 void SolverBase::EvaluateConstraint(Constraint& c, const int& constraint_idx,
                                     const Eigen::VectorXd& x,
                                     const std::vector<sym::VariableVector>& var,
+                                    const std::vector<const double*>& par,
                                     const std::vector<bool>& continuous,
                                     bool jac, bool update_cache) {
     // Get size of constraint
     int nc = c.Dimension();
     int nv = var.size();
+    int np = par.size();
 
     // Create inputs to evaluate the function
     std::vector<const double*> inputs(nv, nullptr);
@@ -159,9 +180,14 @@ void SolverBase::EvaluateConstraint(Constraint& c, const int& constraint_idx,
     }
 
     // Set vector inputs and evaluate necessary functions
-    for (int i = 0; i < inputs.size(); ++i) {
+    for (int i = 0; i < nv; ++i) {
         c.ConstraintFunction().setInput(i, inputs[i]);
         if (jac) c.JacobianFunction().setInput(i, inputs[i]);
+    }
+    // Set parameter inputs
+    for (int i = 0; i < np; ++i) {
+        c.ConstraintFunction().setInput(nv + i, par[i]);
+        if (jac) c.JacobianFunction().setInput(nv + i, par[i]);
     }
 
     c.ConstraintFunction().call();

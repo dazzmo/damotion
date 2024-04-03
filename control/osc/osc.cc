@@ -20,8 +20,8 @@ Eigen::VectorXd DesiredTrackingTaskAcceleration(TrackingTaskData &data,
     const Eigen::VectorXd &xpos = ee.EvalPosition(), &xvel = ee.EvalVelocity();
 
     if (data.type == TrackingTaskData::Type::kTranslational) {
-        data.e = xpos - data.xr;
-        data.de = xvel - data.vr;
+        data.e = xpos.topRows(3) - data.xr;
+        data.de = xvel.topRows(3) - data.vr;
     } else if (data.type == TrackingTaskData::Type::kRotational) {
         // Get rotational component
         Eigen::Vector4d qv = xpos.bottomRows(4);

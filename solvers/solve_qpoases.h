@@ -82,6 +82,11 @@ class QPOASESSolverInstance : public SolverBase {
 
     ~QPOASESSolverInstance() {}
 
+    void Reset() {
+        // Reset the solver flag
+        first_solve_ = true;
+    }
+
     void Solve() {
         common::Profiler profiler("QPOASESSolverInstance::Solve");
         // Number of decision variables in the program
@@ -93,7 +98,6 @@ class QPOASESSolverInstance : public SolverBase {
         H_.setZero();
 
         // Linear costs
-        std::cout << "Linear cost\n";
         for (Binding<LinearCost>& binding :
              GetCurrentProgram().GetLinearCostBindings()) {
             const std::vector<bool>& continuous =
@@ -101,7 +105,8 @@ class QPOASESSolverInstance : public SolverBase {
 
             // Evaluate the cost
             EvaluateCost(binding.Get(), primal_solution_x_,
-                         binding.GetVariables(), continuous, true, true, false);
+                         binding.GetVariables(), binding.GetParameters(),
+                         continuous, true, true, false);
 
             // Update the gradient
             for (int i = 0; i < binding.GetVariables().size(); ++i) {
@@ -111,25 +116,22 @@ class QPOASESSolverInstance : public SolverBase {
             }
         }
         // Quadratic costs
-        std::cout << "Quadratic cost\n";
         for (Binding<QuadraticCost>& binding :
              GetCurrentProgram().GetQuadraticCostBindings()) {
             const std::vector<bool>& continuous =
                 CostBindingContinuousInputCheck(binding);
 
             // Evaluate the cost
-            std::cout << "Eval\n";
             EvaluateCost(binding.Get(), primal_solution_x_,
-                         binding.GetVariables(), continuous, true, true, false);
+                         binding.GetVariables(), binding.GetParameters(),
+                         continuous, true, true, false);
 
-            std::cout << "Gradient\n";
             // Update the gradient
             for (int i = 0; i < binding.GetVariables().size(); ++i) {
                 UpdateVectorAtVariableLocations(g_, binding.Get().g(),
                                                 binding.GetVariable(i),
                                                 continuous[i]);
             }
-            std::cout << "Hessian\n";
             // Update the hessian
             for (int i = 0; i < binding.GetVariables().size(); ++i) {
                 for (int j = i; j < binding.GetVariables().size(); ++j) {
@@ -140,15 +142,15 @@ class QPOASESSolverInstance : public SolverBase {
             }
         }
 
-        std::cout << "Linear constraints\n";
         // Evaluate only the linear constraints of the program
         int idx = 0;
         for (Binding<LinearConstraint>& binding :
              GetCurrentProgram().GetLinearConstraintBindings()) {
             // Compute the constraints
-            EvaluateConstraint(
-                binding.Get(), idx, primal_solution_x_, binding.GetVariables(),
-                ConstraintBindingContinuousInputCheck(binding), true);
+            EvaluateConstraint(binding.Get(), idx, primal_solution_x_,
+                               binding.GetVariables(), binding.GetParameters(),
+                               ConstraintBindingContinuousInputCheck(binding),
+                               true);
 
             // Adapt bounds for the linear constraints
             ubA_.middleRows(idx, binding.Get().Dimension()) =
@@ -160,27 +162,19 @@ class QPOASESSolverInstance : public SolverBase {
             idx += binding.Get().Dimension();
         }
 
-        std::cout << objective_cache_ << std::endl;
-        std::cout << g_ << std::endl;
-        std::cout << H_ << std::endl;
-
-        // TODO - Map to row major
         typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
                               Eigen::RowMajor>
             RowMajorMatrixXd;
-        RowMajorMatrixXd H = Eigen::Map<RowMajorMatrixXd>(H_.data(), nx, nx);
-
-        RowMajorMatrixXd A = Eigen::Map<RowMajorMatrixXd>(
-            constraint_jacobian_cache_.data(), nc, nx);
-
-        std::cout << "A:\n";
-        std::cout << A << '\n';
+        // ! See about effects of copying
+        RowMajorMatrixXd H = H_;
+        RowMajorMatrixXd A = constraint_jacobian_cache_;
 
         // Solve
         int nWSR = 100;
-        if (n_solves_ == 0) {
+        if (first_solve_) {
             qp_->init(H.data(), objective_gradient_cache_.data(), A.data(),
                       lbx_.data(), ubx_.data(), lbA_.data(), ubA_.data(), nWSR);
+            first_solve_ = false;
         } else {
             qp_->hotstart(H.data(), objective_gradient_cache_.data(), A.data(),
                           lbx_.data(), ubx_.data(), lbA_.data(), ubA_.data(),
@@ -189,13 +183,13 @@ class QPOASESSolverInstance : public SolverBase {
 
         // Get primal solution
         qp_->getPrimalSolution(primal_solution_x_.data());
-        std::cout << primal_solution_x_.transpose() << std::endl;
 
-        // TODO: Handle Error
+        // TODO Handle Error
         n_solves_++;
     }
 
    private:
+    bool first_solve_ = true;
     int n_solves_ = 0;
 
     // Sparse method
@@ -226,6 +220,16 @@ class QPOASESSolver {
     // Update program // TODO - Throw warning if program sizes don't match?
     void UpdateProgram(Program& program) { qp_->UpdateProgram(program); }
 
+    /**
+     * @brief Resets the solver
+     *
+     */
+    void Reset() { qp_->Reset(); }
+
+    /**
+     * @brief Solves the current program
+     *
+     */
     void Solve() { qp_->Solve(); }
 
     const Eigen::VectorXd& GetPrimalSolution() const {

@@ -32,6 +32,7 @@ class SolverBase {
 
     void EvaluateCost(Cost& c, const Eigen::VectorXd& x,
                       const std::vector<sym::VariableVector>& var,
+                      const std::vector<const double*>& par,
                       const std::vector<bool>& continuous, bool grd, bool hes,
                       bool update_cache = true);
 
@@ -41,6 +42,7 @@ class SolverBase {
     void EvaluateConstraint(Constraint& c, const int& constraint_idx,
                             const Eigen::VectorXd& x,
                             const std::vector<sym::VariableVector>& var,
+                            const std::vector<const double*>& par,
                             const std::vector<bool>& continuous, bool jac,
                             bool update_cache = true);
 
@@ -48,6 +50,32 @@ class SolverBase {
 
     const Eigen::VectorXd& GetPrimalSolution() const {
         return primal_solution_x_;
+    }
+
+    /**
+     * @brief Returns a vector of the current values of the variables provided
+     * in var. If variables are all together in the vector, we can speed this
+     * process up by setting is_continuous to true.
+     *
+     * @param var
+     * @param is_continuous
+     * @return Eigen::VectorXd
+     */
+    Eigen::VectorXd GetVariableValues(const sym::VariableVector& var,
+                                      bool is_continuous = false) {
+        if (is_continuous) {
+            return primal_solution_x_.middleRows(
+                GetCurrentProgram().GetDecisionVariableIndex(var[0]),
+                var.size());
+        } else {
+            Eigen::VectorXd vec(var.size());
+            for (int i = 0; i < var.size(); ++i) {
+                vec[i] =
+                    primal_solution_x_[GetCurrentProgram()
+                                           .GetDecisionVariableIndex(var[i])];
+            }
+            return vec;
+        }
     }
 
     std::vector<Binding<Constraint>>& GetConstraints() { return constraints_; }
