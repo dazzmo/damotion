@@ -49,14 +49,18 @@ The Damotion library was designed for personal use in robotics projects. It is b
 ### Prerequisites
 
 Damotion requires the following third-party libraries in order to be built and installed.
-* [Eigen3]()
+* [Eigen3](https://gitlab.com/libeigen/eigen)
 * [CasADi](https://github.com/casadi/casadi)
-* [Pinocchio]()
-* [Boost]() (Version 1.70 or higher)
+* [Pinocchio](https://github.com/stack-of-tasks/pinocchio)
+* [Boost](https://www.boost.org/) (Version 1.70 or higher)
+
+For testing purposes we have (this is later be a toggle-able option):
+* [googletest](https://github.com/google/googletest)
+* [glog](https://github.com/google/glog)
 
 We also include interfaces to open-source solvers for numerical optimisation, we currently include:
-* [Ipopt]()
-* [QPOASES]()
+* [Ipopt](https://github.com/coin-or/Ipopt)
+* [QPOASES](https://github.com/coin-or/qpOASES)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
