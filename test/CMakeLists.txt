@@ -5,53 +5,28 @@ link_directories(${GTEST_LIB_DIRS})
 
 enable_testing()
 
-# Utils
-add_executable(codegen_test ${CMAKE_CURRENT_SOURCE_DIR}/utils/codegen.cc)
-target_link_libraries(codegen_test damotion GTest::gtest_main)
+# Create list of files
 
-add_executable(eigen_wrapper_test ${CMAKE_CURRENT_SOURCE_DIR}/utils/eigen_wrapper.cc)
-target_link_libraries(eigen_wrapper_test damotion GTest::gtest_main)
-
-add_executable(pinocchio_wrapper_test ${CMAKE_CURRENT_SOURCE_DIR}/utils/pinocchio_model.cc)
-target_link_libraries(pinocchio_wrapper_test damotion GTest::gtest_main)
-
-add_executable(log ${CMAKE_CURRENT_SOURCE_DIR}/utils/log.cc)
-target_link_libraries(log damotion GTest::gtest_main)
-
-add_executable(casadi_utils ${CMAKE_CURRENT_SOURCE_DIR}/utils/casadi.cc)
-target_link_libraries(casadi_utils damotion GTest::gtest_main)
-
-add_executable(expression ${CMAKE_CURRENT_SOURCE_DIR}/utils/expression.cc)
-target_link_libraries(expression damotion GTest::gtest_main)
-
-# System
-add_executable(controlled_system ${CMAKE_CURRENT_SOURCE_DIR}/system/controlled.cc)
-target_link_libraries(controlled_system damotion GTest::gtest_main)
-
-add_executable(constraint ${CMAKE_CURRENT_SOURCE_DIR}/system/constraint.cc)
-target_link_libraries(constraint damotion GTest::gtest_main)
-
-# Common
-add_executable(profiler ${CMAKE_CURRENT_SOURCE_DIR}/common/profiler.cc)
-target_link_libraries(profiler damotion GTest::gtest_main)
-
-# Control
-add_executable(osc ${CMAKE_CURRENT_SOURCE_DIR}/control/osc.cc)
-target_link_libraries(osc damotion GTest::gtest_main)
-
-# Solvers
-add_executable(program_test ${CMAKE_CURRENT_SOURCE_DIR}/solvers/program.cc)
-target_link_libraries(program_test damotion GTest::gtest_main)
+SET(TEST_FILES
+${CMAKE_CURRENT_SOURCE_DIR}/utils/codegen.cc 
+${CMAKE_CURRENT_SOURCE_DIR}/utils/eigen_wrapper.cc
+${CMAKE_CURRENT_SOURCE_DIR}/utils/pinocchio_model.cc
+${CMAKE_CURRENT_SOURCE_DIR}/utils/log.cc
+${CMAKE_CURRENT_SOURCE_DIR}/utils/casadi.cc
+${CMAKE_CURRENT_SOURCE_DIR}/utils/expression.cc
+${CMAKE_CURRENT_SOURCE_DIR}/system/controlled.cc
+${CMAKE_CURRENT_SOURCE_DIR}/system/constraint.cc
+${CMAKE_CURRENT_SOURCE_DIR}/common/profiler.cc
+${CMAKE_CURRENT_SOURCE_DIR}/control/osc.cc
+${CMAKE_CURRENT_SOURCE_DIR}/solvers/cost.cc
+${CMAKE_CURRENT_SOURCE_DIR}/solvers/program.cc
+)
 
 include(GoogleTest)
-gtest_discover_tests(codegen_test)
-gtest_discover_tests(eigen_wrapper_test)
-gtest_discover_tests(pinocchio_wrapper_test)
-gtest_discover_tests(controlled_system)
-gtest_discover_tests(constraint)
-gtest_discover_tests(log)
-gtest_discover_tests(profiler)
-gtest_discover_tests(osc)
-gtest_discover_tests(program_test)
-gtest_discover_tests(casadi_utils)
-gtest_discover_tests(expression)
+
+foreach(current_file IN LISTS TEST_FILES)
+get_filename_component(current_name ${current_file} NAME_WE)
+    add_executable("test_${current_name}" ${current_file})
+    target_link_libraries("test_${current_name}" damotion GTest::gtest_main)
+    gtest_discover_tests("test_${current_name}")
+endforeach()
