@@ -87,8 +87,8 @@ TEST(Program, AddLinearConstraint) {
     Eigen::Vector<double, 1> b(3.0);
 
     std::shared_ptr<opt::LinearConstraint> con =
-        std::make_shared<opt::LinearConstraint>(
-            A, b, opt::BoundsType::kEquality, "lin");
+        std::make_shared<opt::LinearConstraint>("", A, b,
+                                                opt::BoundsType::kEquality);
 
     program.AddDecisionVariables(x);
     program.AddDecisionVariables(y);
@@ -105,7 +105,7 @@ TEST(Program, AddLinearConstraint) {
     sym::Expression J = dot(xx, xx) + xx(0) + xx(0) * xx(2);
     J.SetInputs({xx}, {});
     std::shared_ptr<opt::QuadraticCost> cost =
-        std::make_shared<opt::QuadraticCost>(J, "sum_squares");
+        std::make_shared<opt::QuadraticCost>("sum_squares", J);
 
     sym::VariableVector xxyy(4);
     xxyy << x, y;

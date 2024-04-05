@@ -3,18 +3,21 @@
 namespace damotion {
 namespace optimisation {
 
-Cost::Cost(const symbolic::Expression &ex, const std::string &name, bool grd,
-           bool hes) {
+Cost::Cost(const std::string &name, const std::string &cost_type) {
+    // Set default name for constraint
+    if (name != "") {
+        name_ = name;
+    } else {
+        name_ = cost_type + "_" + std::to_string(CreateID());
+    }
+}
+
+Cost::Cost(const std::string &name, const symbolic::Expression &ex, bool grd,
+           bool hes) : Cost(name, "cost") {
     // Get input sizes
     // Get input sizes
     nx_ = ex.Variables().size();
     np_ = ex.Parameters().size();
-
-    if (name == "") {
-        name_ = "obj_" + std::to_string(CreateID());
-    } else {
-        name_ = name;
-    }
 
     // Create functions to compute the constraint and derivatives given the
     // variables and parameters

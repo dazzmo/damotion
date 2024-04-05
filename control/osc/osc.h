@@ -93,6 +93,22 @@ class EndEffector : public sym::ExpressionVector {
     }
 };
 
+/**
+ * @brief Create and end-effector data type of a specific class?
+ *
+ */
+class EndEffectorFactory {
+   public:
+    EndEffectorFactory() = default;
+    ~EndEffectorFactory() = default;
+
+    std::shared_ptr<EndEffector> Create(const std::string &name) {
+        return std::make_shared<EndEffector>(name);
+    }
+
+   private:
+};
+
 class HolonomicConstraint : public sym::ExpressionVector {
    public:
     typedef int Id;
@@ -169,21 +185,46 @@ class HolonomicConstraint : public sym::ExpressionVector {
     }
 };
 
-struct TrackingTaskData {
-    enum class Type { kTranslational, kRotational, kFull };
-    Type type;
-
-    // ID of the end-effector the data is associated with
-    EndEffector::Id end_effector_id;
-
-    // Tracking gains
-    Eigen::DiagonalMatrix<double, Eigen::Dynamic> Kp;
-    // Tracking gains
-    Eigen::DiagonalMatrix<double, Eigen::Dynamic> Kd;
-
-    // Error in pose
+class TaskData {
+   public:
+    TaskData() = default;
+    ~TaskData() = default;
+    // Task error
     Eigen::VectorXd e;
     Eigen::VectorXd de;
+
+    // PD Tracking gains
+    Eigen::DiagonalMatrix<double, Eigen::Dynamic> Kp;
+    Eigen::DiagonalMatrix<double, Eigen::Dynamic> Kd;
+
+    virtual Eigen::VectorXd GetPDError() { return Kp * e + Kd * de; }
+
+   private:
+};
+
+class TrackingTaskData : public TaskData {
+   public:
+    enum class Type { kTranslational, kRotational, kFull };
+
+    TrackingTaskData() = default;
+    ~TrackingTaskData() = default;
+
+    TrackingTaskData(const std::shared_ptr<EndEffector> &ee, const Type &type)
+        : TaskData(), ee_(ee) {
+        type_ = type;
+        if (type == Type::kTranslational) {
+            Kp.resize(3);
+            Kd.resize(3);
+        } else if (type == Type::kRotational) {
+            Kp.resize(3);
+            Kd.resize(3);
+        } else {
+            Kp.resize(6);
+            Kd.resize(6);
+        }
+    }
+
+    EndEffector &GetEndEffector() { return *ee_; }
 
     // Desired pose translational component
     Eigen::Vector3d xr;
@@ -194,15 +235,45 @@ struct TrackingTaskData {
     Eigen::Vector3d vr = Eigen::Vector3d::Zero();
     // Desired pose velocity rotational component
     Eigen::Vector3d wr = Eigen::Vector3d::Zero();
+
+    /**
+     * @brief Compute the desired tracking task acceleration as a PD error
+     * metric on the task position and velocity errors
+     *
+     * @return Eigen::VectorXd
+     */
+    void DesiredTrackingTaskAcceleration();
+
+    Eigen::VectorXd GetPDError() override {
+        DesiredTrackingTaskAcceleration();
+        return Kp * e + Kd * de;
+    }
+
+   private:
+    Type type_;
+    std::shared_ptr<EndEffector> ee_;
 };
 
-struct ContactTaskData {
-    // ID of the end-effector the data is associated with
-    EndEffector::Id end_effector_id;
+class TrackingTaskDataFactory {
+   public:
+    TrackingTaskDataFactory() = default;
+    ~TrackingTaskDataFactory() = default;
 
-    // Error in pose
-    Eigen::VectorXd e;
-    Eigen::VectorXd de;
+    std::unique_ptr<TrackingTaskData> Create(
+        std::shared_ptr<EndEffector> &ee, const TrackingTaskData::Type &type) {
+        return std::make_unique<TrackingTaskData>(ee, type);
+    }
+
+   private:
+};
+
+class ContactTaskData : public TaskData {
+   public:
+    ContactTaskData() = default;
+    ~ContactTaskData() = default;
+
+    ContactTaskData(const std::shared_ptr<EndEffector> &ee)
+        : TaskData(), ee_(ee) {}
 
     // Desired pose translational component
     Eigen::Vector3d xr;
@@ -215,17 +286,22 @@ struct ContactTaskData {
 
     // Friction coefficient
     double mu = 1.0;
+
+   private:
+    std::shared_ptr<EndEffector> ee_;
 };
 
-Eigen::VectorXd DesiredTrackingTaskAcceleration(TrackingTaskData &data,
-                                                EndEffector &ee);
+class ContactTaskDataFactory {
+   public:
+    ContactTaskDataFactory() = default;
+    ~ContactTaskDataFactory() = default;
 
-sym::Expression TaskAccelerationErrorCost(const casadi::SX &xacc,
-                                          const casadi::SX &xacc_d) {
-    sym::Expression obj;
-    obj = casadi::SX::dot(xacc - xacc_d, xacc - xacc_d);
-    return obj;
-}
+    std::unique_ptr<ContactTaskData> Create(std::shared_ptr<EndEffector> &ee) {
+        return std::make_unique<ContactTaskData>(ee);
+    }
+
+   private:
+};
 
 /**
  * @brief Returns the linear coefficients for the no-slip constraints required
@@ -259,29 +335,8 @@ optimisation::Constraint LinearisedFrictionConstraint() {
     cone(3) = -sqrt(2.0) * l_y - mu * l_z;
 
     cone.SetInputs({lambda}, {mu});
-    return optimisation::Constraint(cone, opt::BoundsType::kPositive,
-                                    "friction_cone");
-}
-
-sym::Expression ComputeConstrainedDynamics(
-    sym::Expression &unconstrained_inverse_dynamics,
-    std::vector<HolonomicConstraint> &constraints, const casadi::SX &qpos,
-    const casadi::SX &qvel) {
-    sym::Expression constrained_inverse_dynamics =
-        unconstrained_inverse_dynamics;
-
-    // Add effects of holonomic constraints
-    for (HolonomicConstraint &c : constraints) {
-        // Evaluate Jacobian
-        casadi::SX dc = c.ConstraintFirstDerivative();
-        casadi::SX J = jacobian(dc, qvel);
-        // Create constraint forces
-        casadi::SX lam = casadi::SX::sym(c.name() + "_lam", c.Dimension());
-        // Add joint-space forces associated with the task
-        constrained_inverse_dynamics -= mtimes(J.T(), lam);
-    }
-
-    return constrained_inverse_dynamics;
+    return optimisation::Constraint("friction_cone", cone,
+                                    opt::BoundsType::kPositive);
 }
 
 // TODO - Place this is a utility

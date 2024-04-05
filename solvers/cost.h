@@ -13,20 +13,27 @@ namespace sym = damotion::symbolic;
 
 class Cost {
    public:
-    Cost() { name_ = "obj_" + std::to_string(CreateID()); }
+    Cost() = default;
     ~Cost() = default;
 
-    Cost(const symbolic::Expression &ex, const std::string &name = "",
+    Cost(const std::string &name, const std::string &cost_type);
+
+    Cost(const std::string &name, const symbolic::Expression &ex,
          bool grd = false, bool hes = false);
 
     utils::casadi::FunctionWrapper &ObjectiveFunction() { return obj_; }
     utils::casadi::FunctionWrapper &GradientFunction() { return grad_; }
     utils::casadi::FunctionWrapper &HessianFunction() { return hes_; }
 
+    /**
+     * @brief Name of the cost
+     *
+     * @return const std::string&
+     */
     const std::string &name() const { return name_; }
 
     /**
-     * @brief Whether the Cost has a Gradient
+     * @brief Whether the cost has a Gradient
      *
      * @return true
      * @return false
@@ -34,26 +41,12 @@ class Cost {
     const bool HasGradient() const { return has_grd_; }
 
     /**
-     * @brief Whether the Cost has a Hessian
+     * @brief Whether the cost has a Hessian
      *
      * @return true
      * @return false
      */
     const bool HasHessian() const { return has_hes_; }
-
-    /**
-     * @brief Cost weighting
-     *
-     * @return const double
-     */
-    const double weighting() const { return w_; }
-
-    /**
-     * @brief Cost weighting
-     *
-     * @return double&
-     */
-    double &weighting() { return w_; }
 
    protected:
     void SetObjectiveFunction(const casadi::Function &f) { obj_ = f; }
@@ -67,9 +60,6 @@ class Cost {
     }
 
    private:
-    // Cost weighting
-    double w_;
-
     bool has_grd_ = false;
     bool has_hes_ = false;
 
@@ -118,9 +108,9 @@ class Cost {
  */
 class LinearCost : public Cost {
    public:
-    LinearCost(const Eigen::VectorXd &c, const double &b,
-               const std::string &name = "", bool jac = true)
-        : Cost() {
+    LinearCost(const std::string &name, const Eigen::VectorXd &c,
+               const double &b, bool jac = true)
+        : Cost(name, "linear_cost") {
         int nvar = 0;
         casadi::SXVector in = {};
         // Constant vector b
@@ -143,10 +133,9 @@ class LinearCost : public Cost {
         SetGradientFunction(fg);
     }
 
-    LinearCost(const casadi::SX &c, const casadi::SX &b,
-               const casadi::SXVector &p, const std::string &name = "",
-               bool jac = true)
-        : Cost() {
+    LinearCost(const std::string &name, const casadi::SX &c,
+               const casadi::SX &b, const casadi::SXVector &p, bool jac = true)
+        : Cost(name, "linear_cost") {
         int nvar = 0;
         casadi::SXVector in = {};
         // Linear cost
@@ -168,12 +157,45 @@ class LinearCost : public Cost {
         SetGradientFunction(fg);
     }
 
+    LinearCost(const std::string &name, const sym::Expression &ex,
+               bool jac = true, bool hes = true)
+        : Cost(name, "linear_cost") {
+        int nvar = 0;
+        casadi::SXVector in = {};
+        // Extract quadratic form
+        casadi::SX c, b;
+        casadi::SX::linear_coeff(ex, ex.Variables()[0], c, b, true);
+
+        in = ex.Variables();
+        for (const casadi::SX &pi : ex.Parameters()) {
+            in.push_back(pi);
+        }
+
+        // Create the Cost
+        casadi::Function f = casadi::Function(this->name(), in, {ex, b});
+        casadi::Function fg = casadi::Function(this->name() + "_grd", in, {c});
+
+        SetObjectiveFunction(f);
+        SetGradientFunction(fg);
+    }
+
+    /**
+     * @brief Returns the coefficients of x for the cost expression.
+     *
+     * @return Eigen::VectorXd
+     */
     Eigen::VectorXd c() {
         return Eigen::Map<const Eigen::VectorXd>(
             GradientFunction().getOutput(0).data(),
             GradientFunction().getOutput(0).rows());
     }
-    const double &b() { return ObjectiveFunction().getOutput(1).data()[0]; }
+
+    /**
+     * @brief Returns the constant term b in the cost expression.
+     *
+     * @return const double
+     */
+    const double b() { return ObjectiveFunction().getOutput(1).data()[0]; }
 
    private:
 };
@@ -184,10 +206,10 @@ class LinearCost : public Cost {
  */
 class QuadraticCost : public Cost {
    public:
-    QuadraticCost(const Eigen::MatrixXd &Q, const Eigen::VectorXd &g,
-                  const double &c, const std::string &name = "",
-                  bool jac = true, bool hes = true)
-        : Cost() {
+    QuadraticCost(const std::string &name, const Eigen::MatrixXd &Q,
+                  const Eigen::VectorXd &g, const double &c, bool jac = true,
+                  bool hes = true)
+        : Cost(name, "quadratic_cost") {
         int nvar = 0;
         casadi::SXVector in = {};
         // Cost
@@ -212,10 +234,10 @@ class QuadraticCost : public Cost {
         SetHessianFunction(fh);
     }
 
-    QuadraticCost(const casadi::SX &Q, const casadi::SX &g, const casadi::SX &c,
-                  const casadi::SXVector &p, const std::string &name = "",
-                  bool jac = true, bool hes = true)
-        : Cost() {
+    QuadraticCost(const std::string &name, const casadi::SX &Q,
+                  const casadi::SX &g, const casadi::SX &c,
+                  const casadi::SXVector &p, bool jac = true, bool hes = true)
+        : Cost(name, "quadratic_cost") {
         int nvar = 0;
         casadi::SXVector in = {};
         // Linear cost
@@ -237,9 +259,9 @@ class QuadraticCost : public Cost {
         SetHessianFunction(fh);
     }
 
-    QuadraticCost(const sym::Expression &ex, const std::string &name = "",
+    QuadraticCost(const std::string &name, const sym::Expression &ex,
                   bool jac = true, bool hes = true)
-        : Cost() {
+        : Cost(name, "quadratic_cost") {
         int nvar = 0;
         casadi::SXVector in = {};
         // Extract quadratic form
@@ -253,8 +275,8 @@ class QuadraticCost : public Cost {
 
         // Create the Cost
         casadi::Function f = casadi::Function(this->name(), in, {ex, c});
-        casadi::Function fg =
-            casadi::Function(this->name() + "_grd", in, {mtimes(Q, ex.Variables()[0]) + g, g});
+        casadi::Function fg = casadi::Function(
+            this->name() + "_grd", in, {mtimes(Q, ex.Variables()[0]) + g, g});
         casadi::Function fh = casadi::Function(this->name() + "_hes", in, {Q});
 
         SetObjectiveFunction(f);
@@ -263,11 +285,13 @@ class QuadraticCost : public Cost {
     }
 
     const double &c() { return ObjectiveFunction().getOutput(1).data()[0]; }
+
     Eigen::VectorXd g() {
         return Eigen::Map<const Eigen::VectorXd>(
             GradientFunction().getOutput(1).data(),
             GradientFunction().getOutput(1).rows());
     }
+
     const Eigen::MatrixXd &Q() { return HessianFunction().getOutput(0); }
 
    private:

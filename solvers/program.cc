@@ -174,7 +174,7 @@ Binding<BoundingBoxConstraint> Program::AddBoundingBoxConstraint(
     const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
     const sym::VariableVector &x) {
     std::shared_ptr<BoundingBoxConstraint> con =
-        std::make_shared<BoundingBoxConstraint>(lb, ub);
+        std::make_shared<BoundingBoxConstraint>("", lb, ub);
     bounding_box_constraints_.push_back(
         Binding<BoundingBoxConstraint>(con, {x}));
     return bounding_box_constraints_.back();

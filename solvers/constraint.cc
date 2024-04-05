@@ -3,15 +3,9 @@
 namespace damotion {
 namespace optimisation {
 
-Constraint::Constraint(const symbolic::Expression &c, const BoundsType &bounds,
-                       const std::string &name, bool jac, bool hes) {
-    // Set default name for constraint
-    if (name != "") {
-        name_ = name;
-    } else {
-        name_ = "c" + std::to_string(CreateID());
-    }
-
+Constraint::Constraint(const std::string &name, const symbolic::Expression &c,
+                       const BoundsType &bounds, bool jac, bool hes)
+    : Constraint(name, "constraint") {
     // Resize the constraint
     Resize(c.size1(), c.Variables().size(), c.Parameters().size());
 
@@ -43,12 +37,13 @@ Constraint::Constraint(const symbolic::Expression &c, const BoundsType &bounds,
     UpdateBounds(bounds);
 }
 
-Constraint::Constraint(const std::string &name) {
+Constraint::Constraint(const std::string &name,
+                       const std::string &constraint_type) {
     // Set default name for constraint
     if (name != "") {
         name_ = name;
     } else {
-        name_ = "c" + std::to_string(CreateID());
+        name_ = constraint_type + "_" + std::to_string(CreateID());
     }
 }
 
