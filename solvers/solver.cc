@@ -63,19 +63,21 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
         }
     }
 
+    if (grd && !cost.HasGradient()) {
+        throw std::runtime_error("Cost does not have a Gradient!");
+    }
+
+    if (hes && !cost.HasHessian()) {
+        throw std::runtime_error("Cost does not have a Gradient!");
+    }
+
     // Set variables
     for (int i = 0; i < nv; ++i) {
         cost.ObjectiveFunction().setInput(i, inputs[i]);
         if (grd) {
-            if (!cost.HasGradient()) {
-                throw std::runtime_error("Cost does not have a Gradient!");
-            }
             cost.GradientFunction().setInput(i, inputs[i]);
         }
         if (hes) {
-            if (!cost.HasHessian()) {
-                throw std::runtime_error("Cost does not have a Hessian!");
-            }
             cost.HessianFunction().setInput(i, inputs[i]);
         }
     }
@@ -83,15 +85,9 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
     for (int i = 0; i < np; ++i) {
         cost.ObjectiveFunction().setInput(nv + i, par[i]);
         if (grd) {
-            if (!cost.HasGradient()) {
-                throw std::runtime_error("Cost does not have a Gradient!");
-            }
             cost.GradientFunction().setInput(nv + i, par[i]);
         }
         if (hes) {
-            if (!cost.HasHessian()) {
-                throw std::runtime_error("Cost does not have a Hessian!");
-            }
             cost.HessianFunction().setInput(nv + i, par[i]);
         }
     }
@@ -301,12 +297,12 @@ void SolverBase::UpdateJacobianAtVariableLocations(
     Eigen::Block<Eigen::MatrixXd> J = jac.middleRows(row_idx, block.rows());
     if (is_continuous) {
         J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(var[0]),
-                     var.size()) = block;
+                     var.size()) += block;
     } else {
         // For each variable, update the location in the Jacobian
         for (int j = 0; j < var.size(); ++j) {
             int idx = GetCurrentProgram().GetDecisionVariableIndex(var[j]);
-            J.col(idx) = block.col(j);
+            J.col(idx) += block.col(j);
         }
     }
 }

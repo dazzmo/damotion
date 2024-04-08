@@ -1,10 +1,10 @@
-// #include "utils/pinocchio_model.h"
+#include "utils/pinocchio_model.h"
 
-// #include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
-// #include "pinocchio/parsers/urdf.hpp"
-// #include "symbolic/expression.h"
-// #include "utils/codegen.h"
+#include "pinocchio/parsers/urdf.hpp"
+#include "symbolic/expression.h"
+#include "utils/codegen.h"
 
 // TEST(PinocchioModelWrapper, LoadModel) {
 //     pinocchio::Model model;
@@ -20,7 +20,8 @@
 
 //     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
-//     casadi::Function aba = damotion::symbolic::toFunction("aba", wrapper.aba());
+//     casadi::Function aba = damotion::symbolic::toFunction("aba",
+//     wrapper.aba());
 
 //     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
 //     Eigen::VectorXd v(model.nv);
@@ -51,8 +52,8 @@
 
 //     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
-//     casadi::Function aba = damotion::symbolic::toFunction("aba", wrapper.aba());
-//     aba = damotion::utils::casadi::codegen(aba, "./tmp/");
+//     casadi::Function aba = damotion::symbolic::toFunction("aba",
+//     wrapper.aba()); aba = damotion::utils::casadi::codegen(aba, "./tmp/");
 
 //     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
 //     Eigen::VectorXd v(model.nv);
@@ -83,7 +84,8 @@
 
 //     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
-//     casadi::Function rnea = damotion::symbolic::toFunction("rnea", wrapper.rnea());
+//     casadi::Function rnea = damotion::symbolic::toFunction("rnea",
+//     wrapper.rnea());
 
 //     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
 //     Eigen::VectorXd v(model.nv);
@@ -114,8 +116,8 @@
 
 //     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
-//     casadi::Function rnea = damotion::symbolic::toFunction("rnea", wrapper.rnea());
-//     rnea = damotion::utils::casadi::codegen(rnea, "./tmp/");
+//     casadi::Function rnea = damotion::symbolic::toFunction("rnea",
+//     wrapper.rnea()); rnea = damotion::utils::casadi::codegen(rnea, "./tmp/");
 
 //     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
 //     Eigen::VectorXd v(model.nv);
@@ -139,33 +141,54 @@
 //     EXPECT_TRUE(u.isApprox(uc));
 // }
 
-// // TEST(PinocchioModelWrapper, EndEffector) {
-// //     pinocchio::Model model;
-// //     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
-// //     pinocchio::Data data(model);
+TEST(PinocchioModelWrapper, EndEffector) {
+    pinocchio::Model model;
+    pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
+    pinocchio::Data data(model);
 
-// //     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
+    damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
-// //     wrapper.addEndEffector("tool0");
+    wrapper.addEndEffector("tool0");
 
-// //     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
-// //     Eigen::VectorXd v = Eigen::VectorXd::Zero(model.nv);
-// //     Eigen::VectorXd a = Eigen::VectorXd::Zero(model.nv);
+    Eigen::VectorXd q = pinocchio::randomConfiguration(model);
+    Eigen::VectorXd v = Eigen::VectorXd::Random(model.nv);
+    Eigen::VectorXd a = Eigen::VectorXd::Random(model.nv);
 
-// //     // Create function wrapper for end-effector function
-// //     damotion::utils::casadi::FunctionWrapper ee(wrapper.end_effector(0).x);
-// //     ee.setInput(0, q);
-// //     ee.setInput(1, v);
-// //     ee.setInput(2, a);
+    // Create function wrapper for end-effector function
+    damotion::utils::casadi::FunctionWrapper ee(wrapper.end_effector(0).x);
+    ee.setInput(0, q);
+    ee.setInput(1, v);
+    ee.setInput(2, a);
 
-// //     ee.call();
+    ee.call();
 
-// //     std::cout << ee.getOutput(0) << std::endl;
-// //     std::cout << ee.getOutput(1) << std::endl;
-// //     std::cout << ee.getOutput(2) << std::endl;
+    Eigen::MatrixXd J(6, model.nv), dJ(6, model.nv);
+    J.setZero();
+    dJ.setZero();
+    pinocchio::computeFrameJacobian(model, data, q, model.getFrameId("tool0"),
+                                    pinocchio::LOCAL_WORLD_ALIGNED, J);
+    // Get classical frame acceleration drift
+    pinocchio::forwardKinematics(model, data, q, v, Eigen::VectorXd::Zero(model.nv));
+    Eigen::VectorXd dJdt_v = pinocchio::getFrameClassicalAcceleration(
+                                 model, data, model.getFrameId("tool0"),
+                                 pinocchio::LOCAL_WORLD_ALIGNED)
+                                 .toVector();
 
-// //     EXPECT_TRUE(true);
-// // }
+    Eigen::VectorXd xvel = J * v;
+    Eigen::VectorXd xacc = J * a + dJdt_v;
+
+    // Test joint position, velocity and acceleration
+    std::cout << "Velocity (function) : " << ee.getOutput(1).transpose()
+              << std::endl;
+    std::cout << "Velocity (true) : " << xvel.transpose() << std::endl;
+
+    std::cout << "Acceleration (function) : " << ee.getOutput(2).transpose()
+              << std::endl;
+    std::cout << "Acceleration (true) : " << xacc.transpose() << std::endl;
+
+    EXPECT_TRUE(xvel.isApprox(ee.getOutput(1)));
+    EXPECT_TRUE(xacc.isApprox(ee.getOutput(2)));
+}
 
 // // TEST(PinocchioModelWrapper, RNEAWithEndEffector) {
 // //     pinocchio::Model model;
@@ -198,7 +221,8 @@
 // //     wrapper.addEndEffector("tool0");
 
 // //     damotion::utils::casadi::FunctionWrapper fee(
-// //         damotion::utils::casadi::codegen(wrapper.end_effector(0).x, "./tmp")),
+// //         damotion::utils::casadi::codegen(wrapper.end_effector(0).x,
+// "./tmp")),
 // //         f_err(damotion::utils::casadi::codegen(
 // //             wrapper.end_effector(0).pose_error, "./tmp"));
 

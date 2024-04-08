@@ -274,6 +274,7 @@ class QuadraticCost : public Cost {
         }
 
         // Create the Cost
+        // TODO - Make only lower-triangular
         casadi::Function f = casadi::Function(this->name(), in, {ex, c});
         casadi::Function fg = casadi::Function(
             this->name() + "_grd", in, {mtimes(Q, ex.Variables()[0]) + g, g});
@@ -287,9 +288,7 @@ class QuadraticCost : public Cost {
     const double &c() { return ObjectiveFunction().getOutput(1).data()[0]; }
 
     Eigen::VectorXd g() {
-        return Eigen::Map<const Eigen::VectorXd>(
-            GradientFunction().getOutput(1).data(),
-            GradientFunction().getOutput(1).rows());
+        return GradientFunction().getOutput(1);
     }
 
     const Eigen::MatrixXd &Q() { return HessianFunction().getOutput(0); }

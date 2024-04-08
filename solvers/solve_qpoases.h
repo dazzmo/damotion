@@ -120,12 +120,12 @@ class QPOASESSolverInstance : public SolverBase {
              GetCurrentProgram().GetQuadraticCostBindings()) {
             const std::vector<bool>& continuous =
                 CostBindingContinuousInputCheck(binding);
-
+            
             // Evaluate the cost
             EvaluateCost(binding.Get(), primal_solution_x_,
                          binding.GetVariables(), binding.GetParameters(),
                          continuous, true, true, false);
-
+            
             // Update the gradient
             for (int i = 0; i < binding.GetVariables().size(); ++i) {
                 UpdateVectorAtVariableLocations(g_, binding.Get().g(),

@@ -46,6 +46,14 @@ class PinocchioModelWrapper {
     ::casadi::Function rnea();
 
     /**
+     * @brief Returns a casadi::Function that computes the centre-of-mass state
+     * of the the system and its derivatives in time.
+     *
+     * @return casadi::Function
+     */
+    ::casadi::Function com();
+
+    /**
      * @brief End-effector data for a given point on the system, includes data
      * such as its Jacobian, constraint-subspace and acceleration
      *

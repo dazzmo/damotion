@@ -71,8 +71,6 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
 
     // Perform forward kinematics on model
     pinocchio::forwardKinematics(model_, data_, qpos_e, qvel_e, qacc_e);
-    // Perform forward kinematics and compute frames
-    pinocchio::framesForwardKinematics(model_, data_, qpos_e);
     // Get SE3 data for the target frame
     pinocchio::SE3Tpl<::casadi::Matrix<AD>> se3_frame =
         data_.oMf[model_.getFrameId(frame_name)];
@@ -98,9 +96,9 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
 
     // Compute acceleration of the point at the end-effector frame with respect
     // to the chosen reference frame
-    acc_e = pinocchio::getFrameAcceleration(model_, data_,
-                                            model_.getFrameId(frame_name),
-                                            pinocchio::LOCAL_WORLD_ALIGNED)
+    acc_e = pinocchio::getFrameClassicalAcceleration(
+                model_, data_, model_.getFrameId(frame_name),
+                pinocchio::LOCAL_WORLD_ALIGNED)
                 .toVector();
 
     // Convert to casadi matrices
@@ -125,7 +123,8 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
     EndEffector ee;
 
     ee.x = ::casadi::Function(model_.name + "_" + frame_name + "_ee",
-                              {qpos, qvel, qacc}, {pos, vel, acc},
+                              {qpos, qvel, qacc},
+                              {densify(pos), densify(vel), densify(acc)},
                               {"qpos", "qvel", "qacc"}, {"pos", "vel", "acc"});
 
     ee.J = ::casadi::Function(model_.name + "_" + frame_name + "_ee_jac",
