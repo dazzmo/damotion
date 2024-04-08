@@ -109,40 +109,32 @@ class QPOASESSolverInstance : public SolverBase {
                          continuous, true, true, false);
 
             // Update the gradient
-            for (int i = 0; i < binding.GetVariables().size(); ++i) {
-                UpdateVectorAtVariableLocations(g_, binding.Get().c(),
-                                                binding.GetVariable(i),
-                                                continuous[i]);
-            }
+            UpdateVectorAtVariableLocations(
+                g_, binding.Get().c(), binding.GetVariable(0), continuous[0]);
         }
         // Quadratic costs
         for (Binding<QuadraticCost>& binding :
              GetCurrentProgram().GetQuadraticCostBindings()) {
             const std::vector<bool>& continuous =
                 CostBindingContinuousInputCheck(binding);
-            
+
             // Evaluate the cost
             EvaluateCost(binding.Get(), primal_solution_x_,
                          binding.GetVariables(), binding.GetParameters(),
                          continuous, true, true, false);
-            
+
             // Update the gradient
-            for (int i = 0; i < binding.GetVariables().size(); ++i) {
-                UpdateVectorAtVariableLocations(g_, binding.Get().g(),
-                                                binding.GetVariable(i),
-                                                continuous[i]);
-            }
+            UpdateVectorAtVariableLocations(
+                g_, binding.Get().g(), binding.GetVariable(0), continuous[0]);
             // Update the hessian
-            for (int i = 0; i < binding.GetVariables().size(); ++i) {
-                for (int j = i; j < binding.GetVariables().size(); ++j) {
-                    UpdateHessianAtVariableLocations(
-                        H_, 2.0 * binding.Get().Q(), binding.GetVariable(i),
-                        binding.GetVariable(j), continuous[i], continuous[j]);
-                }
-            }
+            UpdateHessianAtVariableLocations(
+                H_, 2.0 * binding.Get().Q(), binding.GetVariable(0),
+                binding.GetVariable(0), continuous[0], continuous[0]);
         }
 
         // Evaluate only the linear constraints of the program
+        // Reset constraint jacobian
+        constraint_jacobian_cache_.setZero();
         int idx = 0;
         for (Binding<LinearConstraint>& binding :
              GetCurrentProgram().GetLinearConstraintBindings()) {
@@ -172,14 +164,18 @@ class QPOASESSolverInstance : public SolverBase {
         // Solve
         int nWSR = 100;
         if (first_solve_) {
-            qp_->init(H.data(), objective_gradient_cache_.data(), A.data(),
+            qp_->init(H.data(), g_.data(), A.data(),
                       lbx_.data(), ubx_.data(), lbA_.data(), ubA_.data(), nWSR);
             first_solve_ = false;
         } else {
-            qp_->hotstart(H.data(), objective_gradient_cache_.data(), A.data(),
+            qp_->hotstart(H.data(), g_.data(), A.data(),
                           lbx_.data(), ubx_.data(), lbA_.data(), ubA_.data(),
                           nWSR);
         }
+
+        std::cout << "H =\n" << H_ << std::endl;
+        std::cout << "g =\n" << g_ << std::endl;
+        std::cout << "A =\n" << A << std::endl;
 
         // Get primal solution
         qp_->getPrimalSolution(primal_solution_x_.data());

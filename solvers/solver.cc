@@ -64,15 +64,22 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
     }
 
     if (grd && !cost.HasGradient()) {
-        throw std::runtime_error("Cost does not have a Gradient!");
+        throw std::runtime_error("Cost does not have a gradient!");
     }
 
     if (hes && !cost.HasHessian()) {
-        throw std::runtime_error("Cost does not have a Gradient!");
+        throw std::runtime_error("Cost does not have a hessian!");
     }
 
     // Set variables
     for (int i = 0; i < nv; ++i) {
+        // ! Print out inputs in cost function
+        std::cout << "Input " << i << " = ";
+        for (int j = 0; j < cost.ObjectiveFunction().f().size1_in(i); ++j) {
+            std::cout << *(inputs[i] + j) << ", ";
+        }
+        std::cout << '\n';
+
         cost.ObjectiveFunction().setInput(i, inputs[i]);
         if (grd) {
             cost.GradientFunction().setInput(i, inputs[i]);
@@ -83,6 +90,13 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
     }
     // Set parameters
     for (int i = 0; i < np; ++i) {
+        std::cout << "Input " << nv + i << " = ";
+        for (int j = 0; j < cost.ObjectiveFunction().f().size1_in(nv + i);
+             ++j) {
+            std::cout << *(par[i] + j) << ", ";
+        }
+        std::cout << '\n';
+
         cost.ObjectiveFunction().setInput(nv + i, par[i]);
         if (grd) {
             cost.GradientFunction().setInput(nv + i, par[i]);
@@ -93,8 +107,26 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
     }
 
     cost.ObjectiveFunction().call();
-    if (grd) cost.GradientFunction().call();
-    if (hes) cost.HessianFunction().call();
+    for (int i = 0; i < cost.ObjectiveFunction().f().n_out(); ++i) {
+        std::cout << "Objective " << i << cost.ObjectiveFunction().getOutput(i)
+                  << std::endl;
+    }
+    if (grd) {
+        cost.GradientFunction().call();
+        for (int i = 0; i < cost.GradientFunction().f().n_out(); ++i) {
+            std::cout << "Gradient " << i
+                      << cost.GradientFunction().getOutput(i).transpose()
+                      << std::endl;
+        }
+    }
+    if (hes) {
+        cost.HessianFunction().call();
+        for (int i = 0; i < cost.HessianFunction().f().n_out(); ++i) {
+            std::cout << "Hessian " << i
+                      << cost.HessianFunction().getOutput(i)
+                      << std::endl;
+        }
+    }
 
     if (update_cache == false) return;
 

@@ -6,6 +6,8 @@
 #include "symbolic/expression.h"
 #include "utils/eigen_wrapper.h"
 
+#include "utils/codegen.h"
+
 namespace damotion {
 namespace optimisation {
 
@@ -268,17 +270,24 @@ class QuadraticCost : public Cost {
         casadi::SX Q, g, c;
         casadi::SX::quadratic_coeff(ex, ex.Variables()[0], Q, g, c, true);
 
+        // Remove factor of two from hessian
+        Q *= 0.5;  
+
         in = ex.Variables();
         for (const casadi::SX &pi : ex.Parameters()) {
             in.push_back(pi);
         }
 
-        // Create the Cost
         // TODO - Make only lower-triangular
+        // Create the Cost
         casadi::Function f = casadi::Function(this->name(), in, {ex, c});
         casadi::Function fg = casadi::Function(
-            this->name() + "_grd", in, {mtimes(Q, ex.Variables()[0]) + g, g});
-        casadi::Function fh = casadi::Function(this->name() + "_hes", in, {Q});
+            this->name() + "_grd", in, {2.0 * mtimes(Q, ex.Variables()[0]) + g, g});
+        casadi::Function fh = casadi::Function(this->name() + "_hes", in, {2.0 * Q});
+
+        std::cout << "c: " << c << std::endl;
+        std::cout << "g: " << g << std::endl;
+        std::cout << "Q: " << Q << std::endl;
 
         SetObjectiveFunction(f);
         SetGradientFunction(fg);
@@ -287,9 +296,7 @@ class QuadraticCost : public Cost {
 
     const double &c() { return ObjectiveFunction().getOutput(1).data()[0]; }
 
-    Eigen::VectorXd g() {
-        return GradientFunction().getOutput(1);
-    }
+    Eigen::VectorXd g() { return GradientFunction().getOutput(1); }
 
     const Eigen::MatrixXd &Q() { return HessianFunction().getOutput(0); }
 

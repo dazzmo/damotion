@@ -71,6 +71,7 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
 
     // Perform forward kinematics on model
     pinocchio::forwardKinematics(model_, data_, qpos_e, qvel_e, qacc_e);
+    pinocchio::updateFramePlacements(model_, data_);
     // Get SE3 data for the target frame
     pinocchio::SE3Tpl<::casadi::Matrix<AD>> se3_frame =
         data_.oMf[model_.getFrameId(frame_name)];
@@ -79,6 +80,7 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
 
     // Translational component
     pos_e.topRows(3) = se3_frame.translation();
+
     // Rotational component
     Eigen::Matrix3<::casadi::Matrix<AD>> R = se3_frame.rotation();
     Eigen::Quaternion<::casadi::Matrix<AD>> qR;
@@ -108,7 +110,6 @@ void PinocchioModelWrapper::addEndEffector(const std::string &frame_name) {
     toCasadi(acc_e, acc);
 
     // Get jacobian of this site with respect to the configuration of the
-    // Compute Jacobian
     pinocchio::DataTpl<::casadi::Matrix<AD>>::Matrix6x Je(6, model_.nv);
     Je.setZero();
 
