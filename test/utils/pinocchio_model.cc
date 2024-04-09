@@ -148,19 +148,14 @@ TEST(PinocchioModelWrapper, EndEffector) {
 
     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
-    wrapper.addEndEffector("tool0");
+    auto tool0 = wrapper.AddEndEffector("tool0");
 
     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
     Eigen::VectorXd v = Eigen::VectorXd::Random(model.nv);
     Eigen::VectorXd a = Eigen::VectorXd::Random(model.nv);
 
     // Create function wrapper for end-effector function
-    damotion::utils::casadi::FunctionWrapper ee(wrapper.end_effector(0).x);
-    ee.setInput(0, q);
-    ee.setInput(1, v);
-    ee.setInput(2, a);
-
-    ee.call();
+    tool0->UpdateState(q, v, a);
 
     Eigen::MatrixXd J(6, model.nv), dJ(6, model.nv);
     J.setZero();
@@ -178,16 +173,8 @@ TEST(PinocchioModelWrapper, EndEffector) {
     Eigen::VectorXd xacc = J * a + dJdt_v;
 
     // Test joint position, velocity and acceleration
-    std::cout << "Velocity (function) : " << ee.getOutput(1).transpose()
-              << std::endl;
-    std::cout << "Velocity (true) : " << xvel.transpose() << std::endl;
-
-    std::cout << "Acceleration (function) : " << ee.getOutput(2).transpose()
-              << std::endl;
-    std::cout << "Acceleration (true) : " << xacc.transpose() << std::endl;
-
-    EXPECT_TRUE(xvel.isApprox(ee.getOutput(1)));
-    EXPECT_TRUE(xacc.isApprox(ee.getOutput(2)));
+    EXPECT_TRUE(xvel.isApprox(tool0->vel()));
+    EXPECT_TRUE(xacc.isApprox(tool0->acc()));
 }
 
 // // TEST(PinocchioModelWrapper, RNEAWithEndEffector) {

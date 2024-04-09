@@ -15,18 +15,17 @@ TEST(TrackingCost, QuadraticForm) {
     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
     // Create end-effector
-    wrapper.addEndEffector("tool0");
+    auto tool0 =  wrapper.AddEndEffector("tool0");
 
     // Create expression of the form || J qacc + dJdt * qvel - xaccd ||^2
     casadi::SX qpos = casadi::SX::sym("qpos", model.nq),
                qvel = casadi::SX::sym("qvel", model.nv),
                qacc = casadi::SX::sym("qacc", model.nv);
 
-    casadi::SX xacc = wrapper.end_effector("tool0").x(
-        casadi::SXVector({qpos, qvel, qacc}))[2];
     casadi::SX xaccd = casadi::SX::sym("xaccd", 6);
+    tool0->UpdateState(qpos, qvel, qacc);
 
-    sym::Expression obj = mtimes(xacc.T(), xacc);
+    sym::Expression obj = mtimes(tool0->acc_sym().T(), tool0->acc_sym());
     obj.SetInputs({qacc}, {qpos, qvel, xaccd});
 
     // Create quadratic cost

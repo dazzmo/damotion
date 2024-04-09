@@ -173,9 +173,9 @@ class QPOASESSolverInstance : public SolverBase {
                           nWSR);
         }
 
-        std::cout << "H =\n" << H_ << std::endl;
-        std::cout << "g =\n" << g_ << std::endl;
-        std::cout << "A =\n" << A << std::endl;
+        // std::cout << "H =\n" << H_ << std::endl;
+        // std::cout << "g =\n" << g_ << std::endl;
+        // std::cout << "A =\n" << A << std::endl;
 
         // Get primal solution
         qp_->getPrimalSolution(primal_solution_x_.data());
