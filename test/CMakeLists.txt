@@ -15,7 +15,6 @@ ${CMAKE_CURRENT_SOURCE_DIR}/utils/log.cc
 ${CMAKE_CURRENT_SOURCE_DIR}/utils/casadi.cc
 ${CMAKE_CURRENT_SOURCE_DIR}/utils/expression.cc
 ${CMAKE_CURRENT_SOURCE_DIR}/system/controlled.cc
-${CMAKE_CURRENT_SOURCE_DIR}/system/constraint.cc
 ${CMAKE_CURRENT_SOURCE_DIR}/common/profiler.cc
 ${CMAKE_CURRENT_SOURCE_DIR}/control/osc.cc
 ${CMAKE_CURRENT_SOURCE_DIR}/solvers/cost.cc

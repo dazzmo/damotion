@@ -25,6 +25,9 @@ common/trajectory/piecewise_bezier.h
 common/trajectory/trajectory.h
 common/profiler.h
 control/osc/osc.h
+control/osc/tasks/task.h
+control/osc/tasks/motion.h
+control/osc/tasks/contact.h
 control/lqr.h
 estimation/ekf.h
 solvers/binding.h
@@ -36,7 +39,6 @@ solvers/solver.h
 symbolic/expression.h
 symbolic/parameter.h
 symbolic/variable.h
-system/constraint.h
 system/controlled.h
 system/system.h
 utils/casadi.h
@@ -52,13 +54,13 @@ common/math/binomial.cc
 common/trajectory/bezier.cc
 common/trajectory/trajectory.cc
 control/osc/osc.cc
+control/osc/tasks/motion.cc
 solvers/bounds.cc
 solvers/constraint.cc
 solvers/cost.cc
 solvers/program.cc
 solvers/solver.cc
 symbolic/variable.cc
-system/constraint.cc
 system/controlled.cc
 system/system.cc
 utils/casadi.cc

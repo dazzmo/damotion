@@ -8,10 +8,11 @@
 #include <string>
 
 #include "common/profiler.h"
+#include "control/osc/tasks/contact.h"
+#include "control/osc/tasks/motion.h"
 #include "solvers/constraint.h"
 #include "solvers/cost.h"
 #include "solvers/program.h"
-#include "system/constraint.h"
 #include "utils/casadi.h"
 #include "utils/codegen.h"
 #include "utils/eigen_wrapper.h"
@@ -29,169 +30,14 @@ namespace osc {
 
 typedef utils::casadi::PinocchioModelWrapper::TargetFrame TargetFrame;
 
-class Task {
-   public:
-    Task() = default;
-    ~Task() = default;
-
-    /**
-     * @brief Dimension of the task.
-     *
-     * @return const int
-     */
-    const int dim() const { return dim_; }
-
-    /**
-     * @brief Resizes the dimension of the task.
-     *
-     * @param ndim
-     */
-    void Resize(const int ndim) {
-        dim_ = ndim;
-        e_ = Eigen::VectorXd::Zero(ndim);
-        de_ = Eigen::VectorXd::Zero(ndim);
-        Kp_ = Eigen::DiagonalMatrix<double, Eigen::Dynamic>(ndim);
-        Kp_.setZero();
-        Kd_ = Eigen::DiagonalMatrix<double, Eigen::Dynamic>(ndim);
-        Kd_.setZero();
-    }
-
-    // void SetReference(const Eigen::VectorXd &xr);
-    // void SetReference(const Eigen::Quaterniond &qr);
-    // void SetReference(const Eigen::VectorXd &xr, const Eigen::Quaterniond
-    // &qr);
-
-    const Eigen::VectorXd &Error() { return e_; }
-    const Eigen::VectorXd &ErrorDerivative() { return de_; }
-
-    void SetKpGains(const Eigen::VectorXd &Kp) { Kp_.diagonal() = Kp; }
-    void SetKdGains(const Eigen::VectorXd &Kd) { Kd_.diagonal() = Kd; }
-
-    virtual Eigen::VectorXd GetPDError() { return Kp_ * e_ + Kd_ * de_; }
-
-   protected:
-    // Task error
-    Eigen::VectorXd e_;
-    Eigen::VectorXd de_;
-    // PD Tracking gains
-    Eigen::DiagonalMatrix<double, Eigen::Dynamic> Kp_;
-    Eigen::DiagonalMatrix<double, Eigen::Dynamic> Kd_;
-
-    // Desired pose translational component
-    Eigen::Vector3d xr_;
-    // Desired pose rotational component
-    Eigen::Quaterniond qr_;
-
-    // Desired pose velocity translational component
-    Eigen::Vector3d vr_ = Eigen::Vector3d::Zero();
-    // Desired pose velocity rotational component
-    Eigen::Vector3d wr_ = Eigen::Vector3d::Zero();
-
-   private:
-    int dim_ = 0;
-};
-
-/**
- * @brief Motion task for operational space control, typically used for tracking
- * of a frame
- *
- */
-class MotionTask : public Task {
-   public:
-    enum class Type { kTranslational, kRotational, kFull };
-
-    MotionTask() = default;
-    ~MotionTask() = default;
-
-    MotionTask(const std::shared_ptr<TargetFrame> &frame, const Type &type)
-        : Task() {
-        type_ = type;
-        if (type == Type::kTranslational || type == Type::kRotational) {
-            Resize(3);
-        } else if (type == Type::kFull) {
-            Resize(6);
-        }
-    }
-
-    /**
-     * @brief Returns the type of the motion task, which can be translational,
-     * rotational or full
-     *
-     * @return const Type&
-     */
-    const Type &type() const { return type_; }
-
-    /**
-     * @brief The TargetFrame the motion task is designed for
-     *
-     * @return const TargetFrame&
-     */
-    TargetFrame &Frame() { return *frame_; }
-
-    /**
-     * @brief Compute the desired tracking task acceleration as a PD error
-     * metric on the task position and velocity errors
-     *
-     * @return Eigen::VectorXd
-     */
-    void ComputePoseError();
-
-   private:
-    Type type_;
-    // Target frame the motion task is associated with
-    std::shared_ptr<TargetFrame> frame_;
-};
-
-/**
- * @brief A contact task that represents a rigid contact for a given frame
- * within the environment or an object
- *
- */
-class ContactTask : public Task {
-   public:
-    ContactTask() = default;
-    ~ContactTask() = default;
-
-    ContactTask(const std::shared_ptr<TargetFrame> &frame) : Task() {
-        Resize(3);
-    }
-
-    /**
-     * @brief The TargetFrame the motion task is designed for
-     *
-     * @return const TargetFrame&
-     */
-    TargetFrame &Frame() { return *frame_; }
-
-    // Desired pose translational component
-    Eigen::Vector3d xr;
-
-    // Whether the point is in contact or not
-    bool inContact = false;
-
-    // Contact surface normal
-    Eigen::Vector3d normal = Eigen::Vector3d::UnitZ();
-
-    // Friction coefficient
-    double mu = 1.0;
-
-    // Maximum allowable force
-    Eigen::Vector3d fmax = Eigen::Vector3d::Ones();
-    // Minimum allowable force
-    Eigen::Vector3d fmin = Eigen::Vector3d::Ones();
-
-   private:
-    std::shared_ptr<TargetFrame> frame_;
-};
-
 optimisation::Constraint LinearisedFrictionConstraint() {
     // Square pyramid approximation
     casadi::SX lambda = casadi::SX::sym("lambda", 3);
+    casadi::SX normal = casadi::SX::sym("normal", 3);
     casadi::SX mu = casadi::SX::sym("mu");
 
     casadi::SX l_x = lambda(0), l_y = lambda(1), l_z = lambda(2);
-
-    // TODO - Add parameter for surface normal
+    casadi::SX n_x = normal(0), n_y = normal(1), n_z = normal(2);
 
     // Friction cone constraint with square pyramid approximation
     sym::Expression cone;
@@ -201,7 +47,7 @@ optimisation::Constraint LinearisedFrictionConstraint() {
     cone(2) = sqrt(2.0) * l_y + mu * l_z;
     cone(3) = -sqrt(2.0) * l_y - mu * l_z;
 
-    cone.SetInputs({lambda}, {mu});
+    cone.SetInputs({lambda}, {normal, mu});
     return optimisation::Constraint("friction_cone", cone,
                                     opt::BoundsType::kPositive);
 }
@@ -227,39 +73,25 @@ class OSC {
     OSC(int nq, int nv, int nu);
 
     /**
-     * @brief Adds a generic contact task that relies on the conventional state
-     * of the system (qpos, qvel, qacc) and no other parameters. If more
-     * parameters are required for the task, we suggest adding these parameters,
-     * constraints and objectives manually by accessing the program through
-     * GetProgram().
+     * @brief Add a contact point to the OSC.
      *
-     * @param name
-     * @param task
-     */
-    void AddContactPoint(const std::string &name,
-                         std::shared_ptr<ContactTask> &task);
-
-    /**
-     * @brief Adds a generic motion task that relies on the conventional state
-     * of the system (qpos, qvel, qacc) and no other parameters. If more
-     * parameters are required for the task, we suggest adding these parameters,
-     * constraints and objectives manually by accessing the program through
-     * GetProgram().
-     *
-     * @param name
      * @param task
      * @return void
      */
-    void AddMotionTask(const std::string &name,
-                       std::shared_ptr<MotionTask> &task);
+    void AddContactPoint(std::shared_ptr<ContactTask> &task);
+
+    /**
+     * @brief Adds a generic motion task to the OSC.
+     *
+     * @param task
+     * @return void
+     */
+    void AddMotionTask(const std::shared_ptr<MotionTask> &task);
 
     /**
      * @brief For a constraint that can be written in the form h(q) = 0,
      * computes the linear constraint imposed by the second derivative in time
-     * of the constraint. This function assumes the input variables to the
-     * constraint are qpos, qvel and qacc of the program with no other
-     * parameters. If a constraint with extra parameters is required, consider
-     * adding it manually to the program by GetProgram().
+     * of the constraint.
      *
      * @param name
      * @param c The holonomic constraint c(q) = 0
@@ -277,14 +109,30 @@ class OSC {
      *
      * @param dynamics
      */
-    void AddUnconstrainedInverseDynamics(const casadi::SX &dynamics) {
+    void AddUnconstrainedInverseDynamics(
+        const casadi::SX &dynamics, const casadi::SXVector &parameters_sym = {},
+        const sym::ParameterRefVector &parameters = {}) {
+        assert(parameters_sym.size() == parameters.size() &&
+               "Parameter inputs must be same size!");
+        // Initialise expression
         constrained_dynamics_ = dynamics;
         // Initialise inputs to the system
         constrained_dynamics_sym_ = casadi::SX::vertcat(
             {symbolic_terms_->qacc(), symbolic_terms_->ctrl()});
-        constrained_dynamics_var_.resize(variables_->qacc().size() +
-                                         variables_->ctrl().size());
+        constrained_dynamics_var_.resize(nv_ + nu_);
         constrained_dynamics_var_ << variables_->qacc(), variables_->ctrl();
+
+        // Initialise parameters
+        constrained_dynamics_par_sym_ = {symbolic_terms_->qpos(),
+                                         symbolic_terms_->qvel()};
+        for (auto &pi : parameters_sym) {
+            constrained_dynamics_par_sym_.push_back(pi);
+        }
+        constrained_dynamics_par_.push_back(GetProgram().GetParameters("qpos"));
+        constrained_dynamics_par_.push_back(GetProgram().GetParameters("qvel"));
+        for (auto &pi : parameters) {
+            constrained_dynamics_par_.push_back(pi);
+        }
     }
 
     /**
@@ -298,23 +146,18 @@ class OSC {
         casadi::SX::linear_coeff(constrained_dynamics_,
                                  constrained_dynamics_sym_, A, b, true);
         auto con = std::make_shared<opt::LinearConstraint>(
-            "dynamics", A, b,
-            casadi::SXVector(
-                {symbolic_terms_->qpos(), symbolic_terms_->qvel()}),
+            "dynamics", A, b, constrained_dynamics_par_sym_,
             opt::BoundsType::kEquality);
         // Add constraint to program
-        program_.AddLinearConstraint(
-            con, {variables_->qacc()},
-            {program_.GetParameters("qpos"), program_.GetParameters("qvel")});
+        program_.AddLinearConstraint(con, {constrained_dynamics_var_},
+                                     constrained_dynamics_par_);
 
         // Construct the decision variable vector  [qacc, ctrl, lambda]
         sym::VariableVector x(program_.NumberOfDecisionVariables());
         // Set it as qacc, ctrl, constraint forces
-        x.topRows(variables_->qacc().size() + variables_->ctrl().size())
-            << variables_->qacc(),
-            variables_->ctrl();
+        x.topRows(nv_ + nu_) << variables_->qacc(), variables_->ctrl();
         // Add any constraint forces
-        int idx = variables_->qacc().size() + variables_->ctrl().size();
+        int idx = nv_ + nu_;
         for (int i = 0; i < variables_->lambda().size(); ++i) {
             x.middleRows(idx, variables_->lambda(i).size()) =
                 variables_->lambda(i);
@@ -326,23 +169,16 @@ class OSC {
         program_.SetParameters("qpos", qpos);
         program_.SetParameters("qvel", qvel);
 
-        // Update frame positions using the given data
-
         // Update each task given the updated data and references
         for (auto &task : motion_tasks_) {
             // Set desired task accelerations
-            task.second->ComputePoseError();
-            program_.SetParameters(task.first + "_xaccd",
-                                   task.second->GetPDError());
+            task->ComputeMotionError();
+            program_.SetParameters(task->name() + "_xaccd",
+                                   -task->GetPDError());
         }
 
         for (auto &task : contact_tasks_) {
-            // Check if the frame is in contact
-            if (task.second->inContact) {
-                // Update forces for the task
-            } else {
-                // Update forces for the task
-            }
+            // Compute the pose error for their costs
         }
 
         // Program is updated
@@ -366,6 +202,11 @@ class OSC {
     void UpdateContactPoint(const std::string &name, ContactTask &task) {
         // Update contact normal, friction cone etc...
         program_.SetParameters(name + "_normal", task.normal);
+        // If in contact, set bounds for the force
+        if (task.inContact) {
+            // Set program variables directly
+        } else {
+        }
     }
 
     class Variables {
@@ -379,12 +220,27 @@ class OSC {
             lambda_ = {};
         }
 
+        /**
+         * @brief Generalised acceleration variables for the program (nv x 1)
+         *
+         * @return const sym::VariableVector&
+         */
         const sym::VariableVector &qacc() const { return qacc_; }
-         sym::VariableVector &qacc()  { return qacc_; }
-         
+        sym::VariableVector &qacc() { return qacc_; }
+
+        /**
+         * @brief Control input variables for the program (nu x 1)
+         *
+         * @return const sym::VariableVector&
+         */
         const sym::VariableVector &ctrl() const { return ctrl_; }
         sym::VariableVector &ctrl() { return ctrl_; }
 
+        /**
+         * @brief Constraint force variable vector
+         *
+         * @return const std::vector<sym::VariableVector>&
+         */
         const std::vector<sym::VariableVector> &lambda() const {
             return lambda_;
         }
@@ -393,6 +249,11 @@ class OSC {
             return lambda_[i];
         }
 
+        /**
+         * @brief Adds constraint force variables to the variable list
+         *
+         * @param lambda
+         */
         void AddConstraintForces(const sym::VariableVector &lambda) {
             lambda_.push_back(lambda);
         }
@@ -444,34 +305,43 @@ class OSC {
     SymbolicTerms &GetSymbolicTerms() { return *symbolic_terms_; }
 
    private:
-    // TODO - Add additional parameters to the constraint where necessary
-    void AddConstraintsToDynamics(const casadi::SX &lambda,
-                                  const sym::VariableVector &lambda_var,
-                                  const casadi::SX &J) {
+    int nq_ = 0;
+    int nv_ = 0;
+    int nu_ = 0;
+
+    void AddConstraintsToDynamics(
+        const casadi::SX &lambda, const sym::VariableVector &lambda_var,
+        const casadi::SX &J, const casadi::SXVector &parameters,
+        const sym::ParameterRefVector &parameters_var) {
         // Add variables to the input vectors
         constrained_dynamics_sym_ =
             casadi::SX::vertcat({constrained_dynamics_sym_, lambda});
         constrained_dynamics_var_.conservativeResize(
             constrained_dynamics_var_.size() + lambda_var.size());
         constrained_dynamics_var_.bottomRows(lambda_var.size()) << lambda_var;
+        for (auto &pi : parameters) {
+            constrained_dynamics_par_sym_.push_back(pi);
+        }
+        for (auto &pi : parameters_var) {
+            constrained_dynamics_par_.push_back(pi);
+        }
         // Add to the constraint
         constrained_dynamics_ -= mtimes(J.T(), lambda);
     }
 
     // Conventional optimisation variables
     std::unique_ptr<Variables> variables_;
-
-    // Symbolic variables used for
+    // Symbolic variables used for constraint/objective generation
     std::unique_ptr<SymbolicTerms> symbolic_terms_;
 
-    std::unordered_map<std::string, std::shared_ptr<MotionTask>> motion_tasks_;
-    std::unordered_map<std::string, std::shared_ptr<ContactTask>>
-        contact_tasks_;
+    std::vector<std::shared_ptr<MotionTask>> motion_tasks_;
+    std::vector<std::shared_ptr<ContactTask>> contact_tasks_;
 
     // Constrained dynamics
     casadi::SX constrained_dynamics_sym_;
-    casadi::SX constrained_dynamics_par_sym_;
+    casadi::SXVector constrained_dynamics_par_sym_;
     sym::VariableVector constrained_dynamics_var_;
+    sym::ParameterRefVector constrained_dynamics_par_;
     sym::Expression constrained_dynamics_;
 
     // Underlying program for the OSC
@@ -482,4 +352,4 @@ class OSC {
 }  // namespace control
 }  // namespace damotion
 
-#endif/* OSC_OSC_H */
+#endif /* OSC_OSC_H */

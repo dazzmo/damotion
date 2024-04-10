@@ -36,7 +36,9 @@ class PinocchioModelWrapper {
      */
     class TargetFrame {
        public:
-        TargetFrame() = default;
+        TargetFrame() {
+            x_.resize(3);
+        }
         ~TargetFrame() = default;
 
         /**
