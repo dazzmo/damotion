@@ -101,7 +101,7 @@ class Constraint {
     }
 
     /**
-     * @brief Sets constaint bounds to a custom interval
+     * @brief Sets constraint bounds to a custom interval
      *
      * @param lb
      * @param ub
@@ -110,6 +110,9 @@ class Constraint {
         bounds_type_ = BoundsType::kCustom;
         lb_ = lb;
         ub_ = ub;
+        
+        // Indicate constraint was updated
+        IsUpdated() = true;
     }
 
     /**
@@ -156,14 +159,14 @@ class Constraint {
     }
 
     /**
-     * @brief Indicates that the constraint does not change subject to variable
-     * or parameter changes
+     * @brief Indicates if the constraint has been updated since it was last
+     * used, can be set to true and false.
      *
-     * @param is_invariant
+     * @return true
+     * @return false
      */
-    void SetInvariant(bool is_invariant) { invariant_ = is_invariant; }
-
-    const bool &IsInvariant() const { return invariant_; }
+    const bool &IsUpdated() const { return updated_; }
+    bool &IsUpdated() { return updated_; }
 
    protected:
     /**
@@ -214,6 +217,9 @@ class Constraint {
     // Dimension of the constraint
     int dim_ = 0;
 
+    // Flag to indicate if the constraint has changed since it was used
+    bool updated_;
+
     // Name of the constraint
     std::string name_;
 
@@ -239,10 +245,6 @@ class Constraint {
     int nx_ = 0;
     // Number of parameter inputs
     int np_ = 0;
-
-    // Flag to indicate if constraint needs updating after creation (i.e.
-    // subject to variable or parameter changes)
-    bool invariant_ = false;
 
     /**
      * @brief Creates a unique id for each constraint

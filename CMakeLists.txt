@@ -55,6 +55,7 @@ common/trajectory/bezier.cc
 common/trajectory/trajectory.cc
 control/osc/osc.cc
 control/osc/tasks/motion.cc
+control/osc/tasks/contact.cc
 solvers/bounds.cc
 solvers/constraint.cc
 solvers/cost.cc

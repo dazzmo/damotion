@@ -103,10 +103,10 @@ class Program {
      *
      * @param var
      */
-    Eigen::Ref<const Eigen::MatrixXd> AddParameters(const std::string &name,
+    Eigen::Ref<Eigen::MatrixXd> AddParameters(const std::string &name,
                                                     int n, int m = 1);
 
-    Eigen::Ref<const Eigen::MatrixXd> GetParameters(const std::string &name);
+    Eigen::Ref<Eigen::MatrixXd> GetParameters(const std::string &name);
 
     void SetParameters(const std::string &name,
                        Eigen::Ref<const Eigen::MatrixXd> val);

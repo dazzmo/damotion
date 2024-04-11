@@ -12,6 +12,28 @@ Eigen::Quaterniond RPYToQuaterion(const double roll, const double pitch,
     return Eigen::Quaterniond(r * p * y);
 }
 
+std::shared_ptr<opt::LinearConstraint> LinearisedFrictionConstraint() {
+    // Square pyramid approximation
+    casadi::SX lambda = casadi::SX::sym("lambda", 3);
+    casadi::SX normal = casadi::SX::sym("normal", 3);
+    casadi::SX mu = casadi::SX::sym("mu");
+
+    casadi::SX l_x = lambda(0), l_y = lambda(1), l_z = lambda(2);
+    casadi::SX n_x = normal(0), n_y = normal(1), n_z = normal(2);
+
+    // Friction cone constraint with square pyramid approximation
+    sym::Expression cone;
+    cone = casadi::SX(4, 1);
+    cone(0) = sqrt(2.0) * l_x + mu * l_z;
+    cone(1) = -sqrt(2.0) * l_x - mu * l_z;
+    cone(2) = sqrt(2.0) * l_y + mu * l_z;
+    cone(3) = -sqrt(2.0) * l_y - mu * l_z;
+    cone.SetInputs({lambda}, {normal, mu});
+
+    return std::make_shared<opt::LinearConstraint>("friction_cone", cone,
+                                                   opt::BoundsType::kPositive);
+}
+
 OSC::OSC(int nq, int nv, int nu) : nq_(nq), nv_(nv), nu_(nu) {
     // Create default symbolic terms
     symbolic_terms_ = std::make_unique<SymbolicTerms>(nq, nv, nu);
@@ -26,6 +48,9 @@ OSC::OSC(int nq, int nv, int nu) : nq_(nq), nv_(nv), nu_(nu) {
     // Create parameters
     program_.AddParameters("qpos", nq);
     program_.AddParameters("qvel", nv);
+
+    // Create friction cone constraint to be bounded to by contact tasks
+    friction_cone_con_ = LinearisedFrictionConstraint();
 }
 
 void OSC::AddMotionTask(const std::shared_ptr<MotionTask> &task) {
@@ -33,8 +58,10 @@ void OSC::AddMotionTask(const std::shared_ptr<MotionTask> &task) {
 
     // Create parameter for program for task-acceleration error
     // minimisation
-    Eigen::Ref<const Eigen::MatrixXd> xaccd =
+    Eigen::Ref<Eigen::MatrixXd> xaccd =
         program_.AddParameters(task->name() + "_xaccd", task->dim());
+
+    // TODO Add weighting for each task
 
     // Create objective for tracking
     casadi::SX xaccd_sym = casadi::SX::sym("xacc_d", task->dim());
@@ -66,11 +93,12 @@ void OSC::AddMotionTask(const std::shared_ptr<MotionTask> &task) {
 
     program_.AddQuadraticCost(task_cost, {variables_->qacc()}, pv);
 
-    // Add motion task to the map
+    // Add motion task and corresponding acceleration reference parameter
     motion_tasks_.push_back(task);
+    motion_tasks_acc_ref_.push_back(xaccd);
 }
 
-void OSC::AddContactPoint(std::shared_ptr<ContactTask> &task) {
+void OSC::AddContactPoint(const std::shared_ptr<ContactTask> &task) {
     // Add new variables to the program
     sym::VariableVector lambda =
         sym::CreateVariableVector(task->name() + "_lambda", task->dim());
@@ -80,11 +108,21 @@ void OSC::AddContactPoint(std::shared_ptr<ContactTask> &task) {
     program_.AddDecisionVariables(lambda);
 
     // Add bounds to constraint forces
-    program_.AddBoundingBoxConstraint(task->fmin, task->fmax, lambda);
+    opt::Binding<opt::BoundingBoxConstraint> force_bounds =
+        program_.AddBoundingBoxConstraint(task->fmin(), task->fmax(), lambda);
+
+    // Create symbolic representation of the constraint forces
+    casadi::SX lam = casadi::SX::sym(task->name() + "_lambda", task->dim());
+    symbolic_terms_->AddConstraintForces(lam);
+    // Get constraint Jacobian
+    casadi::SX J = jacobian(task->vel_sym(), symbolic_terms_->qvel());
+    // Add joint-space forces based on the constraints
+    AddConstraintsToDynamics(lam, lambda, J, task->SymbolicParameters(),
+                             task->Parameters());
 
     // Add parameters for weighting and tracking?
-    Eigen::Ref<const Eigen::MatrixXd> xaccd =
-        program_.AddParameters(task->name() + "_xaccd", task->dim());
+    Eigen::Ref<Eigen::MatrixXd> xaccd =
+        program_.AddParameters(task->name() + "_contact_acc_ref", task->dim());
 
     // Create objective for tracking
     casadi::SX xaccd_sym = casadi::SX::sym("xacc_d", task->dim());
@@ -93,11 +131,21 @@ void OSC::AddContactPoint(std::shared_ptr<ContactTask> &task) {
     program_.AddParameters(task->name() + "_friction_mu", 1);
     program_.AddParameters(task->name() + "_normal", 3);
 
+    // Set the parameters
+    program_.SetParameters(task->name() + "_friction_mu",
+                           Eigen::Vector<double, 1>(task->mu()));
+    program_.SetParameters(task->name() + "_normal", task->normal());
+
+    // Add friction constraint
+    program_.AddLinearConstraint(
+        friction_cone_con_, {lambda},
+        {program_.GetParameters(task->name() + "_normal"),
+         program_.GetParameters(task->name() + "_mu")});
+
     sym::Expression obj;
-    casadi::SX acc = task->Frame().acc_sym();
     // Create objective as || xacc - xacc_d ||^2
-    obj = casadi::SX::dot(acc(casadi::Slice(0, 3)) - xaccd_sym,
-                          acc(casadi::Slice(0, 3)) - xaccd_sym);
+    obj = casadi::SX::dot(task->acc_sym() - xaccd_sym,
+                          task->acc_sym() - xaccd_sym);
 
     // Set inputs to the expression
     obj.SetInputs(
@@ -112,17 +160,10 @@ void OSC::AddContactPoint(std::shared_ptr<ContactTask> &task) {
                               {program_.GetParameters("qpos"),
                                program_.GetParameters("qvel"), xaccd});
 
-    // Create projected dynamics
-
-    // Create symbolic representation of the constraint forces
-    casadi::SX lam = casadi::SX::sym("lam", task->dim());
-    symbolic_terms_->AddConstraintForces(lam);
-    // Get constraint Jacobian
-    casadi::SX J = jacobian(task->Frame().vel_sym(), symbolic_terms_->qvel());
-    // Add joint-space forces based on the constraints
-    AddConstraintsToDynamics(lam, lambda, J, task->SymbolicParameters(),
-                             task->Parameters());
-
+    // Add data to vectors for the OSC
+    contact_tasks_.push_back(task);
+    contact_tasks_acc_ref_.push_back(xaccd);
+    contact_force_bounds_.push_back(force_bounds);
 }
 
 void OSC::AddHolonomicConstraint(const std::string &name, const casadi::SX &c,

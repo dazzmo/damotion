@@ -155,7 +155,7 @@ class OrientationTask : public MotionTask {
         return Frame().acc_sym()(casadi::Slice(3, 6));
     }
 
-    Eigen::VectorXd pos() override { return Frame().pos().bottomRows(3); }
+    Eigen::VectorXd pos() override { return Frame().pos().bottomRows(4); }
     Eigen::VectorXd vel() override { return Frame().vel().bottomRows(3); }
     Eigen::VectorXd acc() override { return Frame().acc().bottomRows(3); }
 

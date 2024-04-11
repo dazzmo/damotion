@@ -30,27 +30,7 @@ namespace osc {
 
 typedef utils::casadi::PinocchioModelWrapper::TargetFrame TargetFrame;
 
-optimisation::Constraint LinearisedFrictionConstraint() {
-    // Square pyramid approximation
-    casadi::SX lambda = casadi::SX::sym("lambda", 3);
-    casadi::SX normal = casadi::SX::sym("normal", 3);
-    casadi::SX mu = casadi::SX::sym("mu");
-
-    casadi::SX l_x = lambda(0), l_y = lambda(1), l_z = lambda(2);
-    casadi::SX n_x = normal(0), n_y = normal(1), n_z = normal(2);
-
-    // Friction cone constraint with square pyramid approximation
-    sym::Expression cone;
-    cone = casadi::SX(4, 1);
-    cone(0) = sqrt(2.0) * l_x + mu * l_z;
-    cone(1) = -sqrt(2.0) * l_x - mu * l_z;
-    cone(2) = sqrt(2.0) * l_y + mu * l_z;
-    cone(3) = -sqrt(2.0) * l_y - mu * l_z;
-
-    cone.SetInputs({lambda}, {normal, mu});
-    return optimisation::Constraint("friction_cone", cone,
-                                    opt::BoundsType::kPositive);
-}
+std::shared_ptr<opt::LinearConstraint> LinearisedFrictionConstraint();
 
 // TODO - Place this in a utility
 Eigen::Quaternion<double> RPYToQuaterion(const double roll, const double pitch,
@@ -78,7 +58,7 @@ class OSC {
      * @param task
      * @return void
      */
-    void AddContactPoint(std::shared_ptr<ContactTask> &task);
+    void AddContactPoint(const std::shared_ptr<ContactTask> &task);
 
     /**
      * @brief Adds a generic motion task to the OSC.
@@ -161,6 +141,7 @@ class OSC {
         for (int i = 0; i < variables_->lambda().size(); ++i) {
             x.middleRows(idx, variables_->lambda(i).size()) =
                 variables_->lambda(i);
+            idx += variables_->lambda(i).size();
         }
         program_.SetDecisionVariableVector(x);
     }
@@ -170,18 +151,42 @@ class OSC {
         program_.SetParameters("qvel", qvel);
 
         // Update each task given the updated data and references
-        for (auto &task : motion_tasks_) {
+        for (int i = 0; i < motion_tasks_.size(); ++i) {
             // Set desired task accelerations
-            task->ComputeMotionError();
-            program_.SetParameters(task->name() + "_xaccd",
-                                   -task->GetPDError());
+            motion_tasks_[i]->ComputeMotionError();
+            motion_tasks_acc_ref_[i] = -motion_tasks_[i]->GetPDError();
         }
 
-        for (auto &task : contact_tasks_) {
+        for (int i = 0; i < contact_tasks_.size(); ++i) {
             // Compute the pose error for their costs
+            contact_tasks_[i]->ComputeMotionError();
+            contact_tasks_acc_ref_[i] = -contact_tasks_[i]->GetPDError();
         }
 
         // Program is updated
+    }
+
+    /**
+     * @brief Updates the contact data within the program for the contact task
+     * task
+     *
+     * @param name
+     * @param task
+     */
+    void UpdateContactPoint(const std::shared_ptr<ContactTask> &task) {
+        int task_idx = 0;
+        if (task->inContact) {
+            // Set in contact
+            contact_force_bounds_[task_idx].Get().UpdateBounds(task->fmin(),
+                                                               task->fmax());
+
+            program_.SetParameters(task->name() + "_friction_mu",
+                                   Eigen::Vector<double, 1>(task->mu()));
+            program_.SetParameters(task->name() + "_lambda", task->normal());
+        } else {
+            contact_force_bounds_[task_idx].Get().UpdateBounds(
+                opt::BoundsType::kEquality);
+        }
     }
 
     /**
@@ -191,23 +196,6 @@ class OSC {
      *
      */
     opt::Program &GetProgram() { return program_; }
-
-    /**
-     * @brief Updates the contact data within the program for the contact task
-     * task
-     *
-     * @param name
-     * @param task
-     */
-    void UpdateContactPoint(const std::string &name, ContactTask &task) {
-        // Update contact normal, friction cone etc...
-        program_.SetParameters(name + "_normal", task.normal);
-        // If in contact, set bounds for the force
-        if (task.inContact) {
-            // Set program variables directly
-        } else {
-        }
-    }
 
     class Variables {
        public:
@@ -334,8 +322,18 @@ class OSC {
     // Symbolic variables used for constraint/objective generation
     std::unique_ptr<SymbolicTerms> symbolic_terms_;
 
+    // Vector of motion tasks for the program
     std::vector<std::shared_ptr<MotionTask>> motion_tasks_;
+    // Reference acceleration parameters in the program for each motion task
+    std::vector<Eigen::Ref<Eigen::MatrixXd>> motion_tasks_acc_ref_;
+
+    // Vector of contact tasks for the program
     std::vector<std::shared_ptr<ContactTask>> contact_tasks_;
+    std::vector<Eigen::Ref<Eigen::MatrixXd>> contact_tasks_acc_ref_;
+    std::vector<opt::Binding<opt::BoundingBoxConstraint>> contact_force_bounds_;
+
+    // Friction cone constraint
+    std::shared_ptr<opt::LinearConstraint> friction_cone_con_;
 
     // Constrained dynamics
     casadi::SX constrained_dynamics_sym_;

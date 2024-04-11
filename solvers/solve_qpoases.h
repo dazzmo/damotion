@@ -36,16 +36,13 @@ class QPOASESSolverInstance : public SolverBase {
                 ubx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
                     binding.Get().UpperBound()[i];
             }
+            // Set updated constraint to false
+            binding.Get().IsUpdated() = false;
         }
 
         // Constraint bounds
         ubA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
         lbA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
-
-        std::cout << lbx_.transpose() << std::endl;
-        std::cout << ubx_.transpose() << std::endl;
-        std::cout << lbA_.transpose() << std::endl;
-        std::cout << ubA_.transpose() << std::endl;
 
         H_ = Eigen::MatrixXd::Zero(
             GetCurrentProgram().NumberOfDecisionVariables(),
@@ -96,6 +93,23 @@ class QPOASESSolverInstance : public SolverBase {
         // Reset costs and gradients
         g_.setZero();
         H_.setZero();
+
+        // Update variable bounds, if any have changed
+        for (Binding<BoundingBoxConstraint>& binding :
+             GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
+            if (binding.Get().IsUpdated()) {
+                // For each variable of the constraint
+                const sym::VariableVector& v = binding.GetVariable(0);
+                for (int i = 0; i < v.size(); ++i) {
+                    lbx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
+                        binding.Get().LowerBound()[i];
+                    ubx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
+                        binding.Get().UpperBound()[i];
+                }
+
+                binding.Get().IsUpdated() = false;
+            }
+        }
 
         // Linear costs
         for (Binding<LinearCost>& binding :
@@ -157,6 +171,7 @@ class QPOASESSolverInstance : public SolverBase {
         typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
                               Eigen::RowMajor>
             RowMajorMatrixXd;
+
         // ! See about effects of copying
         RowMajorMatrixXd H = H_;
         RowMajorMatrixXd A = constraint_jacobian_cache_;
@@ -164,18 +179,13 @@ class QPOASESSolverInstance : public SolverBase {
         // Solve
         int nWSR = 100;
         if (first_solve_) {
-            qp_->init(H.data(), g_.data(), A.data(),
-                      lbx_.data(), ubx_.data(), lbA_.data(), ubA_.data(), nWSR);
+            qp_->init(H.data(), g_.data(), A.data(), lbx_.data(), ubx_.data(),
+                      lbA_.data(), ubA_.data(), nWSR);
             first_solve_ = false;
         } else {
-            qp_->hotstart(H.data(), g_.data(), A.data(),
-                          lbx_.data(), ubx_.data(), lbA_.data(), ubA_.data(),
-                          nWSR);
+            qp_->hotstart(H.data(), g_.data(), A.data(), lbx_.data(),
+                          ubx_.data(), lbA_.data(), ubA_.data(), nWSR);
         }
-
-        // std::cout << "H =\n" << H_ << std::endl;
-        // std::cout << "g =\n" << g_ << std::endl;
-        // std::cout << "A =\n" << A << std::endl;
 
         // Get primal solution
         qp_->getPrimalSolution(primal_solution_x_.data());

@@ -61,6 +61,7 @@ bool Program::SetDecisionVariableVector(
             if (var[idx].id() == id) break;
             idx++;
         }
+
         if (idx == var.size()) {
             std::cout << v
                       << " is not included within the provided decision "
@@ -94,7 +95,7 @@ int Program::GetDecisionVariableIndex(const sym::Variable &v) {
     }
 }
 
-Eigen::Ref<const Eigen::MatrixXd> Program::AddParameters(
+Eigen::Ref<Eigen::MatrixXd> Program::AddParameters(
     const std::string &name, int n, int m) {
     // Check if parameter already exists
     auto it = parameters_.find(name);
@@ -107,7 +108,7 @@ Eigen::Ref<const Eigen::MatrixXd> Program::AddParameters(
     }
 }
 
-Eigen::Ref<const Eigen::MatrixXd> Program::GetParameters(
+Eigen::Ref<Eigen::MatrixXd> Program::GetParameters(
     const std::string &name) {
     auto it = parameters_.find(name);
     if (it == parameters_.end()) {
