@@ -131,7 +131,7 @@ class ContactTask3D : public ContactTask {
     ContactTask3D(const std::string &name,
                   const std::shared_ptr<TargetFrame> &frame)
         : ContactTask(name, frame) {
-        Resize(3);  // TODO Rename this to ResizeTask()
+        ResizeTask(3);
     }
 
     struct Reference {
@@ -182,7 +182,7 @@ class ContactTask6D : public ContactTask {
     ContactTask6D(const std::string &name,
                   const std::shared_ptr<TargetFrame> &frame)
         : ContactTask(name, frame) {
-        Resize(6);  // TODO Rename this to ResizeTask()
+        ResizeTask(6);
     }
 
     struct Reference {

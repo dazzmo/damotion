@@ -100,7 +100,7 @@ class PositionTask : public MotionTask {
     PositionTask(const std::string &name,
                  const std::shared_ptr<TargetFrame> &frame)
         : MotionTask(name, frame) {
-        Resize(3);
+        ResizeTask(3);
     }
 
     casadi::SX pos_sym() override {
@@ -142,7 +142,7 @@ class OrientationTask : public MotionTask {
     OrientationTask(const std::string &name,
                     const std::shared_ptr<TargetFrame> &frame)
         : MotionTask(name, frame) {
-        Resize(3);
+        ResizeTask(3);
     }
 
     casadi::SX pos_sym() override {
@@ -192,7 +192,7 @@ class Pose6DTask : public MotionTask {
     Pose6DTask(const std::string &name,
                const std::shared_ptr<TargetFrame> &frame)
         : MotionTask(name, frame) {
-        Resize(6);
+        ResizeTask(6);
     }
 
     casadi::SX pos_sym() override { return Frame().pos_sym(); }

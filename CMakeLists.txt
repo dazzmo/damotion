@@ -30,6 +30,7 @@ control/osc/tasks/motion.h
 control/osc/tasks/contact.h
 control/lqr.h
 estimation/ekf.h
+model/frame.h
 solvers/binding.h
 solvers/bounds.h
 solvers/constraint.h
@@ -122,6 +123,7 @@ install(DIRECTORY
         "${CMAKE_SOURCE_DIR}/common"
         "${CMAKE_SOURCE_DIR}/control"
         "${CMAKE_SOURCE_DIR}/planning"
+        "${CMAKE_SOURCE_DIR}/model"
         "${CMAKE_SOURCE_DIR}/solvers"
         "${CMAKE_SOURCE_DIR}/symbolic"
         "${CMAKE_SOURCE_DIR}/system"

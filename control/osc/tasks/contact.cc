@@ -8,7 +8,6 @@ void ContactTask3D::ComputeMotionError() {
     damotion::common::Profiler profiler("ContactTask3D::ComputeMotionError");
 
     e_ = pos() - GetReference().x;
-    // Ensure no velocity
     de_ = vel();
 }
 

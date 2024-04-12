@@ -2,6 +2,7 @@
 #define UTILS_PINOCCHIO_MODEL_H
 
 #include <pinocchio/algorithm/aba.hpp>
+#include <pinocchio/algorithm/center-of-mass.hpp>
 #include <pinocchio/algorithm/crba.hpp>
 #include <pinocchio/algorithm/frames.hpp>
 #include <pinocchio/algorithm/joint-configuration.hpp>
@@ -12,6 +13,7 @@
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/multibody/model.hpp>
 
+#include "model/frame.h"
 #include "utils/eigen_wrapper.h"
 #include "utils/log.h"
 
@@ -30,103 +32,10 @@ class PinocchioModelWrapper {
     PinocchioModelWrapper &operator=(pinocchio::Model model);
 
     /**
-     * @brief Target frame of interest on the model, such as an end-effector
-     * position or reference frame such as the centre of mass.
-     *
-     */
-    class TargetFrame {
-       public:
-        TargetFrame() {
-            x_.resize(3);
-        }
-        ~TargetFrame() = default;
-
-        /**
-         * @brief Position of the frame in the given reference frame
-         *
-         * @return const ::casadi::SX&
-         */
-        const ::casadi::SX &pos_sym() { return x_[0]; }
-        /**
-         * @brief Velocity of the frame in the given reference frame
-         *
-         * @return const ::casadi::SX&
-         */
-        const ::casadi::SX &vel_sym() { return x_[1]; }
-        /**
-         * @brief Acceleration of the frame in the given reference frame
-         *
-         * @return const ::casadi::SX&
-         */
-        const ::casadi::SX &acc_sym() { return x_[2]; }
-
-        /**
-         * @brief \copydoc pos_sym()
-         *
-         * @return const ::casadi::SX&
-         */
-        const Eigen::VectorXd &pos() {
-            pos_ = f_wrapper_.getOutput(0);
-            return pos_;
-        }
-        /**
-         * @brief \copydoc vel_sym()
-         *
-         * @return const ::casadi::SX&
-         */
-        const Eigen::VectorXd &vel() {
-            vel_ = f_wrapper_.getOutput(1);
-            return vel_;
-        }
-        /**
-         * @brief \copydoc acc_sym()
-         *
-         * @return const ::casadi::SX&
-         */
-        const Eigen::VectorXd &acc() {
-            acc_ = f_wrapper_.getOutput(2);
-            return acc_;
-        }
-
-        void UpdateState(const ::casadi::SX &qpos, const ::casadi::SX &qvel,
-                         const ::casadi::SX &qacc) {
-            x_ = f_(::casadi::SXVector({qpos, qvel, qacc}));
-        }
-
-        void UpdateState(const Eigen::VectorXd &qpos,
-                         const Eigen::VectorXd &qvel,
-                         const Eigen::VectorXd &qacc) {
-            f_wrapper_.setInput(0, qpos.data());
-            f_wrapper_.setInput(1, qvel.data());
-            f_wrapper_.setInput(2, qacc.data());
-            f_wrapper_.call();
-        }
-
-       protected:
-        void SetFunction(const ::casadi::Function &f) {
-            f_ = f;
-            f_wrapper_ = f_;
-        }
-
-       private:
-        // Current frame state for the symbolic function
-        ::casadi::SXVector x_;
-
-        Eigen::VectorXd pos_;
-        Eigen::VectorXd vel_;
-        Eigen::VectorXd acc_;
-
-        // Function to compute the state of the frame
-        ::casadi::Function f_;
-        // Wrapper for the function of the symbolic function
-        FunctionWrapper f_wrapper_;
-    };
-
-    /**
      * @brief End effector data for a model
      *
      */
-    class EndEffector : public TargetFrame {
+    class EndEffector : public model::TargetFrame {
        public:
         typedef int Id;
         /**
@@ -147,7 +56,8 @@ class PinocchioModelWrapper {
         EndEffector(const std::string &frame_name,
                     pinocchio::ModelTpl<::casadi::Matrix<AD>> &model,
                     pinocchio::DataTpl<::casadi::Matrix<AD>> &data,
-                    const pinocchio::ReferenceFrame &ref = pinocchio::WORLD)
+                    const pinocchio::ReferenceFrame &ref =
+                        pinocchio::LOCAL_WORLD_ALIGNED)
             : name_(frame_name) {
             typedef ::casadi::Matrix<AD> MatrixType;
 
@@ -189,16 +99,14 @@ class PinocchioModelWrapper {
 
             // Compute velocity of the point at the end-effector frame with
             // respect to the chosen reference frame
-            vel_e = pinocchio::getFrameVelocity(model, data,
-                                                model.getFrameId(frame_name),
-                                                pinocchio::LOCAL_WORLD_ALIGNED)
+            vel_e = pinocchio::getFrameVelocity(
+                        model, data, model.getFrameId(frame_name), ref)
                         .toVector();
 
             // Compute acceleration of the point at the end-effector frame with
             // respect to the chosen reference frame
             acc_e = pinocchio::getFrameClassicalAcceleration(
-                        model, data, model.getFrameId(frame_name),
-                        pinocchio::LOCAL_WORLD_ALIGNED)
+                        model, data, model.getFrameId(frame_name), ref)
                         .toVector();
 
             // Convert to casadi matrices
@@ -239,7 +147,7 @@ class PinocchioModelWrapper {
      * @brief Centre of mass data for a model
      *
      */
-    class CentreOfMass : public TargetFrame {
+    class CentreOfMass : public model::TargetFrame {
        public:
         /**
          * @brief Construct a new Centre of Mass object using a frame within the
@@ -249,11 +157,10 @@ class PinocchioModelWrapper {
          * @param model
          * @param data
          */
-        CentreOfMass(const std::string &frame_name,
-                     pinocchio::ModelTpl<::casadi::Matrix<AD>> &model,
+        CentreOfMass(pinocchio::ModelTpl<::casadi::Matrix<AD>> &model,
                      pinocchio::DataTpl<::casadi::Matrix<AD>> &data,
                      const pinocchio::ReferenceFrame &ref = pinocchio::WORLD)
-            : name_(frame_name) {
+            : name_("centre_of_mass") {
             typedef ::casadi::Matrix<AD> MatrixType;
 
             // Create the function for the end-effector
@@ -270,6 +177,9 @@ class PinocchioModelWrapper {
             // Perform forward kinematics on model
             pinocchio::forwardKinematics(model, data, qpos_e, qvel_e, qacc_e);
             pinocchio::updateFramePlacements(model, data);
+
+            // Compute centre of mass kinematics
+            pinocchio::centerOfMass(model, data, qpos_e, qvel_e, qacc_e, false);
             // Get data for centre of mass
             Eigen::Vector<MatrixType, 3> com = data.com[0], vcom = data.vcom[0],
                                          acom = data.acom[0];
@@ -325,7 +235,9 @@ class PinocchioModelWrapper {
      *
      * @return casadi::Function
      */
-    std::shared_ptr<TargetFrame> com();
+    std::shared_ptr<CentreOfMass> com() {
+        return std::make_shared<CentreOfMass>(model_, data_);
+    }
 
     std::shared_ptr<EndEffector> AddEndEffector(const std::string &name) {
         auto ee = std::make_shared<EndEffector>(name, model_, data_);

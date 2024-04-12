@@ -26,9 +26,7 @@ namespace damotion {
 namespace control {
 namespace osc {
 
-// TODO - Split these into different files (e.g. tasks, costs, OSC etc...)
-
-typedef utils::casadi::PinocchioModelWrapper::TargetFrame TargetFrame;
+typedef model::TargetFrame TargetFrame;
 
 std::shared_ptr<opt::LinearConstraint> LinearisedFrictionConstraint();
 
@@ -322,14 +320,15 @@ class OSC {
     // Symbolic variables used for constraint/objective generation
     std::unique_ptr<SymbolicTerms> symbolic_terms_;
 
-    // Vector of motion tasks for the program
+    // Vector of motion tasks and parameter references for the program
     std::vector<std::shared_ptr<MotionTask>> motion_tasks_;
-    // Reference acceleration parameters in the program for each motion task
     std::vector<Eigen::Ref<Eigen::MatrixXd>> motion_tasks_acc_ref_;
+    std::vector<Eigen::Ref<Eigen::MatrixXd>> motion_tasks_weighting_;
 
-    // Vector of contact tasks for the program
+    // Vector of contact tasks and parameter references for the program
     std::vector<std::shared_ptr<ContactTask>> contact_tasks_;
     std::vector<Eigen::Ref<Eigen::MatrixXd>> contact_tasks_acc_ref_;
+    std::vector<Eigen::Ref<Eigen::MatrixXd>> contact_tasks_weighting_;
     std::vector<opt::Binding<opt::BoundingBoxConstraint>> contact_force_bounds_;
 
     // Friction cone constraint
@@ -350,4 +349,4 @@ class OSC {
 }  // namespace control
 }  // namespace damotion
 
-#endif /* OSC_OSC_H */
+#endif/* OSC_OSC_H */

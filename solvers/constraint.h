@@ -353,6 +353,10 @@ class LinearConstraint : public Constraint {
         casadi::SX A, b;
         casadi::SX::linear_coeff(ex, ex.Variables()[0], A, b, true);
 
+        // Create constraint dimensions and update bounds
+        Resize(b.rows(), 1, ex.Parameters().size());
+        UpdateBounds(bounds);
+
         in = ex.Variables();
         for (const casadi::SX &pi : ex.Parameters()) {
             in.push_back(pi);

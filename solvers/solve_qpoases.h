@@ -176,8 +176,16 @@ class QPOASESSolverInstance : public SolverBase {
         RowMajorMatrixXd H = H_;
         RowMajorMatrixXd A = constraint_jacobian_cache_;
 
+        // std::cout << H << std::endl;
+        // std::cout << g_.transpose() << std::endl;
+        // std::cout << A << std::endl;
+        // std::cout << lbA_.transpose() << std::endl;
+        // std::cout << ubA_.transpose() << std::endl;
+        // std::cout << lbx_.transpose() << std::endl;
+        // std::cout << ubx_.transpose() << std::endl;
+
         // Solve
-        int nWSR = 100;
+        int nWSR = 1000;
         if (first_solve_) {
             qp_->init(H.data(), g_.data(), A.data(), lbx_.data(), ubx_.data(),
                       lbA_.data(), ubA_.data(), nWSR);

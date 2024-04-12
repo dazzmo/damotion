@@ -8,6 +8,7 @@
 #include <string>
 
 #include "common/profiler.h"
+#include "model/frame.h"
 #include "solvers/constraint.h"
 #include "solvers/cost.h"
 #include "solvers/program.h"
@@ -24,7 +25,7 @@ namespace damotion {
 namespace control {
 namespace osc {
 
-typedef utils::casadi::PinocchioModelWrapper::TargetFrame TargetFrame;
+typedef model::TargetFrame TargetFrame;
 
 class Task {
    public:
@@ -32,7 +33,6 @@ class Task {
     ~Task() = default;
 
     Task(const std::string &name) : name_(name) {}
-
 
     /**
      * @brief References for a motion
@@ -53,8 +53,7 @@ class Task {
      */
     const int dim() const { return dim_; }
 
-    const std::string & name() const { return name_; }
-
+    const std::string &name() const { return name_; }
 
     /**
      * @brief Add a parameter p along with its program reference for the given
@@ -76,8 +75,9 @@ class Task {
      *
      * @param ndim
      */
-    void Resize(const int ndim) {
+    void ResizeTask(const int ndim) {
         dim_ = ndim;
+        w_ = Eigen::VectorXd::Ones(ndim);
         e_ = Eigen::VectorXd::Zero(ndim);
         de_ = Eigen::VectorXd::Zero(ndim);
         Kp_ = Eigen::DiagonalMatrix<double, Eigen::Dynamic>(ndim);
@@ -88,6 +88,20 @@ class Task {
 
     const Eigen::VectorXd &Error() { return e_; }
     const Eigen::VectorXd &ErrorDerivative() { return de_; }
+
+    const Eigen::VectorXd &Weighting() { return w_; }
+    /**
+     * @brief Set the weighting of the task to the vector w
+     *
+     * @param w
+     */
+    void SetWeighting(const Eigen::VectorXd &w) { w_ = w; }
+    /**
+     * @brief Sets all weightings of the task to w
+     *
+     * @param w
+     */
+    void SetWeighting(const double &w) { w_.setConstant(w); }
 
     void SetKpGains(const Eigen::VectorXd &Kp) { Kp_.diagonal() = Kp; }
     void SetKdGains(const Eigen::VectorXd &Kd) { Kd_.diagonal() = Kd; }
@@ -102,17 +116,18 @@ class Task {
     Eigen::DiagonalMatrix<double, Eigen::Dynamic> Kp_;
     Eigen::DiagonalMatrix<double, Eigen::Dynamic> Kd_;
 
+    // Task parameters
     casadi::SXVector ps_;
     sym::ParameterRefVector pv_;
 
    private:
     int dim_ = 0;
     std::string name_;
+    Eigen::VectorXd w_;
 };
 
-}
-}
-}
+}  // namespace osc
+}  // namespace control
+}  // namespace damotion
 
-
-#endif/* TASKS_TASK_H */
+#endif /* TASKS_TASK_H */

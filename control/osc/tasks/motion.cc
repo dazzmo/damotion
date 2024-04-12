@@ -15,14 +15,20 @@ void OrientationTask::ComputeMotionError() {
     damotion::common::Profiler profiler("OrientationTask::ComputeMotionError");
 
     // Get rotational component
-    Eigen::Vector4d qv = pos();
-    Eigen::Quaterniond q(qv);
+    Eigen::Quaterniond q;
+    // TODO - Find a way to conventionalise the quaternions, Eigen also seems to do the [x, y, z, w] format
+    q.w() = pos()[0];
+    q.x() = pos()[1];
+    q.y() = pos()[2];
+    q.z() = pos()[3];
     // Compute rotational error
     Eigen::Matrix3d R =
-        GetReference().q.toRotationMatrix().transpose() * q.toRotationMatrix();
+        GetReference().q.normalized().toRotationMatrix().transpose() *
+        q.normalized().toRotationMatrix();
     double theta = 0.0;
     Eigen::Vector3d elog;
     elog = pinocchio::log3(R, theta);
+
     // Compute rate of error
     Eigen::Matrix3d Jlog;
     pinocchio::Jlog3(theta, elog, Jlog);

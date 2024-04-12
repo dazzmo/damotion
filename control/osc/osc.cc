@@ -25,9 +25,9 @@ std::shared_ptr<opt::LinearConstraint> LinearisedFrictionConstraint() {
     sym::Expression cone;
     cone = casadi::SX(4, 1);
     cone(0) = sqrt(2.0) * l_x + mu * l_z;
-    cone(1) = -sqrt(2.0) * l_x - mu * l_z;
+    cone(1) = -sqrt(2.0) * l_x + mu * l_z;
     cone(2) = sqrt(2.0) * l_y + mu * l_z;
-    cone(3) = -sqrt(2.0) * l_y - mu * l_z;
+    cone(3) = -sqrt(2.0) * l_y + mu * l_z;
     cone.SetInputs({lambda}, {normal, mu});
 
     return std::make_shared<opt::LinearConstraint>("friction_cone", cone,
@@ -60,19 +60,24 @@ void OSC::AddMotionTask(const std::shared_ptr<MotionTask> &task) {
     // minimisation
     Eigen::Ref<Eigen::MatrixXd> xaccd =
         program_.AddParameters(task->name() + "_xaccd", task->dim());
+    // Add weighting for each task
+    Eigen::Ref<Eigen::MatrixXd> w =
+        program_.AddParameters(task->name() + "_task_weighting", task->dim());
 
-    // TODO Add weighting for each task
+    // Set weighting to task
+    program_.SetParameters(task->name() + "_task_weighting", task->Weighting());
 
     // Create objective for tracking
-    casadi::SX xaccd_sym = casadi::SX::sym("xacc_d", task->dim());
+    casadi::SX xaccd_sym = casadi::SX::sym("xaccd", task->dim());
+    casadi::SX w_sym = casadi::SX::sym("w", task->dim());
 
-    // Create objective as || xacc - xacc_d ||^2
-    sym::Expression obj = casadi::SX::dot(task->acc_sym() - xaccd_sym,
-                                          task->acc_sym() - xaccd_sym);
+    // Create weighted objective as || xacc - xacc_d ||^2_W
+    casadi::SX e = task->acc_sym() - xaccd_sym;
+    sym::Expression obj = mtimes(mtimes(e.T(), casadi::SX::diag(w_sym)), e);
 
     // Add any additional parameters
     casadi::SXVector ps = {symbolic_terms_->qpos(), symbolic_terms_->qvel(),
-                           xaccd_sym};
+                           xaccd_sym, w_sym};
     for (auto &pi : task->SymbolicParameters()) {
         ps.push_back(pi);
     }
@@ -86,7 +91,7 @@ void OSC::AddMotionTask(const std::shared_ptr<MotionTask> &task) {
 
     // Append any additional parameters
     sym::ParameterRefVector pv = {program_.GetParameters("qpos"),
-                                  program_.GetParameters("qvel"), xaccd};
+                                  program_.GetParameters("qvel"), xaccd, w};
     for (auto &pi : task->Parameters()) {
         pv.push_back(pi);
     }
@@ -95,23 +100,23 @@ void OSC::AddMotionTask(const std::shared_ptr<MotionTask> &task) {
 
     // Add motion task and corresponding acceleration reference parameter
     motion_tasks_.push_back(task);
+    motion_tasks_weighting_.push_back(w);
     motion_tasks_acc_ref_.push_back(xaccd);
 }
 
 void OSC::AddContactPoint(const std::shared_ptr<ContactTask> &task) {
-    // Add new variables to the program
+    /* Add constraint forces to program */
     sym::VariableVector lambda =
         sym::CreateVariableVector(task->name() + "_lambda", task->dim());
     // Add to variables
     variables_->AddConstraintForces(lambda);
     // Add to program
     program_.AddDecisionVariables(lambda);
-
     // Add bounds to constraint forces
     opt::Binding<opt::BoundingBoxConstraint> force_bounds =
         program_.AddBoundingBoxConstraint(task->fmin(), task->fmax(), lambda);
 
-    // Create symbolic representation of the constraint forces
+    /* Add constraints to the dynamics of the system */
     casadi::SX lam = casadi::SX::sym(task->name() + "_lambda", task->dim());
     symbolic_terms_->AddConstraintForces(lam);
     // Get constraint Jacobian
@@ -120,37 +125,26 @@ void OSC::AddContactPoint(const std::shared_ptr<ContactTask> &task) {
     AddConstraintsToDynamics(lam, lambda, J, task->SymbolicParameters(),
                              task->Parameters());
 
-    // Add parameters for weighting and tracking?
+    /* Create parameters for task objective */
     Eigen::Ref<Eigen::MatrixXd> xaccd =
         program_.AddParameters(task->name() + "_contact_acc_ref", task->dim());
+    // Add weighting for each task
+    Eigen::Ref<Eigen::MatrixXd> w =
+        program_.AddParameters(task->name() + "_contact_task_weighting", task->dim());
+    // Set weighting to task
+    program_.SetParameters(task->name() + "_contact_task_weighting", task->Weighting());
 
-    // Create objective for tracking
-    casadi::SX xaccd_sym = casadi::SX::sym("xacc_d", task->dim());
-
-    // Create parameters for contact surface
-    program_.AddParameters(task->name() + "_friction_mu", 1);
-    program_.AddParameters(task->name() + "_normal", 3);
-
-    // Set the parameters
-    program_.SetParameters(task->name() + "_friction_mu",
-                           Eigen::Vector<double, 1>(task->mu()));
-    program_.SetParameters(task->name() + "_normal", task->normal());
-
-    // Add friction constraint
-    program_.AddLinearConstraint(
-        friction_cone_con_, {lambda},
-        {program_.GetParameters(task->name() + "_normal"),
-         program_.GetParameters(task->name() + "_mu")});
-
-    sym::Expression obj;
-    // Create objective as || xacc - xacc_d ||^2
-    obj = casadi::SX::dot(task->acc_sym() - xaccd_sym,
-                          task->acc_sym() - xaccd_sym);
+    /* Create objective */
+    // Create weighted objective as || xacc - xacc_d ||^2_W
+    casadi::SX xaccd_sym = casadi::SX::sym("xaccd", task->dim());
+    casadi::SX w_sym = casadi::SX::sym("w", task->dim());
+    casadi::SX e = task->acc_sym() - xaccd_sym;
+    sym::Expression obj = mtimes(mtimes(e.T(), casadi::SX::diag(w_sym)), e);
 
     // Set inputs to the expression
     obj.SetInputs(
         {symbolic_terms_->qacc()},
-        {symbolic_terms_->qpos(), symbolic_terms_->qvel(), xaccd_sym});
+        {symbolic_terms_->qpos(), symbolic_terms_->qvel(), xaccd_sym, w_sym});
 
     // Add objective to program
     std::shared_ptr<opt::QuadraticCost> task_cost =
@@ -158,11 +152,27 @@ void OSC::AddContactPoint(const std::shared_ptr<ContactTask> &task) {
 
     program_.AddQuadraticCost(task_cost, {variables_->qacc()},
                               {program_.GetParameters("qpos"),
-                               program_.GetParameters("qvel"), xaccd});
+                               program_.GetParameters("qvel"), xaccd, w});
+
+    // Create parameters for contact surface
+    program_.AddParameters(task->name() + "_normal", 3);
+    program_.AddParameters(task->name() + "_friction_mu", 1);
+
+    // Set the parameters
+    program_.SetParameters(task->name() + "_normal", task->normal());
+    program_.SetParameters(task->name() + "_friction_mu",
+                           Eigen::Vector<double, 1>(task->mu()));
+
+    // Add friction constraint
+    program_.AddLinearConstraint(
+        friction_cone_con_, {lambda},
+        {program_.GetParameters(task->name() + "_normal"),
+         program_.GetParameters(task->name() + "_friction_mu")});
 
     // Add data to vectors for the OSC
     contact_tasks_.push_back(task);
     contact_tasks_acc_ref_.push_back(xaccd);
+    contact_tasks_weighting_.push_back(w);
     contact_force_bounds_.push_back(force_bounds);
 }
 

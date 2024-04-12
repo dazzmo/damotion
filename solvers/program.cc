@@ -220,13 +220,13 @@ void Program::ListParameters() {
     std::cout << "Parameter\tCurrent Value\n";
     std::cout << "----------------------\n";
     for (const auto &p : parameters_) {
-        std::cout << p.first << '\t' << p.second << '\n';
+        std::cout << p.first << '\t' << p.second.transpose() << '\n';
     }
 }
 
 void Program::ListDecisionVariables() {
     std::cout << "----------------------\n";
-    std::cout << "Variable\tCurrent Value\n";
+    std::cout << "Variable\n";
     std::cout << "----------------------\n";
     for (sym::Variable &v : decision_variables_) {
         std::cout << v << '\n';
@@ -235,7 +235,7 @@ void Program::ListDecisionVariables() {
 
 void Program::ListConstraints() {
     std::cout << "----------------------\n";
-    std::cout << "Constraint\tSize\tUpper Bound\tLower Bound\n";
+    std::cout << "Constraint\tSize\tLower Bound\tUpper Bound\n";
     std::cout << "----------------------\n";
     // Get all constraints
     std::vector<Binding<Constraint>> constraints = GetAllConstraints();
@@ -243,16 +243,28 @@ void Program::ListConstraints() {
         std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
         for (int i = 0; i < b.Get().Dimension(); ++i) {
             std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
-                      << b.Get().UpperBound()[i] << "\t"
-                      << b.Get().LowerBound()[i] << "\n";
+                      << b.Get().LowerBound()[i] << "\t"
+                      << b.Get().UpperBound()[i] << "\n";
+        }
+    }
+    for (Binding<BoundingBoxConstraint> &b : GetBoundingBoxConstraintBindings()) {
+        std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
+        for (int i = 0; i < b.Get().Dimension(); ++i) {
+            std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
+                      << b.Get().LowerBound()[i] << "\t"
+                      << b.Get().UpperBound()[i] << "\n";
         }
     }
 }
 
 void Program::ListCosts() {
     std::cout << "----------------------\n";
-    std::cout << "Cost\tWeighting\n";
+    std::cout << "Cost\n";
     std::cout << "----------------------\n";
+    std::vector<Binding<Cost>> costs = GetAllCostBindings();
+    for (Binding<Cost> &b : costs) {
+        std::cout << b.Get().name() << '\n';
+    }
 }
 
 void Program::PrintProgramSummary() {
