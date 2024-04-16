@@ -34,23 +34,29 @@ SolverBase::SolverBase(Program& prog) : prog_(prog) {
 
 void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
                               const std::vector<sym::VariableVector>& var,
-                              const std::vector<const double*>& par,
+                              const sym::ParameterRefVector& par,
                               const std::vector<bool>& continuous, bool grd,
                               bool hes, bool update_cache) {
     int nv = var.size();
     int np = par.size();
-    // Create inputs to evaluate the function
-    std::vector<const double*> inputs(nv, nullptr);
     // Optional creation of vectors for inputs to the functions (if vector input
     // is not continuous in optimisation vector)
+    common::Function::InputRefVector inputs;
+
+    // Mapped vectors from existing data
+    std::vector<Eigen::Map<const Eigen::VectorXd>> m_vecs = {};
+    // Vectors created manually
     std::vector<Eigen::VectorXd> vecs = {};
 
-    // Determine inputs to the function
+    // Set variables
     for (int i = 0; i < nv; ++i) {
         if (continuous[i]) {
             // Set input to the start of the vector input
-            inputs[i] = x.data() +
-                        GetCurrentProgram().GetDecisionVariableIndex(var[i][0]);
+            m_vecs[i] = Eigen::Map<const Eigen::VectorXd>(
+                x.data() +
+                    GetCurrentProgram().GetDecisionVariableIndex(var[i][0]),
+                var.size());
+            inputs.push_back(m_vecs[0]);
         } else {
             // Construct a vector for this input
             Eigen::VectorXd xi(var[i].size());
@@ -59,74 +65,27 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
                     x[GetCurrentProgram().GetDecisionVariableIndex(var[i][ii])];
             }
             vecs.push_back(xi);
-            inputs[i] = vecs.back().data();
+            inputs.push_back(vecs.back());
         }
     }
 
+    // Set parameters
+    for (int i = 0; i < np; ++i) {
+        inputs.push_back(par[i]);
+    }
+
+    // Check if gradient exists
     if (grd && !cost.HasGradient()) {
         throw std::runtime_error("Cost does not have a gradient!");
     }
-
+    // Check if hessian exists
     if (hes && !cost.HasHessian()) {
         throw std::runtime_error("Cost does not have a hessian!");
     }
 
-    // Set variables
-    for (int i = 0; i < nv; ++i) {
-        // ! Print out inputs in cost function
-        // std::cout << "Input " << i << " = ";
-        // for (int j = 0; j < cost.ObjectiveFunction().f().size1_in(i); ++j) {
-        //     std::cout << *(inputs[i] + j) << ", ";
-        // }
-        // std::cout << '\n';
-
-        cost.ObjectiveFunction().setInput(i, inputs[i]);
-        if (grd) {
-            cost.GradientFunction().setInput(i, inputs[i]);
-        }
-        if (hes) {
-            cost.HessianFunction().setInput(i, inputs[i]);
-        }
-    }
-    // Set parameters
-    for (int i = 0; i < np; ++i) {
-        // std::cout << "Input " << nv + i << " = ";
-        // for (int j = 0; j < cost.ObjectiveFunction().f().size1_in(nv + i);
-        //      ++j) {
-        //     std::cout << *(par[i] + j) << ", ";
-        // }
-        // std::cout << '\n';
-
-        cost.ObjectiveFunction().setInput(nv + i, par[i]);
-        if (grd) {
-            cost.GradientFunction().setInput(nv + i, par[i]);
-        }
-        if (hes) {
-            cost.HessianFunction().setInput(nv + i, par[i]);
-        }
-    }
-
-    cost.ObjectiveFunction().call();
-    // for (int i = 0; i < cost.ObjectiveFunction().f().n_out(); ++i) {
-    //     std::cout << "Objective " << i << cost.ObjectiveFunction().getOutput(i)
-    //               << std::endl;
-    // }
-    if (grd) {
-        cost.GradientFunction().call();
-        // for (int i = 0; i < cost.GradientFunction().f().n_out(); ++i) {
-        //     std::cout << "Gradient " << i
-        //               << cost.GradientFunction().getOutput(i).transpose()
-        //               << std::endl;
-        // }
-    }
-    if (hes) {
-        cost.HessianFunction().call();
-        // for (int i = 0; i < cost.HessianFunction().f().n_out(); ++i) {
-        //     std::cout << "Hessian " << i
-        //               << cost.HessianFunction().getOutput(i)
-        //               << std::endl;
-        // }
-    }
+    cost.ObjectiveFunction().call(inputs);
+    if (grd) cost.GradientFunction().call(inputs);
+    if (hes) cost.HessianFunction().call(inputs);
 
     if (update_cache == false) return;
 
@@ -175,7 +134,7 @@ void SolverBase::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
 void SolverBase::EvaluateConstraint(Constraint& c, const int& constraint_idx,
                                     const Eigen::VectorXd& x,
                                     const std::vector<sym::VariableVector>& var,
-                                    const std::vector<const double*>& par,
+                                    const sym::ParameterRefVector& par,
                                     const std::vector<bool>& continuous,
                                     bool jac, bool update_cache) {
     // Get size of constraint

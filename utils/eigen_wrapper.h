@@ -6,6 +6,8 @@
 #include <casadi/casadi.hpp>
 #include <pinocchio/autodiff/casadi.hpp>
 
+#include "common/function.h"
+
 namespace damotion {
 namespace utils {
 namespace casadi {
@@ -95,7 +97,7 @@ class SparseMatrixWrapper {};
  * be extracted as Eigen matrices
  *
  */
-class FunctionWrapper {
+class FunctionWrapper : public common::Function {
    public:
     FunctionWrapper() = default;
     FunctionWrapper(::casadi::Function f);
@@ -107,71 +109,12 @@ class FunctionWrapper {
     ~FunctionWrapper();
 
     /**
-     * @brief Number of inputs for the function
-     *
-     * @return const int
-     */
-    const int n_in() const { return f_.n_in(); }
-
-    /**
-     * @brief Number of outputs for the function
-     *
-     * @return const int
-     */
-    const int n_out() const { return f_.n_out(); }
-
-    /**
-     * @brief Sets the i-th input for the function
-     *
-     * @param i
-     * @param x
-     * @param check Perform checks on the input to ensure correct size and good
-     * data
-     */
-    void setInput(int i, const Eigen::Ref<const Eigen::MatrixXd> &x,
-                  bool check = false);
-
-    /**
-     * @brief Sets a set of inputs for the function
-     *
-     * @param idx Vector of input indices
-     * @param x Vector of inputs
-     * @param check Perform checks on the input to ensure correct size and good
-     * data
-     */
-    void setInput(const std::vector<int> &idx,
-                  const std::vector<Eigen::Ref<const Eigen::MatrixXd>> &x,
-                  bool check = false);
-
-    /**
-     * @brief Sets the i-th input for the function by direct pointer to the
-     * input data array
-     *
-     * @param i
-     * @param x_ptr Pointer to the start of the data array
-     */
-    void setInput(int i, const double *x_ptr);
-
-    /**
      * @brief Calls the function with the current inputs
      *
      */
-    void call();
+    void callImpl(const common::Function::InputRefVector &input) override;
 
-    /**
-     * @brief Indicate that the output will be sparse
-     *
-     * @param i Index of the output
-     */
     void setSparseOutput(int i);
-
-    /**
-     * @brief Returns the dense output i
-     *
-     * @param i
-     * @return const Eigen::MatrixXd&
-     */
-    const Eigen::Ref<const Eigen::MatrixXd> getOutput(int i);
 
     /**
      * @brief Returns the sparse matrix output i. You must call
@@ -195,21 +138,10 @@ class FunctionWrapper {
     // Data output pointers for casadi function
     std::vector<double *> out_data_ptr_;
 
-    // Non-zero data for each output
-    std::vector<std::vector<double>> out_data_;
-
-    // Dense matrix outputs
-    std::vector<Eigen::MatrixXd> out_;
-    // Sparse matrix outputs
-    std::vector<Eigen::SparseMatrix<double>> out_sparse_;
-
     // Row triplet data for nnz of each output
     std::vector<std::vector<casadi_int>> rows_;
     // Column triplet data for nnz of each output
     std::vector<std::vector<casadi_int>> cols_;
-
-    // Flag to indicate if output has been set as sparse
-    std::vector<bool> is_out_sparse_;
 
     // Memory allocated for function evaluation
     int mem_;

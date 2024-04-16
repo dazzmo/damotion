@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include "common/logging.h"
+
 namespace common = damotion::common;
 
 class TestCallback {
@@ -32,10 +34,32 @@ TEST(Function, CallbackFunction) {
     xa.setRandom();
     xb.setRandom();
 
+    LOG(INFO) << xa.transpose();
+    LOG(INFO) << xb.transpose();
+
     xc = xa + xb;
 
     // Set function
     f->call({xa, xb});
 
     EXPECT_TRUE(xc.isApprox(f->getOutput(0)));
+}
+
+TEST(Function, NoCallbackFunction) {
+    std::unique_ptr<common::Function> f;
+
+    // Create dummy input
+    Eigen::VectorXd xa(5), xb(5), xc(5);
+    xa.setRandom();
+    xb.setRandom();
+
+    xc = xa + xb;
+
+    // Set function
+    try {
+        f->call({xa, xb});
+    } catch (const std::runtime_error &error) {
+        EXPECT_TRUE(error.what() ==
+                    "Function callback not provided to CallbackFunction!");
+    }
 }

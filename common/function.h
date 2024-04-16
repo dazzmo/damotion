@@ -100,6 +100,14 @@ class Function {
     int n_in_;
     int n_out_;
 
+    /**
+     * @brief Assesses if all inputs provided to the function are valid, such as
+     * not including infinite values, NaNs...
+     *
+     * @param input
+     * @return true
+     * @return false
+     */
     bool CheckInputRefVector(const InputRefVector &input) {
         int idx = 0;
         for (const Eigen::Ref<const Eigen::VectorXd> &x : input) {
@@ -135,15 +143,28 @@ class CallbackFunction : public Function {
         SetCallback(callback);
     }
 
+    /**
+     * @brief Set the callback to be used when call() is used for the function.
+     *
+     * @param callback
+     */
     void SetCallback(const f_callback_ &callback) { f_ = callback; }
 
+    /**
+     * @brief Calls the callback function provided to it
+     *
+     * @param input
+     */
     void callImpl(const Function::InputRefVector &input) override {
-        std::cout << "callImpl\n";
+        if (f_ == nullptr) {
+            throw std::runtime_error(
+                "Function callback not provided to CallbackFunction!");
+        }
         f_(input, out_);
     }
 
    private:
-    f_callback_ f_;
+    f_callback_ f_ = nullptr;
 };
 
 }  // namespace common

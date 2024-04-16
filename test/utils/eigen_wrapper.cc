@@ -16,9 +16,7 @@ TEST(EigenWrapper, EigenWrapperLoad) {
     x_in.setRandom();
     y_in.setRandom();
 
-    wrapper.setInput(0, x_in);
-    wrapper.setInput(1, y_in);
-    wrapper.call();
+    wrapper.call({x_in, y_in});
     output = wrapper.getOutput(0);
 
     EXPECT_DOUBLE_EQ(output[0], (x_in[0] + y_in[0]));
@@ -60,9 +58,8 @@ TEST(EigenWrapper, EigenWrapperSparse) {
     Eigen::Matrix2d I;
     I.setIdentity();
 
-    wrapper.setInput(0, x_in);
     wrapper.setSparseOutput(0);
-    wrapper.call();
+    wrapper.call({x_in});
     Eigen::SparseMatrix<double> res = wrapper.getOutputSparse(0);
 
     EXPECT_TRUE(res.isApprox(I));
@@ -81,9 +78,7 @@ TEST(EigenWrapper, EigenWrapperCodegenLoad) {
     x_in.setRandom();
     y_in.setRandom();
 
-    wrapper.setInput(0, x_in);
-    wrapper.setInput(1, y_in);
-    wrapper.call();
+    wrapper.call({x_in, y_in});
     output = wrapper.getOutput(0);
 
     EXPECT_DOUBLE_EQ(output[0], (x_in[0] + y_in[0]));

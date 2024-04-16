@@ -69,10 +69,7 @@ class TargetFrame {
 
     void UpdateState(const Eigen::VectorXd &qpos, const Eigen::VectorXd &qvel,
                      const Eigen::VectorXd &qacc) {
-        f_wrapper_.setInput(0, qpos.data());
-        f_wrapper_.setInput(1, qvel.data());
-        f_wrapper_.setInput(2, qacc.data());
-        f_wrapper_.call();
+        f_wrapper_.call({qpos, qvel, qacc});
     }
 
    protected:
