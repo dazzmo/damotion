@@ -89,7 +89,7 @@ class OSC {
      */
     void AddUnconstrainedInverseDynamics(
         const casadi::SX &dynamics, const casadi::SXVector &parameters_sym = {},
-        const sym::ParameterRefVector &parameters = {}) {
+        const sym::ParameterVector &parameters = {}) {
         assert(parameters_sym.size() == parameters.size() &&
                "Parameter inputs must be same size!");
         // Initialise expression
@@ -106,8 +106,8 @@ class OSC {
         for (auto &pi : parameters_sym) {
             constrained_dynamics_par_sym_.push_back(pi);
         }
-        constrained_dynamics_par_.push_back(GetProgram().GetParameters("qpos"));
-        constrained_dynamics_par_.push_back(GetProgram().GetParameters("qvel"));
+        constrained_dynamics_par_.push_back(qpos_param_);
+        constrained_dynamics_par_.push_back(qvel_param_);
         for (auto &pi : parameters) {
             constrained_dynamics_par_.push_back(pi);
         }
@@ -145,20 +145,22 @@ class OSC {
     }
 
     void Update(const Eigen::VectorXd &qpos, const Eigen::VectorXd &qvel) {
-        program_.SetParameters("qpos", qpos);
-        program_.SetParameters("qvel", qvel);
+        program_.SetParameterValues(qpos_param_, qpos);
+        program_.SetParameterValues(qvel_param_, qvel);
 
         // Update each task given the updated data and references
         for (int i = 0; i < motion_tasks_.size(); ++i) {
             // Set desired task accelerations
             motion_tasks_[i]->ComputeMotionError();
-            motion_tasks_acc_ref_[i] = -motion_tasks_[i]->GetPDError();
+            GetProgram().SetParameterValues(motion_task_parameters_[i].xaccd,
+                                            -motion_tasks_[i]->GetPDError());
         }
 
         for (int i = 0; i < contact_tasks_.size(); ++i) {
             // Compute the pose error for their costs
             contact_tasks_[i]->ComputeMotionError();
-            contact_tasks_acc_ref_[i] = -contact_tasks_[i]->GetPDError();
+            GetProgram().SetParameterValues(contact_task_parameters_[i].xaccd,
+                                            -contact_tasks_[i]->GetPDError());
         }
 
         // Program is updated
@@ -174,13 +176,15 @@ class OSC {
     void UpdateContactPoint(const std::shared_ptr<ContactTask> &task) {
         int task_idx = 0;
         if (task->inContact) {
+            // Get parameters related to the contact task
+            ContactTaskParameters &p = contact_task_parameters_[task_idx];
             // Set in contact
             contact_force_bounds_[task_idx].Get().UpdateBounds(task->fmin(),
                                                                task->fmax());
 
-            program_.SetParameters(task->name() + "_friction_mu",
-                                   Eigen::Vector<double, 1>(task->mu()));
-            program_.SetParameters(task->name() + "_lambda", task->normal());
+            program_.SetParameterValues(p.mu,
+                                        Eigen::Vector<double, 1>(task->mu()));
+            program_.SetParameterValues(p.normal, task->normal());
         } else {
             contact_force_bounds_[task_idx].Get().UpdateBounds(
                 opt::BoundsType::kEquality);
@@ -295,10 +299,11 @@ class OSC {
     int nv_ = 0;
     int nu_ = 0;
 
-    void AddConstraintsToDynamics(
-        const casadi::SX &lambda, const sym::VariableVector &lambda_var,
-        const casadi::SX &J, const casadi::SXVector &parameters,
-        const sym::ParameterRefVector &parameters_var) {
+    void AddConstraintsToDynamics(const casadi::SX &lambda,
+                                  const sym::VariableVector &lambda_var,
+                                  const casadi::SX &J,
+                                  const casadi::SXVector &parameters,
+                                  const sym::ParameterVector &parameters_var) {
         // Add variables to the input vectors
         constrained_dynamics_sym_ =
             casadi::SX::vertcat({constrained_dynamics_sym_, lambda});
@@ -320,15 +325,28 @@ class OSC {
     // Symbolic variables used for constraint/objective generation
     std::unique_ptr<SymbolicTerms> symbolic_terms_;
 
+    // Default parameters
+    sym::Parameter qpos_param_;
+    sym::Parameter qvel_param_;
+
     // Vector of motion tasks and parameter references for the program
     std::vector<std::shared_ptr<MotionTask>> motion_tasks_;
-    std::vector<Eigen::Ref<Eigen::MatrixXd>> motion_tasks_acc_ref_;
-    std::vector<Eigen::Ref<Eigen::MatrixXd>> motion_tasks_weighting_;
+    struct MotionTaskParameters {
+        sym::Parameter xaccd;
+        sym::Parameter w;
+    };
+    std::vector<MotionTaskParameters> motion_task_parameters_;
 
     // Vector of contact tasks and parameter references for the program
     std::vector<std::shared_ptr<ContactTask>> contact_tasks_;
-    std::vector<Eigen::Ref<Eigen::MatrixXd>> contact_tasks_acc_ref_;
-    std::vector<Eigen::Ref<Eigen::MatrixXd>> contact_tasks_weighting_;
+    // Parameters for each contact point
+    struct ContactTaskParameters {
+        sym::Parameter xaccd;
+        sym::Parameter w;
+        sym::Parameter mu;
+        sym::Parameter normal;
+    };
+    std::vector<ContactTaskParameters> contact_task_parameters_;
     std::vector<opt::Binding<opt::BoundingBoxConstraint>> contact_force_bounds_;
 
     // Friction cone constraint
@@ -338,7 +356,7 @@ class OSC {
     casadi::SX constrained_dynamics_sym_;
     casadi::SXVector constrained_dynamics_par_sym_;
     sym::VariableVector constrained_dynamics_var_;
-    sym::ParameterRefVector constrained_dynamics_par_;
+    sym::ParameterVector constrained_dynamics_par_;
     sym::Expression constrained_dynamics_;
 
     // Underlying program for the OSC

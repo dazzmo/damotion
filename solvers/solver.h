@@ -32,7 +32,7 @@ class SolverBase {
 
     void EvaluateCost(Cost& c, const Eigen::VectorXd& x,
                       const std::vector<sym::VariableVector>& var,
-                      const sym::ParameterRefVector &par,
+                      const sym::ParameterVector &par,
                       const std::vector<bool>& continuous, bool grd, bool hes,
                       bool update_cache = true);
 
@@ -42,7 +42,7 @@ class SolverBase {
     void EvaluateConstraint(Constraint& c, const int& constraint_idx,
                             const Eigen::VectorXd& x,
                             const std::vector<sym::VariableVector>& var,
-                            const sym::ParameterRefVector &par,
+                            const sym::ParameterVector &par,
                             const std::vector<bool>& continuous, bool jac,
                             bool update_cache = true);
 

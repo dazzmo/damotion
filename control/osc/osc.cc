@@ -46,26 +46,28 @@ OSC::OSC(int nq, int nv, int nu) : nq_(nq), nv_(nv), nu_(nu) {
     program_.AddDecisionVariables(variables_->ctrl());
 
     // Create parameters
-    program_.AddParameters("qpos", nq);
-    program_.AddParameters("qvel", nv);
+    qpos_param_ = sym::Parameter("qpos", nq);
+    qvel_param_ = sym::Parameter("qvel", nv);
+    program_.AddParameter(qpos_param_);
+    program_.AddParameter(qvel_param_);
 
     // Create friction cone constraint to be bounded to by contact tasks
     friction_cone_con_ = LinearisedFrictionConstraint();
 }
 
 void OSC::AddMotionTask(const std::shared_ptr<MotionTask> &task) {
-    // Create objective for this task
-
     // Create parameter for program for task-acceleration error
     // minimisation
-    Eigen::Ref<Eigen::MatrixXd> xaccd =
-        program_.AddParameters(task->name() + "_xaccd", task->dim());
+    MotionTaskParameters parameters;
+    parameters.xaccd = sym::Parameter(task->name() + "_xaccd", task->dim());
     // Add weighting for each task
-    Eigen::Ref<Eigen::MatrixXd> w =
-        program_.AddParameters(task->name() + "_task_weighting", task->dim());
+    parameters.w =
+        sym::Parameter(task->name() + "_task_weighting", task->dim());
+    program_.AddParameter(parameters.xaccd);
+    program_.AddParameter(parameters.w);
 
     // Set weighting to task
-    program_.SetParameters(task->name() + "_task_weighting", task->Weighting());
+    program_.SetParameterValues(parameters.w, task->Weighting());
 
     // Create objective for tracking
     casadi::SX xaccd_sym = casadi::SX::sym("xaccd", task->dim());
@@ -90,8 +92,8 @@ void OSC::AddMotionTask(const std::shared_ptr<MotionTask> &task) {
         std::make_shared<opt::QuadraticCost>(task->name() + "_motion_obj", obj);
 
     // Append any additional parameters
-    sym::ParameterRefVector pv = {program_.GetParameters("qpos"),
-                                  program_.GetParameters("qvel"), xaccd, w};
+    sym::ParameterVector pv = {qpos_param_, qvel_param_, parameters.xaccd,
+                               parameters.w};
     for (auto &pi : task->Parameters()) {
         pv.push_back(pi);
     }
@@ -100,11 +102,13 @@ void OSC::AddMotionTask(const std::shared_ptr<MotionTask> &task) {
 
     // Add motion task and corresponding acceleration reference parameter
     motion_tasks_.push_back(task);
-    motion_tasks_weighting_.push_back(w);
-    motion_tasks_acc_ref_.push_back(xaccd);
+    motion_task_parameters_.push_back(parameters);
 }
 
 void OSC::AddContactPoint(const std::shared_ptr<ContactTask> &task) {
+    // Create parameters
+    ContactTaskParameters parameters;
+
     /* Add constraint forces to program */
     sym::VariableVector lambda =
         sym::CreateVariableVector(task->name() + "_lambda", task->dim());
@@ -126,13 +130,22 @@ void OSC::AddContactPoint(const std::shared_ptr<ContactTask> &task) {
                              task->Parameters());
 
     /* Create parameters for task objective */
-    Eigen::Ref<Eigen::MatrixXd> xaccd =
-        program_.AddParameters(task->name() + "_contact_acc_ref", task->dim());
-    // Add weighting for each task
-    Eigen::Ref<Eigen::MatrixXd> w =
-        program_.AddParameters(task->name() + "_contact_task_weighting", task->dim());
-    // Set weighting to task
-    program_.SetParameters(task->name() + "_contact_task_weighting", task->Weighting());
+    parameters.xaccd =
+        sym::Parameter(task->name() + "_contact_acc_ref", task->dim());
+    parameters.w =
+        sym::Parameter(task->name() + "_contact_task_weighting", task->dim());
+    parameters.mu = sym::Parameter(task->name() + "_friction_mu", 1);
+    parameters.normal = sym::Parameter(task->name() + "_normal", 3);
+
+    program_.AddParameter(parameters.xaccd);
+    program_.AddParameter(parameters.w);
+    program_.AddParameter(parameters.mu);
+    program_.AddParameter(parameters.normal);
+
+    program_.SetParameterValues(parameters.w, task->Weighting());
+    program_.SetParameterValues(parameters.normal, task->normal());
+    program_.SetParameterValues(parameters.mu,
+                                Eigen::Vector<double, 1>(task->mu()));
 
     /* Create objective */
     // Create weighted objective as || xacc - xacc_d ||^2_W
@@ -150,29 +163,17 @@ void OSC::AddContactPoint(const std::shared_ptr<ContactTask> &task) {
     std::shared_ptr<opt::QuadraticCost> task_cost =
         std::make_shared<opt::QuadraticCost>(task->name() + "_contact", obj);
 
-    program_.AddQuadraticCost(task_cost, {variables_->qacc()},
-                              {program_.GetParameters("qpos"),
-                               program_.GetParameters("qvel"), xaccd, w});
-
-    // Create parameters for contact surface
-    program_.AddParameters(task->name() + "_normal", 3);
-    program_.AddParameters(task->name() + "_friction_mu", 1);
-
-    // Set the parameters
-    program_.SetParameters(task->name() + "_normal", task->normal());
-    program_.SetParameters(task->name() + "_friction_mu",
-                           Eigen::Vector<double, 1>(task->mu()));
+    program_.AddQuadraticCost(
+        task_cost, {variables_->qacc()},
+        {qpos_param_, qvel_param_, parameters.xaccd, parameters.w});
 
     // Add friction constraint
-    program_.AddLinearConstraint(
-        friction_cone_con_, {lambda},
-        {program_.GetParameters(task->name() + "_normal"),
-         program_.GetParameters(task->name() + "_friction_mu")});
+    program_.AddLinearConstraint(friction_cone_con_, {lambda},
+                                 {parameters.normal, parameters.mu});
 
     // Add data to vectors for the OSC
     contact_tasks_.push_back(task);
-    contact_tasks_acc_ref_.push_back(xaccd);
-    contact_tasks_weighting_.push_back(w);
+    contact_task_parameters_.push_back(parameters);
     contact_force_bounds_.push_back(force_bounds);
 }
 
@@ -188,9 +189,8 @@ void OSC::AddHolonomicConstraint(const std::string &name, const casadi::SX &c,
         opt::BoundsType::kEquality);
 
     // Add constraint to program
-    program_.AddLinearConstraint(
-        con, {variables_->qacc()},
-        {program_.GetParameters("qpos"), program_.GetParameters("qvel")});
+    program_.AddLinearConstraint(con, {variables_->qacc()},
+                                 {qpos_param_, qvel_param_});
 
     // Add constraint forces as decision variables in the program
     sym::VariableVector lambda =

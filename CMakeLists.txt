@@ -64,6 +64,7 @@ solvers/cost.cc
 solvers/program.cc
 solvers/solver.cc
 symbolic/variable.cc
+symbolic/parameter.cc
 system/controlled.cc
 system/system.cc
 utils/casadi.cc

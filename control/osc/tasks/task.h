@@ -62,13 +62,13 @@ class Task {
      * @param p
      */
     void AddParameter(const casadi::SX &p,
-                      Eigen::Ref<const Eigen::MatrixXd> &pref) {
+                      const sym::Parameter &par) {
         ps_.push_back(p);
-        pv_.push_back(pref);
+        pv_.push_back(par);
     }
 
     casadi::SXVector &SymbolicParameters() { return ps_; }
-    sym::ParameterRefVector &Parameters() { return pv_; }
+    sym::ParameterVector &Parameters() { return pv_; }
 
     /**
      * @brief Resizes the dimension of the task.
@@ -118,7 +118,7 @@ class Task {
 
     // Task parameters
     casadi::SXVector ps_;
-    sym::ParameterRefVector pv_;
+    sym::ParameterVector pv_;
 
    private:
     int dim_ = 0;

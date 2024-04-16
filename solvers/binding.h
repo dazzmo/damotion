@@ -29,17 +29,12 @@ class Binding {
      * @param p
      */
     Binding(const std::shared_ptr<T> &c, const sym::VariableRefVector &x,
-            const sym::ParameterRefVector &p = {}) {
+            const sym::ParameterVector &p = {}) : p_(p) {
         c_ = c;
         // Create variable and parameter vectors
         x_.reserve(x.size());
         for (auto xi : x) {
             x_.push_back(xi);
-        }
-
-        p_.reserve(p.size());
-        for (auto pi : p) {
-            p_.push_back(pi);
         }
 
         nx_ = x.size();
@@ -50,15 +45,8 @@ class Binding {
 
     Binding(const std::shared_ptr<T> &c,
             const std::vector<sym::VariableVector> &variables,
-            const sym::ParameterRefVector &parameters) {
+            const sym::ParameterVector &parameters) : x_(variables), p_(parameters) {
         c_ = c;
-
-        x_ = variables;
-        p_.reserve(parameters.size());
-        for (auto pi : parameters) {
-            p_.push_back(pi);
-        }
-        // p_ = parameters;
 
         nx_ = variables.size();
         np_ = parameters.size();
@@ -93,7 +81,7 @@ class Binding {
     const std::shared_ptr<T> &GetPtr() const { return c_; }
 
     const std::vector<sym::VariableVector> GetVariables() const { return x_; }
-    const sym::ParameterRefVector & GetParameters() const { return p_; }
+    const sym::ParameterVector & GetParameters() const { return p_; }
 
     const sym::VariableVector &GetVariable(const int &i) const { return x_[i]; }
 
@@ -107,7 +95,7 @@ class Binding {
     // Vector of variables bound to the constraint
     std::vector<sym::VariableVector> x_ = {};
     // Vector of pointers to references to parameters bound to the constraint
-    sym::ParameterRefVector p_;
+    sym::ParameterVector p_ = {};
 
     /**
      * @brief Set an ID for the binding, useful for distinguishing one binding

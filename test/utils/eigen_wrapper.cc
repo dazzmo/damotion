@@ -1,7 +1,7 @@
 #include "utils/eigen_wrapper.h"
 
 #include <gtest/gtest.h>
-
+#include "common/logging.h"
 #include "utils/codegen.h"
 
 TEST(EigenWrapper, EigenWrapperLoad) {
@@ -15,8 +15,9 @@ TEST(EigenWrapper, EigenWrapperLoad) {
     Eigen::VectorXd x_in(1), y_in(1), output(1);
     x_in.setRandom();
     y_in.setRandom();
-
+    LOG(INFO) << "Calling";
     wrapper.call({x_in, y_in});
+    LOG(INFO) << "Getting Output";
     output = wrapper.getOutput(0);
 
     EXPECT_DOUBLE_EQ(output[0], (x_in[0] + y_in[0]));

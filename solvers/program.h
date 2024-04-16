@@ -97,8 +97,22 @@ class Program {
 
     int GetDecisionVariableIndex(const sym::Variable &v);
 
+    /**
+     * @brief Whether a variable var is a decision variable within the program
+     *
+     * @param var
+     * @return true
+     * @return false
+     */
     bool IsDecisionVariable(const sym::Variable &var);
 
+    /**
+     * @brief Whether the parameter par is included within the program
+     *
+     * @param par
+     * @return true
+     * @return false
+     */
     bool IsParameter(const sym::Parameter &par);
 
     /**
@@ -107,9 +121,24 @@ class Program {
      * @param var
      */
     Eigen::Ref<Eigen::MatrixXd> AddParameter(const sym::Parameter &p);
+
+    /**
+     * @brief Returns the values of the parameter p as an Eigen::MatrixXd
+     * reference
+     *
+     * @param p
+     * @return Eigen::Ref<const Eigen::MatrixXd>
+     */
     Eigen::Ref<const Eigen::MatrixXd> GetParameterValues(
         const sym::Parameter &p);
 
+    /**
+     * @brief Sets the parameter p within the program to the values given by
+     * val.
+     *
+     * @param p
+     * @param val
+     */
     void SetParameterValues(const sym::Parameter &p,
                             Eigen::Ref<const Eigen::MatrixXd> val);
 

@@ -33,8 +33,7 @@ bool Program::IsDecisionVariable(const sym::Variable &var) {
 
 bool Program::IsParameter(const sym::Parameter &par) {
     // Check if variable is already added to the program
-    return std::find(parameter_idx_.begin(), parameter_idx_.end(), par.id()) !=
-           parameter_idx_.end();
+    return parameter_idx_.find(par.id()) != parameter_idx_.end();
 }
 
 void Program::SetDecisionVariableVector() {

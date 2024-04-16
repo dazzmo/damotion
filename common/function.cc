@@ -17,6 +17,9 @@ void Function::setSparseOutput(int i) {
 
 const Eigen::Ref<const Eigen::MatrixXd> Function::getOutput(int i) {
     // Return the dense output i
+    LOG(INFO) << "i: " << i << std::endl;
+    LOG(INFO) << "Size: " << out_[i].rows() << " x " << out_[i].cols() << std::endl;
+    LOG(INFO) << "Value: " << out_[i] << std::endl;
     return out_[i];
 }
 

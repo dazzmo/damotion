@@ -117,15 +117,6 @@ class FunctionWrapper : public common::Function {
     void setSparseOutput(int i);
 
     /**
-     * @brief Returns the sparse matrix output i. You must call
-     * setSparseOutput(i) beforehand to return a sparse output for output i.
-     *
-     * @param i
-     * @return const Eigen::SparseMatrix<double>&
-     */
-    const Eigen::Ref<const Eigen::SparseMatrix<double>> getOutputSparse(int i);
-
-    /**
      * @brief The casadi::Function that is wrapped.
      *
      * @return casadi::Function&

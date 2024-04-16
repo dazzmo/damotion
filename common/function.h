@@ -6,6 +6,8 @@
 #include <functional>
 #include <iostream>
 
+#include "common/logging.h"
+
 namespace damotion {
 namespace common {
 
