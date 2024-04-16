@@ -36,6 +36,7 @@ FunctionWrapper& FunctionWrapper::operator=(::casadi::Function f) {
     SetNumberOfInputs(f.n_in());
     SetNumberOfOutputs(f.n_out());
 
+    // Initialise output data
     out_ = {};
     out_data_ptr_ = {};
 

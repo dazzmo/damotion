@@ -80,6 +80,7 @@ class Function {
     const Eigen::Ref<const Eigen::SparseMatrix<double>> getOutputSparse(int i);
 
    protected:
+    // TODO - Make these private and have setter/getter functions
     // Dense matrix outputs
     std::vector<Eigen::MatrixXd> out_;
     // Sparse matrix outputs
