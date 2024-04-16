@@ -8,6 +8,7 @@
 #include "solvers/constraint.h"
 #include "solvers/cost.h"
 #include "symbolic/expression.h"
+#include "symbolic/parameter.h"
 #include "symbolic/variable.h"
 #include "utils/casadi.h"
 #include "utils/codegen.h"
@@ -98,42 +99,43 @@ class Program {
 
     bool IsDecisionVariable(const sym::Variable &var);
 
+    bool IsParameter(const sym::Parameter &par);
+
     /**
      * @brief Add parameters to the program
      *
      * @param var
      */
-    Eigen::Ref<Eigen::MatrixXd> AddParameters(const std::string &name,
-                                                    int n, int m = 1);
+    Eigen::Ref<Eigen::MatrixXd> AddParameter(const sym::Parameter &p);
+    Eigen::Ref<const Eigen::MatrixXd> GetParameterValues(
+        const sym::Parameter &p);
 
-    Eigen::Ref<Eigen::MatrixXd> GetParameters(const std::string &name);
-
-    void SetParameters(const std::string &name,
-                       Eigen::Ref<const Eigen::MatrixXd> val);
+    void SetParameterValues(const sym::Parameter &p,
+                            Eigen::Ref<const Eigen::MatrixXd> val);
 
     /**
      * @brief Removes variables currently considered by the program.
      *
      * @param var
      */
-    void RemoveParameters(const std::string &name);
+    void RemoveParameters(const sym::Parameter &p);
 
     Binding<Cost> AddCost(const std::shared_ptr<Cost> &cost,
                           const sym::VariableRefVector &x,
-                          const sym::ParameterRefVector &p);
+                          const sym::ParameterVector &p);
 
     Binding<LinearCost> AddLinearCost(const std::shared_ptr<LinearCost> &cost,
                                       const sym::VariableRefVector &x,
-                                      const sym::ParameterRefVector &p);
+                                      const sym::ParameterVector &p);
     Binding<QuadraticCost> AddQuadraticCost(
         const std::shared_ptr<QuadraticCost> &cost,
-        const sym::VariableRefVector &x, const sym::ParameterRefVector &p);
+        const sym::VariableRefVector &x, const sym::ParameterVector &p);
 
     // TODO - Remove cost or constraint
 
     Binding<LinearConstraint> AddLinearConstraint(
         const std::shared_ptr<LinearConstraint> &con,
-        const sym::VariableRefVector &x, const sym::ParameterRefVector &p);
+        const sym::VariableRefVector &x, const sym::ParameterVector &p);
 
     Binding<BoundingBoxConstraint> AddBoundingBoxConstraint(
         const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
@@ -153,7 +155,7 @@ class Program {
      */
     Binding<Constraint> AddConstraint(const std::shared_ptr<Constraint> &c,
                                       const sym::VariableRefVector &x,
-                                      const sym::ParameterRefVector &p);
+                                      const sym::ParameterVector &p);
 
     /**
      * @brief Add a generic constraint to the program that uses the variables
@@ -166,7 +168,7 @@ class Program {
      */
     Binding<Constraint> AddGenericConstraint(std::shared_ptr<Constraint> &c,
                                              const sym::VariableRefVector &x,
-                                             const sym::ParameterRefVector &p);
+                                             const sym::ParameterVector &p);
 
     std::vector<Binding<Constraint>> GetAllConstraints() {
         std::vector<Binding<Constraint>> constraints;
@@ -262,15 +264,15 @@ class Program {
         return bounding_box_constraints_;
     }
 
-    std::vector<Binding<Cost>> GetAllCostBindings() { 
+    std::vector<Binding<Cost>> GetAllCostBindings() {
         std::vector<Binding<Cost>> costs;
-        costs.insert(costs.begin(), linear_costs_.begin(),
-                           linear_costs_.end());
+        costs.insert(costs.begin(), linear_costs_.begin(), linear_costs_.end());
         costs.insert(costs.begin(), quadratic_costs_.begin(),
-                           quadratic_costs_.end());
+                     quadratic_costs_.end());
 
         // Return vector of all costs
-        return costs; }
+        return costs;
+    }
 
     std::vector<Binding<LinearCost>> &GetLinearCostBindings() {
         return linear_costs_;
@@ -310,16 +312,15 @@ class Program {
 
     // Optimisation vector
     Eigen::VectorXd x_;
-    // Parameter vector
-    typedef sym::Variable Parameter;
-    Parameter p_;
 
     // Decision variables
     std::unordered_map<sym::Variable::Id, int> decision_variable_idx_;
     std::vector<sym::Variable> decision_variables_;
 
     // Parameters
-    std::unordered_map<std::string, Eigen::MatrixXd> parameters_;
+    std::unordered_map<sym::Parameter::Id, int> parameter_idx_;
+    std::vector<sym::Parameter> parameters_;
+    std::vector<Eigen::MatrixXd> parameter_vals_;
 
     // Constraints
     std::vector<Binding<Constraint>> constraints_;

@@ -31,6 +31,12 @@ bool Program::IsDecisionVariable(const sym::Variable &var) {
                      var) != decision_variables_.end();
 }
 
+bool Program::IsParameter(const sym::Parameter &par) {
+    // Check if variable is already added to the program
+    return std::find(parameter_idx_.begin(), parameter_idx_.end(), par.id()) !=
+           parameter_idx_.end();
+}
+
 void Program::SetDecisionVariableVector() {
     // Set indices by order in the decision variable vector
     int idx = 0;
@@ -95,55 +101,60 @@ int Program::GetDecisionVariableIndex(const sym::Variable &v) {
     }
 }
 
-Eigen::Ref<Eigen::MatrixXd> Program::AddParameters(
-    const std::string &name, int n, int m) {
+Eigen::Ref<Eigen::MatrixXd> Program::AddParameter(const sym::Parameter &p) {
     // Check if parameter already exists
-    auto it = parameters_.find(name);
-    if (it != parameters_.end()) {
-        throw std::runtime_error("Parameters with name " + name +
+    if (!IsParameter(p)) {
+        throw std::runtime_error("Parameter" + p.name() +
                                  " already in the program!");
     } else {
-        parameters_[name] = Eigen::MatrixXd::Zero(n, m);
-        return parameters_[name];
+        // Add parameter values
+        parameters_.push_back(p);
+        parameter_vals_.push_back(Eigen::MatrixXd::Zero(p.rows(), p.cols()));
+        n_parameters_ += p.rows() * p.cols();
+        return parameter_vals_.back();
     }
 }
 
-Eigen::Ref<Eigen::MatrixXd> Program::GetParameters(
-    const std::string &name) {
-    auto it = parameters_.find(name);
-    if (it == parameters_.end()) {
-        throw std::runtime_error("Parameters with name " + name +
+Eigen::Ref<const Eigen::MatrixXd> Program::GetParameterValues(
+    const sym::Parameter &p) {
+    auto it = parameter_idx_.find(p.id());
+    if (it == parameter_idx_.end()) {
+        throw std::runtime_error("Parameter " + p.name() +
                                  " is not in the program!");
     } else {
-        return parameters_[name];
+        return parameter_vals_[it->second];
     }
 }
 
-void Program::SetParameters(const std::string &name,
-                            Eigen::Ref<const Eigen::MatrixXd> val) {
-    auto it = parameters_.find(name);
-    if (it == parameters_.end()) {
-        throw std::runtime_error("Parameters with name " + name +
+void Program::SetParameterValues(const sym::Parameter &p,
+                                 Eigen::Ref<const Eigen::MatrixXd> val) {
+    auto it = parameter_idx_.find(p.id());
+    if (it == parameter_idx_.end()) {
+        throw std::runtime_error("Parameter " + p.name() +
                                  " is not in the program!");
     } else {
-        parameters_[name] = val;
+        assert(val.rows() == p.rows() && val.cols() == p.cols() &&
+               "Parameter dimension mismatch!");
+        parameter_vals_[it->second] = val;
     }
 }
 
-void Program::RemoveParameters(const std::string &name) {
+void Program::RemoveParameters(const sym::Parameter &p) {
     // Check if parameter exists
-    auto it = parameters_.find(name);
-    if (it == parameters_.end()) {
-        std::cout << "Parameters with name " << name
-                  << " is not in the program!";
+    auto it = parameter_idx_.find(p.id());
+    if (it == parameter_idx_.end()) {
+        std::cout << "Parameter " << p.name() << " is not in the program!";
     } else {
-        parameters_.erase(name);
+        parameters_.erase(parameters_.begin() + it->second);
+        parameter_vals_.erase(parameter_vals_.begin() + it->second);
+        parameter_idx_.erase(p.id());
+        n_parameters_ -= p.rows() * p.cols();
     }
 }
 
 Binding<Cost> Program::AddCost(const std::shared_ptr<Cost> &cost,
                                const sym::VariableRefVector &x,
-                               const sym::ParameterRefVector &p) {
+                               const sym::ParameterVector &p) {
     Binding<Cost> binding(cost, x, p);
     costs_.push_back(binding);
     return costs_.back();
@@ -151,21 +162,21 @@ Binding<Cost> Program::AddCost(const std::shared_ptr<Cost> &cost,
 
 Binding<LinearCost> Program::AddLinearCost(
     const std::shared_ptr<LinearCost> &cost, const sym::VariableRefVector &x,
-    const sym::ParameterRefVector &p) {
+    const sym::ParameterVector &p) {
     linear_costs_.push_back(Binding<LinearCost>(cost, x, p));
     return linear_costs_.back();
 }
 
 Binding<QuadraticCost> Program::AddQuadraticCost(
     const std::shared_ptr<QuadraticCost> &cost, const sym::VariableRefVector &x,
-    const sym::ParameterRefVector &p) {
+    const sym::ParameterVector &p) {
     quadratic_costs_.push_back(Binding<QuadraticCost>(cost, x, p));
     return quadratic_costs_.back();
 }
 
 Binding<LinearConstraint> Program::AddLinearConstraint(
     const std::shared_ptr<LinearConstraint> &con,
-    const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
+    const sym::VariableRefVector &x, const sym::ParameterVector &p) {
     linear_constraints_.push_back(Binding<LinearConstraint>(con, x, p));
     n_constraints_ += con->Dimension();
     return linear_constraints_.back();
@@ -191,7 +202,7 @@ Binding<BoundingBoxConstraint> Program::AddBoundingBoxConstraint(
 
 Binding<Constraint> Program::AddConstraint(
     const std::shared_ptr<Constraint> &con, const sym::VariableRefVector &x,
-    const sym::ParameterRefVector &p) {
+    const sym::ParameterVector &p) {
     // Check bound variables and parameters exist
     for (const sym::VariableVector &v : x) {
         for (int i = 0; i < v.size(); i++) {
@@ -209,7 +220,7 @@ Binding<Constraint> Program::AddConstraint(
 
 Binding<Constraint> Program::AddGenericConstraint(
     std::shared_ptr<Constraint> &con, const sym::VariableRefVector &x,
-    const sym::ParameterRefVector &p) {
+    const sym::ParameterVector &p) {
     constraints_.push_back(Binding<Constraint>(con, x, p));
     n_constraints_ += con->Dimension();
     return constraints_.back();
@@ -220,7 +231,8 @@ void Program::ListParameters() {
     std::cout << "Parameter\tCurrent Value\n";
     std::cout << "----------------------\n";
     for (const auto &p : parameters_) {
-        std::cout << p.first << '\t' << p.second.transpose() << '\n';
+        std::cout << p.name() << '\t' << parameter_vals_[parameter_idx_[p.id()]]
+                  << '\n';
     }
 }
 
@@ -247,7 +259,8 @@ void Program::ListConstraints() {
                       << b.Get().UpperBound()[i] << "\n";
         }
     }
-    for (Binding<BoundingBoxConstraint> &b : GetBoundingBoxConstraintBindings()) {
+    for (Binding<BoundingBoxConstraint> &b :
+         GetBoundingBoxConstraintBindings()) {
         std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
         for (int i = 0; i < b.Get().Dimension(); ++i) {
             std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
@@ -277,8 +290,7 @@ void Program::PrintProgramSummary() {
     std::cout << "Number of Constraints: " << NumberOfConstraints() << '\n';
     std::cout << "Constraint\tSize\n";
 
-    std::cout << "Number of Parameters: "
-              << "TBD" << '\n';
+    std::cout << "Number of Parameters: " << NumberOfParameters() << '\n';
     std::cout << "Parameters\tSize\n";
 
     std::cout << "-----------------------\n";
