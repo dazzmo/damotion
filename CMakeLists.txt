@@ -10,15 +10,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/)
 include_directories(/usr/local/include)
 link_directories(/usr/local/lib)
 
-
 find_package(Boost REQUIRED)
+find_package(glog REQUIRED)
 find_package(casadi REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
-find_package(glog REQUIRED)
 find_package(pinocchio REQUIRED)
 
 SET(${PROJECT_NAME}_HEADERS
 common/math/binomial.h
+common/function.h
 common/math/random.h
 common/trajectory/bezier.h
 common/trajectory/piecewise_bezier.h
@@ -51,6 +51,7 @@ utils/pinocchio_model.h
 
 # Collect source files
 SET(${PROJECT_NAME}_SOURCES
+common/function.cc
 common/math/binomial.cc
 common/trajectory/bezier.cc
 common/trajectory/trajectory.cc
@@ -79,12 +80,14 @@ casadi
 glog 
 )
 
+option(WITH_QPOASES "Includes functionality for qpOASES" OFF)
 if(WITH_QPOASES)
 find_package(qpOASES REQUIRED)
 list(APPEND ${PROJECT_NAME}_LIBRARIES qpOASES)
 list(APPEND ${PROJECT_NAME}_HEADERS solvers/solve_qpoases.h)
 endif(WITH_QPOASES)
 
+option(WITH_IPOPT "Includes functionality for IPOPT" OFF)
 if(WITH_IPOPT)
 list(APPEND ${PROJECT_NAME}_LIBRARIES ipopt)
 list(APPEND ${PROJECT_NAME}_SOURCES solvers/solve_ipopt.cc)
@@ -104,6 +107,7 @@ target_include_directories(${PROJECT_NAME}
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE "-DINCLUDE_DIR=\"${PROJECT_SOURCE_DIR}\"")
 
+option(BUILD_TEST "Compile all tests" OFF)
 if(BUILD_TESTS)
   add_subdirectory(test)
 endif(BUILD_TESTS)

@@ -69,36 +69,40 @@ void FunctionWrapper::setSparseOutput(int i) {
     out_sparse_[i] = createSparseMatrix(f_.sparsity_out(i), rows_[i], cols_[i]);
 }
 
-void FunctionWrapper::setInput(int i, Eigen::Ref<const Eigen::MatrixXd> x) {
-    // Check input dimension
+void FunctionWrapper::setInput(int i,
+                               const Eigen::Ref<const Eigen::MatrixXd>& x,
+                               bool check) {
+    // If no check is required, add data as input
+    if (!check) {
+        in_data_ptr_[i] = x.data();
+        return;
+    }
+    // Check size
     if (x.size() != f_.size1_in(i)) {
         throw std::invalid_argument(f_.name() + ": input " + std::to_string(i) +
                                     " is incorrect dimension");
     }
 
     // Check if all values are good
-    // TODO: Add flag to perform these checks if runtime speed is critical
     if (x.hasNaN() || !x.allFinite()) {
         std::ostringstream ss;
         ss << f_.name() + ": input " << i << " has invalid values:\n"
            << x.transpose().format(3);
         throw std::runtime_error(ss.str());
     }
-
-    // Otherwise, add vector data pointer to input
+    // Add data as input
     in_data_ptr_[i] = x.data();
 }
 
-void FunctionWrapper::setInput(int i, const  double* x_ptr) {
-    // TODO - Perform checks of the input data
+void FunctionWrapper::setInput(int i, const double* x_ptr) {
     in_data_ptr_[i] = x_ptr;
 }
 
 void FunctionWrapper::setInput(
     const std::vector<int>& idx,
-    const std::vector<Eigen::Ref<const Eigen::MatrixXd>>& x) {
+    const std::vector<Eigen::Ref<const Eigen::MatrixXd>>& x, bool check) {
     for (int i = 0; i < idx.size(); ++i) {
-        setInput(idx[i], x[i]);
+        setInput(idx[i], x[i], check);
     }
 }
 
@@ -107,7 +111,7 @@ void FunctionWrapper::call() {
     f_(in_data_ptr_.data(), out_data_ptr_.data(), iw_.data(), dw_.data(), mem_);
 }
 
-const Eigen::MatrixXd& FunctionWrapper::getOutput(int i) {
+const Eigen::Ref<const Eigen::MatrixXd> FunctionWrapper::getOutput(int i) {
     // Use sparse output data to construct dense matrix
     out_[i].setZero();
     const ::casadi::Sparsity& sp = f_.sparsity_out(i);
@@ -119,7 +123,8 @@ const Eigen::MatrixXd& FunctionWrapper::getOutput(int i) {
     return out_[i];
 }
 
-const Eigen::SparseMatrix<double>& FunctionWrapper::getOutputSparse(int i) {
+const Eigen::Ref<const Eigen::SparseMatrix<double>>
+FunctionWrapper::getOutputSparse(int i) {
     if (is_out_sparse_[i] != true) {
         // ! Throw warning and create sparse output
     }

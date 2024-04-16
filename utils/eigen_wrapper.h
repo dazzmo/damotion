@@ -125,17 +125,23 @@ class FunctionWrapper {
      *
      * @param i
      * @param x
+     * @param check Perform checks on the input to ensure correct size and good
+     * data
      */
-    void setInput(int i, Eigen::Ref<const Eigen::MatrixXd> x);
+    void setInput(int i, const Eigen::Ref<const Eigen::MatrixXd> &x,
+                  bool check = false);
 
     /**
      * @brief Sets a set of inputs for the function
      *
      * @param idx Vector of input indices
      * @param x Vector of inputs
+     * @param check Perform checks on the input to ensure correct size and good
+     * data
      */
     void setInput(const std::vector<int> &idx,
-                  const std::vector<Eigen::Ref<const Eigen::MatrixXd>> &x);
+                  const std::vector<Eigen::Ref<const Eigen::MatrixXd>> &x,
+                  bool check = false);
 
     /**
      * @brief Sets the i-th input for the function by direct pointer to the
@@ -165,7 +171,7 @@ class FunctionWrapper {
      * @param i
      * @return const Eigen::MatrixXd&
      */
-    const Eigen::MatrixXd &getOutput(int i);
+    const Eigen::Ref<const Eigen::MatrixXd> getOutput(int i);
 
     /**
      * @brief Returns the sparse matrix output i. You must call
@@ -174,7 +180,7 @@ class FunctionWrapper {
      * @param i
      * @return const Eigen::SparseMatrix<double>&
      */
-    const Eigen::SparseMatrix<double> &getOutputSparse(int i);
+    const Eigen::Ref<const Eigen::SparseMatrix<double>> getOutputSparse(int i);
 
     /**
      * @brief The casadi::Function that is wrapped.
