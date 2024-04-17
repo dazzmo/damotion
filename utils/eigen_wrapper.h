@@ -89,32 +89,20 @@ void toCasadi(const Eigen::Matrix<::casadi::Matrix<T>, rows, cols> &E,
     }
 }
 
-template <typename T>
-class SparseMatrixWrapper {};
-
 /**
- * @brief Class that takes a casadi::Function and allows inputs and outputs to
- * be extracted as Eigen matrices
+ * @brief Function wrapper base class for casadi functions to Eigen
+ * representation
  *
  */
-class FunctionWrapper : public common::Function {
+class FunctionWrapperBase {
    public:
-    FunctionWrapper() = default;
-    FunctionWrapper(::casadi::Function f);
-    FunctionWrapper &operator=(::casadi::Function f);
-
-    FunctionWrapper(const FunctionWrapper &other);
-    FunctionWrapper &operator=(const FunctionWrapper &other);
-
-    ~FunctionWrapper();
-
-    /**
-     * @brief Calls the function with the current inputs
-     *
-     */
-    void callImpl(const common::Function::InputRefVector &input) override;
-
-    void setSparseOutput(int i);
+    FunctionWrapperBase() = default;
+    ~FunctionWrapperBase() {
+        // Release memory for casadi function
+        if (!f_.is_null()) {
+            f_.release(mem_);
+        }
+    }
 
     /**
      * @brief The casadi::Function that is wrapped.
@@ -123,7 +111,7 @@ class FunctionWrapper : public common::Function {
      */
     ::casadi::Function &f() { return f_; }
 
-   private:
+   protected:
     // Data input vector for casadi function
     std::vector<const double *> in_data_ptr_;
     // Data output pointers for casadi function
@@ -144,6 +132,53 @@ class FunctionWrapper : public common::Function {
 
     // Underlying function
     ::casadi::Function f_;
+};
+
+/**
+ * @brief Class that takes a casadi::Function and allows inputs and outputs to
+ * be extracted as Eigen matrices
+ *
+ */
+class FunctionWrapper : public FunctionWrapperBase, common::Function {
+   public:
+    FunctionWrapper() = default;
+    FunctionWrapper(::casadi::Function f);
+    FunctionWrapper &operator=(::casadi::Function f);
+
+    FunctionWrapper(const FunctionWrapper &other);
+    FunctionWrapper &operator=(const FunctionWrapper &other);
+
+    ~FunctionWrapper();
+
+    /**
+     * @brief Calls the function with the current inputs
+     *
+     */
+    void callImpl(const common::FunctionBase::InputRefVector &input) override;
+};
+
+/**
+ * @brief Class that takes a casadi::Function and allows inputs and outputs to
+ * be extracted as sparse Eigen matrices
+ *
+ */
+class SparseFunctionWrapper : public FunctionWrapperBase,
+                              common::SparseFunction {
+   public:
+    SparseFunctionWrapper() = default;
+    SparseFunctionWrapper(::casadi::Function f);
+    SparseFunctionWrapper &operator=(::casadi::Function f);
+
+    SparseFunctionWrapper(const SparseFunctionWrapper &other);
+    SparseFunctionWrapper &operator=(const SparseFunctionWrapper &other);
+
+    ~SparseFunctionWrapper();
+
+    /**
+     * @brief Calls the function with the current inputs
+     *
+     */
+    void callImpl(const common::FunctionBase::InputRefVector &input) override;
 
     Eigen::SparseMatrix<double> createSparseMatrix(
         const ::casadi::Sparsity &sparsity, std::vector<casadi_int> &rows,

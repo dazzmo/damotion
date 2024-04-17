@@ -13,36 +13,20 @@ namespace optimisation {
 
 namespace sym = damotion::symbolic;
 
-class Constraint {
+class ConstraintBase {
    public:
-    Constraint() = default;
-    ~Constraint() = default;
+    ConstraintBase() = default;
+    ~ConstraintBase() = default;
 
     /**
-     * @brief Construct a new Constraint object from the symbolic expression c
-     *
-     * @param name Optional name for the constraint, if set to "", creates a
-     * default name for the constraint base on the id of the constraint
-     * @param c The expression to compute the constraint and derivatives from
-     * @param bounds Bounds for the constraint (e.g. equality, positive,
-     * negative ...)
-     * @param jac Flag to compute the jacobian of c with respect to each input
-     * variable
-     * @param hes Flag to compute the hessian of c with respect to each input
-     * variable
-     */
-    Constraint(const std::string &name, const symbolic::Expression &c,
-               const BoundsType &bounds, bool jac = true, bool hes = true);
-
-    /**
-     * @brief Construct a new Constraint object without an expression
+     * @brief Construct a new ConstraintBase object without an expression
      *
      * @param name Name for the constraint, if given "", provides a default name
      * based on the constraint id
      * @param constraint_type Constraint type to use for the name if default
      * names are chosen
      */
-    Constraint(const std::string &name, const std::string &constraint_type);
+    ConstraintBase(const std::string &name, const std::string &constraint_type);
 
     /**
      * @brief Name of the constraint
@@ -59,16 +43,9 @@ class Constraint {
     const int Dimension() const { return dim_; }
 
     std::shared_ptr<common::Function> &ConstraintFunction() { return con_; }
-    std::shared_ptr<common::Function> &JacobianFunction() { return jac_; }
-    std::shared_ptr<common::Function> &HessianFunction() { return hes_; }
-
-    void SetBoundsType(const BoundsType &type) {
-        bounds_type_ = type;
-        SetBounds(ub_, lb_, bounds_type_);
-    }
 
     /**
-     * @brief Whether the constraint has a Jacobian
+     * @brief Flag to indicate if the constraint has a Jacobian
      *
      * @return true
      * @return false
@@ -76,12 +53,17 @@ class Constraint {
     const bool HasJacobian() const { return has_jac_; }
 
     /**
-     * @brief Whether the constraint has a Hessian
+     * @brief Flag to indicate whether the constraint has a Hessian
      *
      * @return true
      * @return false
      */
     const bool HasHessian() const { return has_hes_; }
+
+    void SetBoundsType(const BoundsType &type) {
+        bounds_type_ = type;
+        SetBounds(ub_, lb_, bounds_type_);
+    }
 
     /**
      * @brief The current type of bounds for the constraint
@@ -197,26 +179,6 @@ class Constraint {
         con_ = f;
     }
 
-    /**
-     * @brief Set the Jacobian Function object
-     *
-     * @param f
-     */
-    void SetJacobianFunction(const std::shared_ptr<common::Function> &f) {
-        jac_ = f;
-        has_jac_ = true;
-    }
-
-    /**
-     * @brief Set the Hessian Function object
-     *
-     * @param f
-     */
-    void SetHessianFunction(const std::shared_ptr<common::Function> &f) {
-        hes_ = f;
-        has_hes_ = true;
-    }
-
    private:
     // Dimension of the constraint
     int dim_ = 0;
@@ -240,10 +202,6 @@ class Constraint {
 
     // Constraint
     std::shared_ptr<common::Function> con_;
-    // Jacobian
-    std::shared_ptr<common::Function> jac_;
-    // Hessian of vector-product
-    std::shared_ptr<common::Function> hes_;
 
     // Number of variable inputs
     int nx_ = 0;
@@ -261,6 +219,139 @@ class Constraint {
         next_id++;
         return id;
     }
+};
+
+/**
+ * @brief Dense constraint class
+ *
+ */
+class Constraint : public ConstraintBase {
+   public:
+    Constraint() = default;
+    ~Constraint() = default;
+
+    /**
+     * @brief Construct a new Constraint object from the symbolic expression c
+     *
+     * @param name Optional name for the constraint, if set to "", creates a
+     * default name for the constraint base on the id of the constraint
+     * @param c The expression to compute the constraint and derivatives from
+     * @param bounds Bounds for the constraint (e.g. equality, positive,
+     * negative ...)
+     * @param jac Flag to compute the jacobian of c with respect to each input
+     * variable
+     * @param hes Flag to compute the hessian of c with respect to each input
+     * variable
+     */
+    Constraint(const std::string &name, const symbolic::Expression &c,
+               const BoundsType &bounds, bool jac = true, bool hes = true);
+
+    /**
+     * @brief Construct a new Constraint object without an expression
+     *
+     * @param name Name for the constraint, if given "", provides a default name
+     * based on the constraint id
+     * @param constraint_type Constraint type to use for the name if default
+     * names are chosen
+     */
+    Constraint(const std::string &name, const std::string &constraint_type);
+
+    std::shared_ptr<common::Function> &JacobianFunction() { return jac_; }
+    std::shared_ptr<common::Function> &HessianFunction() { return hes_; }
+
+
+
+   protected:
+    /**
+     * @brief Set the Jacobian Function object
+     *
+     * @param f
+     */
+    void SetJacobianFunction(const std::shared_ptr<common::Function> &f) {
+        jac_ = f;
+        // has_jac_ = true;
+    }
+
+    /**
+     * @brief Set the Hessian Function object
+     *
+     * @param f
+     */
+    void SetHessianFunction(const std::shared_ptr<common::Function> &f) {
+        hes_ = f;
+        // has_hes_ = true;
+    }
+
+   private:
+    // Jacobian
+    std::shared_ptr<common::Function> jac_;
+    // Hessian of vector-product
+    std::shared_ptr<common::Function> hes_;
+};
+
+class SparseConstraint : public ConstraintBase {
+   public:
+    SparseConstraint() = default;
+    ~SparseConstraint() = default;
+
+    /**
+     * @brief Construct a new SparseConstraint object from the symbolic
+     * expression c
+     *
+     * @param name Optional name for the constraint, if set to "", creates a
+     * default name for the constraint base on the id of the constraint
+     * @param c The expression to compute the constraint and derivatives from
+     * @param bounds Bounds for the constraint (e.g. equality, positive,
+     * negative ...)
+     * @param jac Flag to compute the jacobian of c with respect to each input
+     * variable
+     * @param hes Flag to compute the hessian of c with respect to each input
+     * variable
+     */
+    SparseConstraint(const std::string &name, const symbolic::Expression &c,
+                     const BoundsType &bounds, bool jac = true,
+                     bool hes = true);
+
+    /**
+     * @brief Construct a new Constraint object without an expression
+     *
+     * @param name Name for the constraint, if given "", provides a default name
+     * based on the constraint id
+     * @param constraint_type Constraint type to use for the name if default
+     * names are chosen
+     */
+    SparseConstraint(const std::string &name,
+                     const std::string &constraint_type);
+
+    std::shared_ptr<common::SparseFunction> &JacobianFunction() { return jac_; }
+    std::shared_ptr<common::SparseFunction> &HessianFunction() { return hes_; }
+
+   protected:
+    /**
+     * @brief Set the Jacobian Function object
+     *
+     * @param f
+     */
+    void SetJacobianFunction(const std::shared_ptr<common::SparseFunction> &f) {
+        jac_ = f;
+        // has_jac_ = true;
+    }
+
+    /**
+     * @brief Set the Hessian Function object
+     *
+     * @param f
+     */
+    void SetHessianFunction(const std::shared_ptr<common::SparseFunction> &f) {
+        hes_ = f;
+        // has_hes_ = true;
+    }
+
+   private:
+    // Jacobian
+    std::shared_ptr<common::SparseFunction> jac_;
+    // Hessian of vector-product
+    std::shared_ptr<common::SparseFunction> hes_;
 };
 
 class LinearConstraint : public Constraint {
@@ -356,7 +447,8 @@ class LinearConstraint : public Constraint {
 
     void ConstructConstraint(const casadi::SX &A, const casadi::SX &b,
                              const casadi::SXVector &p,
-                             const BoundsType &bounds, bool jac = true, bool sparse = false) {
+                             const BoundsType &bounds, bool jac = true,
+                             bool sparse = false) {
         casadi::SXVector in = {};
         int nvar = 0;
         assert(A.rows() == b.rows() && "A and b must be same dimension!");
@@ -374,6 +466,144 @@ class LinearConstraint : public Constraint {
             casadi::Function(this->name() + "_A", in, {densify(A)}));
         fb_ = std::make_shared<utils::casadi::FunctionWrapper>(
             casadi::Function(this->name() + "_b", in, {densify(b)}));
+
+        std::shared_ptr<common::CallbackFunction> con_cb =
+            std::make_shared<common::CallbackFunction>(
+                in.size(), 1,
+                [this](const common::Function::InputRefVector &in,
+                       std::vector<Eigen::MatrixXd> &out) {
+                    this->ConstraintCallback(in, out);
+                });
+        std::shared_ptr<common::CallbackFunction> jac_cb =
+            std::make_shared<common::CallbackFunction>(
+                in.size(), 1,
+                [this](const common::Function::InputRefVector &in,
+                       std::vector<Eigen::MatrixXd> &out) {
+                    this->JacobianCallback(in, out);
+                });
+
+        // Set output sizes for the callback
+        con_cb->setOutputSize(0, A.size1(), 1);
+        jac_cb->setOutputSize(0, A.size1(), A.size2());
+
+        // Create functions through callbacks
+        SetConstraintFunction(con_cb);
+        SetJacobianFunction(jac_cb);
+    }
+};
+
+class SparseLinearConstraint : public SparseConstraint {
+   public:
+    /**
+     * @brief Construct a new Linear Constraint object of the form \f$ A x + b
+     * \f$
+     *
+     * @param name Name of the constraint. Default name given if provided ""
+     * @param A Vector of coefficient matrices
+     * @param b
+     * @param p Parameters that A and b depend on
+     * @param bounds
+     * @param jac
+     */
+    SparseLinearConstraint(const std::string &name, const casadi::SX &A,
+                     const casadi::SX &b, const casadi::SXVector &p,
+                     const BoundsType &bounds, bool jac = true)
+        : SparseConstraint(name, "linear_constraint") {
+        ConstructConstraint(A, b, p, bounds, jac);
+    }
+
+    SparseLinearConstraint(const std::string &name, const Eigen::MatrixXd &A,
+                     const Eigen::VectorXd &b, const BoundsType &bounds,
+                     bool jac = true)
+        : SparseConstraint(name, "linear_constraint") {
+        // Constant vector b
+        casadi::DM Ad, bd;
+        damotion::utils::casadi::toCasadi(b, bd);
+        damotion::utils::casadi::toCasadi(A, Ad);
+        casadi::SX bsx = bd;
+        casadi::SX Asx = Ad;
+
+        // Construct constraint
+        ConstructConstraint(Asx, bsx, {}, bounds, jac);
+    }
+
+    SparseLinearConstraint(const std::string &name, const sym::Expression &ex,
+                     const BoundsType &bounds, bool jac = true)
+        : SparseConstraint(name, "linear_constraint") {
+        // Extract linear form
+        casadi::SX A, b;
+        casadi::SX::linear_coeff(ex, ex.Variables()[0], A, b, true);
+
+        ConstructConstraint(A, b, ex.Parameters(), bounds, jac);
+    }
+
+    void SetCallback(const common::CallbackFunction::f_callback_ &fA,
+                     const common::CallbackFunction::f_callback_ &fb) {
+        fA_ = std::make_shared<common::CallbackFunction>(1, 1, fA);
+        fb_ = std::make_shared<common::CallbackFunction>(1, 1, fb);
+    }
+
+    /**
+     * @brief The coefficient matrix A for the expression A x + b.
+     *
+     * @return const Eigen::MatrixXd&
+     */
+    const Eigen::Ref<const Eigen::MatrixXd> A() { return fA_->getOutput(0); }
+
+    /**
+     * @brief The constant vector for the linear constraint A x + b
+     *
+     * @return const Eigen::VectorXd&
+     */
+    const Eigen::Ref<const Eigen::VectorXd> b() { return fb_->getOutput(0); }
+
+   private:
+    std::shared_ptr<common::SparseFunction> fA_;
+    std::shared_ptr<common::Function> fb_;
+
+    /**
+     * @brief Compute the constraint with use of A and b
+     *
+     * @param input
+     * @param out
+     */
+    void ConstraintCallback(const common::Function::InputRefVector &input,
+                            std::vector<Eigen::MatrixXd> &out) {
+        out[0] = fA_->getOutput(0) * input[0] + fb_->getOutput(0);
+    }
+
+    /**
+     * @brief Compute the Jacobian of the constraint with A
+     *
+     * @param input
+     * @param out
+     */
+    void JacobianCallback(const common::Function::InputRefVector &input,
+                          std::vector<Eigen::SparseMatrix<double>> &out) {
+        out[0] = fA_->getOutput(0);
+    }
+
+    void ConstructConstraint(const casadi::SX &A, const casadi::SX &b,
+                             const casadi::SXVector &p,
+                             const BoundsType &bounds, bool jac = true,
+                             bool sparse = false) {
+        casadi::SXVector in = {};
+        int nvar = 0;
+        assert(A.rows() == b.rows() && "A and b must be same dimension!");
+
+        // Create constraint dimensions and update bounds
+        Resize(b.rows(), in.size(), p.size());
+        UpdateBounds(bounds);
+
+        // Add any parameters that define A and b
+        for (const casadi::SX &pi : p) {
+            in.push_back(pi);
+        }
+
+        fA_ = std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(this->name() + "_A", in, {A}));
+        fb_ = std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(this->name() + "_b", in, {b}));
 
         std::shared_ptr<common::CallbackFunction> con_cb =
             std::make_shared<common::CallbackFunction>(

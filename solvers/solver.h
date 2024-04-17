@@ -7,6 +7,7 @@ namespace damotion {
 namespace optimisation {
 namespace solvers {
 
+
 class SolverBase {
    public:
     SolverBase(Program& prog, bool sparse = false);
@@ -154,6 +155,10 @@ class SolverBase {
 
     void ConstructSparseConstraintJacobian();
 };
+
+namespace sparse {
+
+}
 
 }  // namespace solvers
 }  // namespace optimisation
