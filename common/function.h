@@ -21,8 +21,9 @@ class Function {
 
     Function() : n_in_(0), n_out_(0), out_({}) {}
 
-    Function(const int n_in, const int n_out)
-        : n_in_(n_in), n_out_(n_out), out_(n_out) {}
+    Function(const int n_in, const int n_out) : n_in_(n_in), n_out_(n_out) {
+        out_.resize(n_out);
+    }
 
     Function(const Function &other);
     Function &operator=(const Function &other);
@@ -46,7 +47,7 @@ class Function {
     /**
      * @brief Pure virtual method that updates the function based on its inputs
      *
-     * @param List of input vectors for the function
+     * @param input List of input vectors for the function
      * @param check Perform checks on the input to ensure correct size and good
      * data
      */
@@ -62,13 +63,10 @@ class Function {
      */
     void setSparseOutput(int i);
 
-    /**
-     * @brief Returns the dense output i
-     *
-     * @param i
-     * @return const Eigen::MatrixXd&
-     */
-    const Eigen::Ref<const Eigen::MatrixXd> getOutput(int i);
+    template <typename T = Eigen::MatrixXd>
+    const Eigen::Ref<const T> getOutput(int i) {
+        return out_[i];
+    }
 
     /**
      * @brief Returns the sparse matrix output i. You must call
@@ -144,6 +142,11 @@ class CallbackFunction : public Function {
                      const f_callback_ &callback)
         : Function(n_in, n_out) {
         SetCallback(callback);
+    }
+
+    void setOutputSize(int i, const int rows, const int cols) {
+        assert(i < n_out() && "Number of outputs exceeded");
+        out_[i] = Eigen::MatrixXd::Zero(rows, cols);
     }
 
     /**

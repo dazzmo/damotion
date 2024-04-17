@@ -57,8 +57,8 @@ TEST(Program, CreateOptimisationVector) {
 TEST(Program, CreateParameters) {
     // Create codegen function
     opt::Program program;
-
-    auto a = program.AddParameters("a", 2, 3);
+    sym::Parameter a("a", 2, 3);
+    program.AddParameter(a);
 
     EXPECT_EQ(a.rows(), 2);
     EXPECT_EQ(a.cols(), 3);
@@ -66,11 +66,11 @@ TEST(Program, CreateParameters) {
     Eigen::MatrixXd b(2, 3);
     b.setRandom();
 
-    program.SetParameters("a", b);
+    program.SetParameterValues(a, b);
 
-    EXPECT_TRUE(a.isApprox(b));
+    EXPECT_TRUE(program.GetParameterValues(a).isApprox(b));
 
-    Eigen::MatrixXd c = program.GetParameters("a");
+    Eigen::MatrixXd c = program.GetParameterValues(a);
     EXPECT_TRUE(c.isApprox(b));
 }
 
@@ -98,7 +98,8 @@ TEST(Program, AddLinearConstraint) {
 
     program.AddLinearConstraint(con, {xy}, {});
 
-    program.AddParameters("a", 2);
+    sym::Parameter a("a", 2);
+    program.AddParameter(a);
 
     // Create random cost
     casadi::SX xx = casadi::SX::sym("x", 4);

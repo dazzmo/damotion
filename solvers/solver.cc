@@ -41,7 +41,7 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
     int np = par.size();
     // Optional creation of vectors for inputs to the functions (if vector input
     // is not continuous in optimisation vector)
-    common::Function::InputRefVector inputs;
+    common::Function::InputRefVector inputs = {};
 
     // Mapped vectors from existing data
     std::vector<Eigen::Map<const Eigen::VectorXd>> m_vecs = {};
@@ -55,7 +55,7 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
             m_vecs.push_back(Eigen::Map<const Eigen::VectorXd>(
                 x.data() +
                     GetCurrentProgram().GetDecisionVariableIndex(var[i][0]),
-                var.size()));
+                var[i].size()));
             inputs.push_back(m_vecs.back());
         } else {
             // Construct a vector for this input
@@ -83,19 +83,19 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
         throw std::runtime_error("Cost does not have a hessian!");
     }
 
-    cost.ObjectiveFunction().call(inputs);
-    if (grd) cost.GradientFunction().call(inputs);
-    if (hes) cost.HessianFunction().call(inputs);
+    cost.ObjectiveFunction()->call(inputs);
+    if (grd) cost.GradientFunction()->call(inputs);
+    if (hes) cost.HessianFunction()->call(inputs);
 
     if (update_cache == false) return;
 
-    objective_cache_ += cost.ObjectiveFunction().getOutput(0).data()[0];
+    objective_cache_ += cost.ObjectiveFunction()->getOutput(0).data()[0];
 
     if (grd) {
         for (int i = 0; i < nv; ++i) {
             UpdateVectorAtVariableLocations(
-                objective_gradient_cache_, cost.GradientFunction().getOutput(i),
-                var[i], continuous[i]);
+                objective_gradient_cache_,
+                cost.GradientFunction()->getOutput(i), var[i], continuous[i]);
         }
     }
 
@@ -106,7 +106,7 @@ void SolverBase::EvaluateCost(Cost& cost, const Eigen::VectorXd& x,
                 // Increase the count for the Hessian
                 UpdateHessianAtVariableLocations(
                     lagrangian_hes_cache_,
-                    cost.HessianFunction().getOutput(cnt), var[i], var[j],
+                    cost.HessianFunction()->getOutput(cnt), var[i], var[j],
                     continuous[i], continuous[j]);
                 cnt++;
             }
@@ -175,25 +175,25 @@ void SolverBase::EvaluateConstraint(Constraint& c, const int& constraint_idx,
         inputs.push_back(GetCurrentProgram().GetParameterValues(par[i]));
     }
 
-    c.ConstraintFunction().call(inputs);
+    c.ConstraintFunction()->call(inputs);
 
     // Check if jacobian exists
     if (jac && !c.HasJacobian()) {
         throw std::runtime_error("Cost does not have a jacobian!");
     }
-    if (jac) c.JacobianFunction().call(inputs);
+    if (jac) c.JacobianFunction()->call(inputs);
 
     if (update_cache == false) return;
 
     constraint_cache_.middleRows(constraint_idx, nc) =
-        c.ConstraintFunction().getOutput(0);
+        c.ConstraintFunction()->getOutput(0);
 
     // ! Currently a dense jacobian - Look into sparse work
     // Update Jacobian blocks
     for (int i = 0; i < nv; ++i) {
         UpdateJacobianAtVariableLocations(
             constraint_jacobian_cache_, constraint_idx,
-            c.JacobianFunction().getOutput(i), var[i], continuous[i]);
+            c.JacobianFunction()->getOutput(i), var[i], continuous[i]);
     }
 }
 

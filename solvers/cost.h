@@ -4,9 +4,8 @@
 #include <casadi/casadi.hpp>
 
 #include "symbolic/expression.h"
-#include "utils/eigen_wrapper.h"
-
 #include "utils/codegen.h"
+#include "utils/eigen_wrapper.h"
 
 namespace damotion {
 namespace optimisation {
@@ -23,9 +22,9 @@ class Cost {
     Cost(const std::string &name, const symbolic::Expression &ex,
          bool grd = false, bool hes = false);
 
-    utils::casadi::FunctionWrapper &ObjectiveFunction() { return obj_; }
-    utils::casadi::FunctionWrapper &GradientFunction() { return grad_; }
-    utils::casadi::FunctionWrapper &HessianFunction() { return hes_; }
+    std::shared_ptr<common::Function> &ObjectiveFunction() { return obj_; }
+    std::shared_ptr<common::Function> &GradientFunction() { return grad_; }
+    std::shared_ptr<common::Function> &HessianFunction() { return hes_; }
 
     /**
      * @brief Name of the cost
@@ -51,12 +50,14 @@ class Cost {
     const bool HasHessian() const { return has_hes_; }
 
    protected:
-    void SetObjectiveFunction(const casadi::Function &f) { obj_ = f; }
-    void SetGradientFunction(const casadi::Function &f) {
+    void SetObjectiveFunction(const std::shared_ptr<common::Function> &f) {
+        obj_ = f;
+    }
+    void SetGradientFunction(const std::shared_ptr<common::Function> &f) {
         grad_ = f;
         has_grd_ = true;
     }
-    void SetHessianFunction(const casadi::Function &f) {
+    void SetHessianFunction(const std::shared_ptr<common::Function> &f) {
         hes_ = f;
         has_hes_ = true;
     }
@@ -77,19 +78,19 @@ class Cost {
      * @brief Objective function
      *
      */
-    utils::casadi::FunctionWrapper obj_;
+    std::shared_ptr<common::Function> obj_;
 
     /**
      * @brief Gradient function
      *
      */
-    utils::casadi::FunctionWrapper grad_;
+    std::shared_ptr<common::Function> grad_;
 
     /**
      * @brief Hessian function
      *
      */
-    utils::casadi::FunctionWrapper hes_;
+    std::shared_ptr<common::Function> hes_;
 
     /**
      * @brief Creates a unique id for each cost
@@ -113,50 +114,18 @@ class LinearCost : public Cost {
     LinearCost(const std::string &name, const Eigen::VectorXd &c,
                const double &b, bool jac = true)
         : Cost(name, "linear_cost") {
-        int nvar = 0;
-        casadi::SXVector in = {};
-        // Constant vector b
-        casadi::SX linear_cost = b;
         // Create Costs
-        casadi::DM cd;
+        casadi::DM cd, bd = b;
         damotion::utils::casadi::toCasadi(c, cd);
-        casadi::SX cs = cd;
+        casadi::SX cs = cd, bs = bd;
 
-        casadi::SX x = casadi::SX::sym("x", c.rows());
-        linear_cost += mtimes(cs.T(), x);
-        in.push_back(x);
-
-        // Create the Cost
-        casadi::Function f =
-            casadi::Function(this->name(), in, {linear_cost, b});
-        casadi::Function fg = casadi::Function(this->name() + "_grd", in, {cs});
-
-        SetObjectiveFunction(f);
-        SetGradientFunction(fg);
+        ConstructConstraint(cs, bs, {}, jac, true);
     }
 
     LinearCost(const std::string &name, const casadi::SX &c,
                const casadi::SX &b, const casadi::SXVector &p, bool jac = true)
         : Cost(name, "linear_cost") {
-        int nvar = 0;
-        casadi::SXVector in = {};
-        // Linear cost
-        casadi::SX x = casadi::SX::sym("x", c.rows());
-        casadi::SX linear_cost = mtimes(c.T(), x) + b;
-        // Create Costs
-        linear_cost += mtimes(c.T(), x);
-        in.push_back(x);
-        for (const casadi::SX &pi : p) {
-            in.push_back(pi);
-        }
-
-        // Create the Cost
-        casadi::Function f =
-            casadi::Function(this->name(), in, {linear_cost, b});
-        casadi::Function fg = casadi::Function(this->name() + "_grd", in, {c});
-
-        SetObjectiveFunction(f);
-        SetGradientFunction(fg);
+        ConstructConstraint(c, b, p, jac, true);
     }
 
     LinearCost(const std::string &name, const sym::Expression &ex,
@@ -168,17 +137,7 @@ class LinearCost : public Cost {
         casadi::SX c, b;
         casadi::SX::linear_coeff(ex, ex.Variables()[0], c, b, true);
 
-        in = ex.Variables();
-        for (const casadi::SX &pi : ex.Parameters()) {
-            in.push_back(pi);
-        }
-
-        // Create the Cost
-        casadi::Function f = casadi::Function(this->name(), in, {ex, b});
-        casadi::Function fg = casadi::Function(this->name() + "_grd", in, {c});
-
-        SetObjectiveFunction(f);
-        SetGradientFunction(fg);
+        ConstructConstraint(c, b, ex.Parameters(), jac, hes);
     }
 
     /**
@@ -186,20 +145,84 @@ class LinearCost : public Cost {
      *
      * @return Eigen::VectorXd
      */
-    Eigen::VectorXd c() {
-        return Eigen::Map<const Eigen::VectorXd>(
-            GradientFunction().getOutput(0).data(),
-            GradientFunction().getOutput(0).rows());
-    }
+    const Eigen::Ref<const Eigen::VectorXd> c() { return fc_->getOutput(0); }
 
     /**
      * @brief Returns the constant term b in the cost expression.
      *
      * @return const double
      */
-    const double b() { return ObjectiveFunction().getOutput(1).data()[0]; }
+    const double b() { return fb_->getOutput(0).data()[0]; }
 
    private:
+    std::shared_ptr<common::Function> fc_;
+    std::shared_ptr<common::Function> fb_;
+
+    /**
+     * @brief Compute the constraint with use of A and b
+     *
+     * @param input
+     * @param out
+     */
+    void ObjectiveCallback(const common::Function::InputRefVector &input,
+                           std::vector<Eigen::MatrixXd> &out) {
+        fc_->call(input);
+        fb_->call(input);
+        out[0].data()[0] = fc_->getOutput<Eigen::VectorXd>(0).dot(input[0]) +
+                           fb_->getOutput(0).data()[0];
+    }
+
+    /**
+     * @brief Compute the gradient of the constraint with c
+     *
+     * @param input
+     * @param out
+     */
+    void GradientCallback(const common::Function::InputRefVector &input,
+                          std::vector<Eigen::MatrixXd> &out) {
+        fc_->call(input);
+        out[0] = fc_->getOutput(0);
+    }
+
+    void ConstructConstraint(const casadi::SX &c, const casadi::SX &b,
+                             const casadi::SXVector &p, bool jac = true,
+                             bool hes = true) {
+        int nvar = 0;
+        casadi::SXVector in = {};
+        for (const casadi::SX &pi : p) {
+            in.push_back(pi);
+        }
+
+        // Create coefficient functions
+        fc_ = std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(this->name() + "_A", in, {c}));
+        fb_ = std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(this->name() + "_b", in, {b}));
+
+        // Create callback functions
+        std::shared_ptr<common::CallbackFunction> obj_cb =
+            std::make_shared<common::CallbackFunction>(
+                in.size(), 1,
+                [this](const common::Function::InputRefVector &in,
+                       std::vector<Eigen::MatrixXd> &out) {
+                    this->ObjectiveCallback(in, out);
+                });
+        std::shared_ptr<common::CallbackFunction> grd_cb =
+            std::make_shared<common::CallbackFunction>(
+                in.size(), 1,
+                [this](const common::Function::InputRefVector &in,
+                       std::vector<Eigen::MatrixXd> &out) {
+                    this->GradientCallback(in, out);
+                });
+
+        // Set output sizes for the callbacks
+        obj_cb->setOutputSize(0, 1, 1);
+        grd_cb->setOutputSize(0, c.size1(), 1);
+
+        // Create functions through callbacks
+        SetObjectiveFunction(obj_cb);
+        SetGradientFunction(grd_cb);
+    }
 };
 
 /**
@@ -208,57 +231,24 @@ class LinearCost : public Cost {
  */
 class QuadraticCost : public Cost {
    public:
-    QuadraticCost(const std::string &name, const Eigen::MatrixXd &Q,
-                  const Eigen::VectorXd &g, const double &c, bool jac = true,
+    QuadraticCost(const std::string &name, const Eigen::MatrixXd &A,
+                  const Eigen::VectorXd &b, const double &c, bool jac = true,
                   bool hes = true)
         : Cost(name, "quadratic_cost") {
-        int nvar = 0;
-        casadi::SXVector in = {};
         // Cost
-        casadi::SX cost = c;
-        casadi::DM Qd, gd;
-        damotion::utils::casadi::toCasadi(g, gd);
-        damotion::utils::casadi::toCasadi(Q, Qd);
-        casadi::SX Qs = Qd, gs = gd;
-        casadi::SX x = casadi::SX::sym("x", Q.rows());
-        // Create quadaratic cost expression
-        cost += mtimes(x.T(), mtimes(Qs, x)) + mtimes(gs.T(), x);
-        in.push_back(x);
-
-        // Create the Cost
-        casadi::Function f = casadi::Function(this->name(), in, {cost, c});
-        casadi::Function fg = casadi::Function(this->name() + "_grd", in,
-                                               {mtimes(Qs, x) + gs, gs});
-        casadi::Function fh = casadi::Function(this->name() + "_hes", in, {Qs});
-
-        SetObjectiveFunction(f);
-        SetGradientFunction(fg);
-        SetHessianFunction(fh);
+        casadi::DM Ad, bd;
+        casadi::SX csx = c;
+        damotion::utils::casadi::toCasadi(A, Ad);
+        damotion::utils::casadi::toCasadi(b, bd);
+        casadi::SX Asx = Ad, bsx = bd;
+        ConstructConstraint(Asx, bsx, csx, {}, jac, hes);
     }
 
-    QuadraticCost(const std::string &name, const casadi::SX &Q,
-                  const casadi::SX &g, const casadi::SX &c,
+    QuadraticCost(const std::string &name, const casadi::SX &A,
+                  const casadi::SX &b, const casadi::SX &c,
                   const casadi::SXVector &p, bool jac = true, bool hes = true)
         : Cost(name, "quadratic_cost") {
-        int nvar = 0;
-        casadi::SXVector in = {};
-        // Linear cost
-        casadi::SX x = casadi::SX::sym("x", Q.rows());
-        casadi::SX cost = mtimes(x.T(), mtimes(Q, x)) + mtimes(g.T(), x) + c;
-        in.push_back(x);
-        for (const casadi::SX &pi : p) {
-            in.push_back(pi);
-        }
-
-        // Create the Cost
-        casadi::Function f = casadi::Function(this->name(), in, {cost, c});
-        casadi::Function fg =
-            casadi::Function(this->name() + "_grd", in, {mtimes(Q, x) + g, g});
-        casadi::Function fh = casadi::Function(this->name() + "_hes", in, {Q});
-
-        SetObjectiveFunction(f);
-        SetGradientFunction(fg);
-        SetHessianFunction(fh);
+        ConstructConstraint(A, b, c, p, jac, hes);
     }
 
     QuadraticCost(const std::string &name, const sym::Expression &ex,
@@ -267,40 +257,123 @@ class QuadraticCost : public Cost {
         int nvar = 0;
         casadi::SXVector in = {};
         // Extract quadratic form
-        casadi::SX Q, g, c;
-        casadi::SX::quadratic_coeff(ex, ex.Variables()[0], Q, g, c, true);
+        casadi::SX A, b, c;
+        casadi::SX::quadratic_coeff(ex, ex.Variables()[0], A, b, c, true);
 
         // Remove factor of two from hessian
-        Q *= 0.5;  
+        A *= 0.5;
 
-        in = ex.Variables();
-        for (const casadi::SX &pi : ex.Parameters()) {
+        ConstructConstraint(A, b, c, ex.Parameters(), jac, hes);
+    }
+
+    const Eigen::Ref<const Eigen::MatrixXd> A() { return fA_->getOutput(0); }
+    const Eigen::Ref<const Eigen::VectorXd> b() {
+        return fb_->getOutput<Eigen::VectorXd>(0);
+    }
+    const double &c() { return fc_->getOutput(0).data()[0]; }
+
+   private:
+    std::shared_ptr<common::Function> fA_;
+    std::shared_ptr<common::Function> fb_;
+    std::shared_ptr<common::Function> fc_;
+
+    /**
+     * @brief Compute the cost with use of A, b and c
+     *
+     * @param input
+     * @param out
+     */
+    void ObjectiveCallback(const common::Function::InputRefVector &input,
+                           std::vector<Eigen::MatrixXd> &out) {
+        fA_->call(input);
+        fb_->call(input);
+        fc_->call(input);
+        LOG(INFO) << "Objective";
+        out[0].data()[0] = input[0].dot(fA_->getOutput(0) * input[0]) +
+                           fb_->getOutput<Eigen::VectorXd>(0).dot(input[0]) +
+                           fc_->getOutput(0).data()[0];
+        LOG(INFO) << "Objective complete";
+    }
+
+    /**
+     * @brief Compute the gradient of the cost with A and b
+     *
+     * @param input
+     * @param out
+     */
+    void GradientCallback(const common::Function::InputRefVector &input,
+                          std::vector<Eigen::MatrixXd> &out) {
+        fA_->call(input);
+        fb_->call(input);
+        out[0] = 2.0 * fA_->getOutput(0) * input[0] + fb_->getOutput(0);
+    }
+
+    /**
+     * @brief Compute the hessian of the cost with A
+     *
+     * @param input
+     * @param out
+     */
+    void HessianCallback(const common::Function::InputRefVector &input,
+                         std::vector<Eigen::MatrixXd> &out) {
+        fA_->call(input);
+        out[0] = 2.0 * fA_->getOutput(0);
+    }
+
+    void ConstructConstraint(const casadi::SX &A, const casadi::SX &b,
+                             const casadi::SX &c, const casadi::SXVector &p,
+                             bool jac = true, bool hes = true) {
+        int nvar = 0;
+        casadi::SXVector in = {};
+        // Linear cost
+        casadi::SX x = casadi::SX::sym("x", A.rows());
+        casadi::SX cost = mtimes(x.T(), mtimes(A, x)) + mtimes(b.T(), x) + c;
+        in.push_back(x);
+        for (const casadi::SX &pi : p) {
             in.push_back(pi);
         }
 
-        // TODO - Make only lower-triangular
-        // Create the Cost
-        casadi::Function f = casadi::Function(this->name(), in, {ex, c});
-        casadi::Function fg = casadi::Function(
-            this->name() + "_grd", in, {2.0 * mtimes(Q, ex.Variables()[0]) + g, g});
-        casadi::Function fh = casadi::Function(this->name() + "_hes", in, {2.0 * Q});
+        // Create coefficient functions
+        fA_ = std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(this->name() + "_A", in, {A}));
+        fb_ = std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(this->name() + "_b", in, {b}));
+        fc_ = std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(this->name() + "_c", in, {c}));
 
-        std::cout << "c: " << c << std::endl;
-        std::cout << "g: " << g << std::endl;
-        std::cout << "Q: " << Q << std::endl;
+        // Create callback functions
+        std::shared_ptr<common::CallbackFunction> obj_cb =
+            std::make_shared<common::CallbackFunction>(
+                in.size(), 1,
+                [this](const common::Function::InputRefVector &in,
+                       std::vector<Eigen::MatrixXd> &out) {
+                    this->ObjectiveCallback(in, out);
+                });
+        std::shared_ptr<common::CallbackFunction> grd_cb =
+            std::make_shared<common::CallbackFunction>(
+                in.size(), 1,
+                [this](const common::Function::InputRefVector &in,
+                       std::vector<Eigen::MatrixXd> &out) {
+                    this->GradientCallback(in, out);
+                });
+        std::shared_ptr<common::CallbackFunction> hes_cb =
+            std::make_shared<common::CallbackFunction>(
+                in.size(), 1,
+                [this](const common::Function::InputRefVector &in,
+                       std::vector<Eigen::MatrixXd> &out) {
+                    this->HessianCallback(in, out);
+                });
 
-        SetObjectiveFunction(f);
-        SetGradientFunction(fg);
-        SetHessianFunction(fh);
+        // Set output sizes for the callbacks
+        obj_cb->setOutputSize(0, 1, 1);
+        grd_cb->setOutputSize(0, b.size1(), 1);
+        hes_cb->setOutputSize(0, A.size1(), A.size2());
+
+        // Create functions through callbacks
+        SetObjectiveFunction(obj_cb);
+        SetGradientFunction(grd_cb);
+        SetHessianFunction(hes_cb);
     }
-
-    const double &c() { return ObjectiveFunction().getOutput(1).data()[0]; }
-
-    Eigen::VectorXd g() { return GradientFunction().getOutput(1); }
-
-    const Eigen::MatrixXd &Q() { return HessianFunction().getOutput(0); }
-
-   private:
 };
 
 }  // namespace optimisation

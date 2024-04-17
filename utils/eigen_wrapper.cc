@@ -57,7 +57,6 @@ FunctionWrapper& FunctionWrapper::operator=(::casadi::Function f) {
         const ::casadi::Sparsity& sparsity = f_.sparsity_out(i);
         // Create dense matrix for output and add data to output data pointer
         // vector
-        LOG(INFO) << "Output Size: " << sparsity.rows() << " x " << sparsity.columns();
         out_.push_back(Eigen::MatrixXd::Zero(sparsity.rows(), sparsity.columns()));
         out_data_ptr_.push_back(out_.back().data());
 
@@ -84,16 +83,14 @@ void FunctionWrapper::setSparseOutput(int i) {
 }
 
 void FunctionWrapper::callImpl(const Function::InputRefVector& input) {
-    LOG(INFO) << "FunctionWrapper::callImpl";
+    LOG(INFO) << "FunctionWrapper::callImpl for " << f_.name();
     // Set vector of inputs
     int idx = 0;
     for (const Eigen::Ref<const Eigen::VectorXd>& x : input) {
         in_data_ptr_[idx++] = x.data();
     }
-    LOG(INFO) << "Value: " << *out_data_ptr_[0];
     // Call the function
     f_(in_data_ptr_.data(), out_data_ptr_.data(), iw_.data(), dw_.data(), mem_);
-    LOG(INFO) << "Value: " << *out_data_ptr_[0];
 }
 
 Eigen::SparseMatrix<double> FunctionWrapper::createSparseMatrix(

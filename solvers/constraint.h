@@ -44,9 +44,23 @@ class Constraint {
      */
     Constraint(const std::string &name, const std::string &constraint_type);
 
-    utils::casadi::FunctionWrapper &ConstraintFunction() { return con_; }
-    utils::casadi::FunctionWrapper &JacobianFunction() { return jac_; }
-    utils::casadi::FunctionWrapper &HessianFunction() { return hes_; }
+    /**
+     * @brief Name of the constraint
+     *
+     * @return const std::string
+     */
+    const std::string name() const { return name_; }
+
+    /**
+     * @brief Dimension of the constraint
+     *
+     * @return const int
+     */
+    const int Dimension() const { return dim_; }
+
+    std::shared_ptr<common::Function> &ConstraintFunction() { return con_; }
+    std::shared_ptr<common::Function> &JacobianFunction() { return jac_; }
+    std::shared_ptr<common::Function> &HessianFunction() { return hes_; }
 
     void SetBoundsType(const BoundsType &type) {
         bounds_type_ = type;
@@ -68,20 +82,6 @@ class Constraint {
      * @return false
      */
     const bool HasHessian() const { return has_hes_; }
-
-    /**
-     * @brief Name of the constraint
-     *
-     * @return const std::string
-     */
-    const std::string name() const { return name_; }
-
-    /**
-     * @brief Dimension of the constraint
-     *
-     * @return const int
-     */
-    const int Dimension() const { return dim_; }
 
     /**
      * @brief The current type of bounds for the constraint
@@ -110,7 +110,7 @@ class Constraint {
         bounds_type_ = BoundsType::kCustom;
         lb_ = lb;
         ub_ = ub;
-        
+
         // Indicate constraint was updated
         IsUpdated() = true;
     }
@@ -148,11 +148,11 @@ class Constraint {
         // Determine if constraint within threshold
         double c_norm = 0.0;
         if (p == 1) {
-            c_norm = con_.getOutput(0).lpNorm<1>();
+            c_norm = con_->getOutput(0).lpNorm<1>();
         } else if (p == 2) {
-            c_norm = con_.getOutput(0).lpNorm<2>();
+            c_norm = con_->getOutput(0).lpNorm<2>();
         } else if (p == Eigen::Infinity) {
-            c_norm = con_.getOutput(0).lpNorm<Eigen::Infinity>();
+            c_norm = con_->getOutput(0).lpNorm<Eigen::Infinity>();
         }
 
         return c_norm <= eps;
@@ -191,14 +191,16 @@ class Constraint {
      *
      * @param f
      */
-    void SetConstraintFunction(const casadi::Function &f) { con_ = f; }
+    void SetConstraintFunction(const std::shared_ptr<common::Function> &f) {
+        con_ = f;
+    }
 
     /**
      * @brief Set the Jacobian Function object
      *
      * @param f
      */
-    void SetJacobianFunction(const casadi::Function &f) {
+    void SetJacobianFunction(const std::shared_ptr<common::Function> &f) {
         jac_ = f;
         has_jac_ = true;
     }
@@ -208,7 +210,7 @@ class Constraint {
      *
      * @param f
      */
-    void SetHessianFunction(const casadi::Function &f) {
+    void SetHessianFunction(const std::shared_ptr<common::Function> &f) {
         hes_ = f;
         has_hes_ = true;
     }
@@ -235,11 +237,11 @@ class Constraint {
     Eigen::VectorXd ub_;
 
     // Constraint
-    utils::casadi::FunctionWrapper con_;
+    std::shared_ptr<common::Function> con_;
     // Jacobian
-    utils::casadi::FunctionWrapper jac_;
+    std::shared_ptr<common::Function> jac_;
     // Hessian of vector-product
-    utils::casadi::FunctionWrapper hes_;
+    std::shared_ptr<common::Function> hes_;
 
     // Number of variable inputs
     int nx_ = 0;
@@ -261,49 +263,9 @@ class Constraint {
 
 class LinearConstraint : public Constraint {
    public:
-    LinearConstraint(const std::string &name, const Eigen::MatrixXd &A,
-                     const Eigen::VectorXd &b, const BoundsType &bounds,
-                     bool jac = true)
-        : Constraint(name, "linear_constraint") {
-        casadi::SXVector in = {}, jacobians = {};
-        int nvar = 0;
-        // Constant vector b
-        casadi::DM bdm;
-        damotion::utils::casadi::toCasadi(b, bdm);
-        casadi::SX bsx = bdm;
-        casadi::SX linear_constraint = bsx;
-
-        assert(A.rows() == b.rows() && "A and b must be same dimension!");
-
-        // Create constraints
-        casadi::DM Adm;
-        damotion::utils::casadi::toCasadi(A, Adm);
-        casadi::SX Asx = Adm;
-
-        casadi::SX xi = casadi::SX::sym("x", A.cols());
-        linear_constraint = mtimes(Asx, xi);
-        jacobians.push_back(Asx);
-        in.push_back(xi);
-        nvar += 1;
-
-        // Resize the constraint
-        Resize(b.rows(), nvar, 0);
-        // Update bounds
-        UpdateBounds(bounds);
-
-        // Create the constraint
-        casadi::Function f =
-            casadi::Function(this->name(), in, {linear_constraint, bsx});
-        casadi::Function fjac =
-            casadi::Function(this->name() + "_jac", in, jacobians);
-
-        SetConstraintFunction(f);
-        SetJacobianFunction(fjac);
-    }
-
     /**
-     * @brief Construct a new Linear Constraint object of the form \f$ A_0 x_0 +
-     * A_1 x_1 + \hdots + A_n x_n + b \f$
+     * @brief Construct a new Linear Constraint object of the form \f$ A x + b
+     * \f$
      *
      * @param name Name of the constraint. Default name given if provided ""
      * @param A Vector of coefficient matrices
@@ -316,15 +278,87 @@ class LinearConstraint : public Constraint {
                      const casadi::SX &b, const casadi::SXVector &p,
                      const BoundsType &bounds, bool jac = true)
         : Constraint(name, "linear_constraint") {
+        ConstructConstraint(A, b, p, bounds, jac);
+    }
+
+    LinearConstraint(const std::string &name, const Eigen::MatrixXd &A,
+                     const Eigen::VectorXd &b, const BoundsType &bounds,
+                     bool jac = true)
+        : Constraint(name, "linear_constraint") {
+        // Constant vector b
+        casadi::DM Ad, bd;
+        damotion::utils::casadi::toCasadi(b, bd);
+        damotion::utils::casadi::toCasadi(A, Ad);
+        casadi::SX bsx = bd;
+        casadi::SX Asx = Ad;
+
+        // Construct constraint
+        ConstructConstraint(Asx, bsx, {}, bounds, jac);
+    }
+
+    LinearConstraint(const std::string &name, const sym::Expression &ex,
+                     const BoundsType &bounds, bool jac = true)
+        : Constraint(name, "linear_constraint") {
+        // Extract linear form
+        casadi::SX A, b;
+        casadi::SX::linear_coeff(ex, ex.Variables()[0], A, b, true);
+
+        ConstructConstraint(A, b, ex.Parameters(), bounds, jac);
+    }
+
+    void SetCallback(const common::CallbackFunction::f_callback_ &fA,
+                     const common::CallbackFunction::f_callback_ &fb) {
+        fA_ = std::make_shared<common::CallbackFunction>(1, 1, fA);
+        fb_ = std::make_shared<common::CallbackFunction>(1, 1, fb);
+    }
+
+    /**
+     * @brief The coefficient matrix A for the expression A x + b.
+     *
+     * @return const Eigen::MatrixXd&
+     */
+    const Eigen::Ref<const Eigen::MatrixXd> A() { return fA_->getOutput(0); }
+
+    /**
+     * @brief The constant vector for the linear constraint A x + b
+     *
+     * @return const Eigen::VectorXd&
+     */
+    const Eigen::Ref<const Eigen::VectorXd> b() { return fb_->getOutput(0); }
+
+   private:
+    std::shared_ptr<common::Function> fA_;
+    std::shared_ptr<common::Function> fb_;
+
+    /**
+     * @brief Compute the constraint with use of A and b
+     *
+     * @param input
+     * @param out
+     */
+    void ConstraintCallback(const common::Function::InputRefVector &input,
+                            std::vector<Eigen::MatrixXd> &out) {
+        out[0] = fA_->getOutput(0) * input[0] + fb_->getOutput(0);
+    }
+
+    /**
+     * @brief Compute the Jacobian of the constraint with A
+     *
+     * @param input
+     * @param out
+     */
+    void JacobianCallback(const common::Function::InputRefVector &input,
+                          std::vector<Eigen::MatrixXd> &out) {
+        out[0] = fA_->getOutput(0);
+    }
+
+    void ConstructConstraint(const casadi::SX &A, const casadi::SX &b,
+                             const casadi::SXVector &p,
+                             const BoundsType &bounds, bool jac = true) {
         casadi::SXVector in = {};
         int nvar = 0;
-        casadi::SX linear_constraint = b;
         assert(A.rows() == b.rows() && "A and b must be same dimension!");
-        // Create optimisation variables for each coefficient matrix
-        casadi::SX xi = casadi::SX::sym("x", A.columns());
-        in.push_back(xi);
-        // Add linear expression Ax + b
-        linear_constraint += casadi::SX::mtimes(A, xi);
+
         // Create constraint dimensions and update bounds
         Resize(b.rows(), in.size(), p.size());
         UpdateBounds(bounds);
@@ -334,60 +368,34 @@ class LinearConstraint : public Constraint {
             in.push_back(pi);
         }
 
-        // Create the constraint, including the constant term b as well
-        casadi::Function f =
-            casadi::Function(this->name(), in, {linear_constraint, b});
-        casadi::Function fjac =
-            casadi::Function(this->name() + "_jac", in, {A});
-        SetConstraintFunction(f);
-        SetJacobianFunction(fjac);
+        fA_ = std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(this->name() + "_A", in, {A}));
+        fb_ = std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(this->name() + "_b", in, {b}));
+
+        std::shared_ptr<common::CallbackFunction> con_cb =
+            std::make_shared<common::CallbackFunction>(
+                in.size(), 1,
+                [this](const common::Function::InputRefVector &in,
+                       std::vector<Eigen::MatrixXd> &out) {
+                    this->ConstraintCallback(in, out);
+                });
+        std::shared_ptr<common::CallbackFunction> jac_cb =
+            std::make_shared<common::CallbackFunction>(
+                in.size(), 1,
+                [this](const common::Function::InputRefVector &in,
+                       std::vector<Eigen::MatrixXd> &out) {
+                    this->JacobianCallback(in, out);
+                });
+
+        // Set output sizes for the callback
+        con_cb->setOutputSize(0, A.size1(), 1);
+        jac_cb->setOutputSize(0, A.size1(), A.size2());
+
+        // Create functions through callbacks
+        SetConstraintFunction(con_cb);
+        SetJacobianFunction(jac_cb);
     }
-
-    LinearConstraint(const std::string &name, const sym::Expression &ex,
-                     const BoundsType &bounds, bool jac = true)
-        : Constraint(name, "linear_constraint") {
-        // Compute coefficients
-        int nvar = 0;
-        casadi::SXVector in = {};
-        // Extract quadratic form
-        casadi::SX A, b;
-        casadi::SX::linear_coeff(ex, ex.Variables()[0], A, b, true);
-
-        // Create constraint dimensions and update bounds
-        Resize(b.rows(), 1, ex.Parameters().size());
-        UpdateBounds(bounds);
-
-        in = ex.Variables();
-        for (const casadi::SX &pi : ex.Parameters()) {
-            in.push_back(pi);
-        }
-
-        // Create the cost
-        casadi::Function f = casadi::Function(this->name(), in, {ex, b});
-        casadi::Function fjac =
-            casadi::Function(this->name() + "_jac", in, {A});
-
-        SetConstraintFunction(f);
-        SetJacobianFunction(fjac);
-    }
-
-    /**
-     * @brief The coefficient matrix A for the expression A x + b.
-     *
-     * @return const Eigen::MatrixXd&
-     */
-    const Eigen::MatrixXd &A() { return JacobianFunction().getOutput(0); }
-
-    /**
-     * @brief The constant vector for the linear constraint A x + b
-     *
-     * @return const Eigen::VectorXd&
-     */
-    Eigen::VectorXd b() { return ConstraintFunction().getOutput(1); }
-
-   private:
-    Eigen::MatrixXd A_;
-    Eigen::VectorXd b_;
 };
 
 class BoundingBoxConstraint : public Constraint {
@@ -409,8 +417,10 @@ class BoundingBoxConstraint : public Constraint {
         casadi::Function fjac =
             casadi::Function(this->name() + "_jac", {x}, {jacobian(x, x)});
 
-        SetConstraintFunction(f);
-        SetJacobianFunction(fjac);
+        SetConstraintFunction(
+            std::make_shared<utils::casadi::FunctionWrapper>(f));
+        SetJacobianFunction(
+            std::make_shared<utils::casadi::FunctionWrapper>(fjac));
     }
 
    private:

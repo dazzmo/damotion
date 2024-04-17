@@ -139,10 +139,10 @@ class QPOASESSolverInstance : public SolverBase {
 
             // Update the gradient
             UpdateVectorAtVariableLocations(
-                g_, binding.Get().g(), binding.GetVariable(0), continuous[0]);
+                g_, binding.Get().b(), binding.GetVariable(0), continuous[0]);
             // Update the hessian
             UpdateHessianAtVariableLocations(
-                H_, 2.0 * binding.Get().Q(), binding.GetVariable(0),
+                H_, 2.0 * binding.Get().A(), binding.GetVariable(0),
                 binding.GetVariable(0), continuous[0], continuous[0]);
         }
 
@@ -173,8 +173,12 @@ class QPOASESSolverInstance : public SolverBase {
             RowMajorMatrixXd;
 
         // ! See about effects of copying
-        RowMajorMatrixXd H = H_;
-        RowMajorMatrixXd A = constraint_jacobian_cache_;
+        RowMajorMatrixXd H =
+            Eigen::Map<RowMajorMatrixXd>(H_.data(), H_.rows(), H_.cols());
+        RowMajorMatrixXd A =
+            Eigen::Map<RowMajorMatrixXd>(constraint_jacobian_cache_.data(),
+                                         constraint_jacobian_cache_.rows(),
+                                         constraint_jacobian_cache_.cols());
 
         // std::cout << H << std::endl;
         // std::cout << g_.transpose() << std::endl;

@@ -102,11 +102,12 @@ int Program::GetDecisionVariableIndex(const sym::Variable &v) {
 
 Eigen::Ref<Eigen::MatrixXd> Program::AddParameter(const sym::Parameter &p) {
     // Check if parameter already exists
-    if (!IsParameter(p)) {
-        throw std::runtime_error("Parameter" + p.name() +
+    if (IsParameter(p)) {
+        throw std::runtime_error("Parameter " + p.name() +
                                  " already in the program!");
     } else {
         // Add parameter values
+        parameter_idx_[p.id()] = parameters_.size();
         parameters_.push_back(p);
         parameter_vals_.push_back(Eigen::MatrixXd::Zero(p.rows(), p.cols()));
         n_parameters_ += p.rows() * p.cols();

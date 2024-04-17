@@ -17,7 +17,8 @@ Constraint::Constraint(const std::string &name, const symbolic::Expression &c,
     }
 
     // Constraint
-    SetConstraintFunction(casadi::Function(name_, in, {c}));
+    SetConstraintFunction(std::make_shared<utils::casadi::FunctionWrapper>(
+        casadi::Function(name_, in, {c})));
 
     // Jacobian
     if (jac) {
@@ -26,7 +27,8 @@ Constraint::Constraint(const std::string &name, const symbolic::Expression &c,
             jacobians.push_back(jacobian(c, xi));
         }
         // Wrap the functions
-        SetJacobianFunction(casadi::Function(name_ + "_jac", in, jacobians));
+        SetJacobianFunction(std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(name_ + "_jac", in, jacobians)));
     }
 
     if (hes) {

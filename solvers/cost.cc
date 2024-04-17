@@ -13,7 +13,8 @@ Cost::Cost(const std::string &name, const std::string &cost_type) {
 }
 
 Cost::Cost(const std::string &name, const symbolic::Expression &ex, bool grd,
-           bool hes) : Cost(name, "cost") {
+           bool hes)
+    : Cost(name, "cost") {
     // Get input sizes
     // Get input sizes
     nx_ = ex.Variables().size();
@@ -30,7 +31,8 @@ Cost::Cost(const std::string &name, const symbolic::Expression &ex, bool grd,
 
     // Create functions for each and wrap them
     // Constraint
-    SetObjectiveFunction(casadi::Function(name, in, {ex}));
+    SetObjectiveFunction(std::make_shared<utils::casadi::FunctionWrapper>(
+        casadi::Function(name, in, {ex})));
     // Jacobian
     if (grd) {
         casadi::SXVector gradients;
@@ -38,7 +40,8 @@ Cost::Cost(const std::string &name, const symbolic::Expression &ex, bool grd,
             gradients.push_back(gradient(ex, xi));
         }
         // Wrap the functions
-        SetGradientFunction(casadi::Function(name + "_grd", in, gradients));
+        SetGradientFunction(std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(name + "_grd", in, gradients)));
     }
 
     // Hessians
@@ -60,7 +63,8 @@ Cost::Cost(const std::string &name, const symbolic::Expression &ex, bool grd,
         }
 
         // Wrap the functions
-        SetHessianFunction(casadi::Function(name + "_hes", in, hessians));
+        SetHessianFunction(std::make_shared<utils::casadi::FunctionWrapper>(
+            casadi::Function(name + "_hes", in, hessians)));
     }
 }
 
