@@ -144,6 +144,9 @@ class QPOASESSolverInstance : public SolverBase {
             UpdateHessianAtVariableLocations(
                 H_, 2.0 * binding.Get().A(), binding.GetVariable(0),
                 binding.GetVariable(0), continuous[0], continuous[0]);
+
+            LOG(INFO) << binding.Get().A();
+            LOG(INFO) << binding.Get().b();
         }
 
         // Evaluate only the linear constraints of the program
@@ -166,6 +169,9 @@ class QPOASESSolverInstance : public SolverBase {
 
             // Increase constraint index
             idx += binding.Get().Dimension();
+
+            LOG(INFO) << binding.Get().A();
+            LOG(INFO) << binding.Get().b();
         }
 
         typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
@@ -189,7 +195,7 @@ class QPOASESSolverInstance : public SolverBase {
         // std::cout << ubx_.transpose() << std::endl;
 
         // Solve
-        int nWSR = 1000;
+        int nWSR = 100;
         if (first_solve_) {
             qp_->init(H.data(), g_.data(), A.data(), lbx_.data(), ubx_.data(),
                       lbA_.data(), ubA_.data(), nWSR);

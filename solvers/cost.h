@@ -195,9 +195,9 @@ class LinearCost : public Cost {
 
         // Create coefficient functions
         fc_ = std::make_shared<utils::casadi::FunctionWrapper>(
-            casadi::Function(this->name() + "_A", in, {c}));
+            casadi::Function(this->name() + "_A", in, {densify(c)}));
         fb_ = std::make_shared<utils::casadi::FunctionWrapper>(
-            casadi::Function(this->name() + "_b", in, {b}));
+            casadi::Function(this->name() + "_b", in, {densify(b)}));
 
         // Create callback functions
         std::shared_ptr<common::CallbackFunction> obj_cb =
@@ -335,11 +335,11 @@ class QuadraticCost : public Cost {
 
         // Create coefficient functions
         fA_ = std::make_shared<utils::casadi::FunctionWrapper>(
-            casadi::Function(this->name() + "_A", in, {A}));
+            casadi::Function(this->name() + "_A", in, {densify(A)}));
         fb_ = std::make_shared<utils::casadi::FunctionWrapper>(
-            casadi::Function(this->name() + "_b", in, {b}));
+            casadi::Function(this->name() + "_b", in, {densify(b)}));
         fc_ = std::make_shared<utils::casadi::FunctionWrapper>(
-            casadi::Function(this->name() + "_c", in, {c}));
+            casadi::Function(this->name() + "_c", in, {densify(c)}));
 
         // Create callback functions
         std::shared_ptr<common::CallbackFunction> obj_cb =

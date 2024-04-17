@@ -369,9 +369,9 @@ class LinearConstraint : public Constraint {
         }
 
         fA_ = std::make_shared<utils::casadi::FunctionWrapper>(
-            casadi::Function(this->name() + "_A", in, {A}));
+            casadi::Function(this->name() + "_A", in, {densify(A)}));
         fb_ = std::make_shared<utils::casadi::FunctionWrapper>(
-            casadi::Function(this->name() + "_b", in, {b}));
+            casadi::Function(this->name() + "_b", in, {densify(b)}));
 
         std::shared_ptr<common::CallbackFunction> con_cb =
             std::make_shared<common::CallbackFunction>(
@@ -413,9 +413,9 @@ class BoundingBoxConstraint : public Constraint {
 
         casadi::SX x = casadi::SX::sym("x", n);
 
-        casadi::Function f = casadi::Function(this->name(), {x}, {x});
-        casadi::Function fjac =
-            casadi::Function(this->name() + "_jac", {x}, {jacobian(x, x)});
+        casadi::Function f = casadi::Function(this->name(), {x}, {densify(x)});
+        casadi::Function fjac = casadi::Function(this->name() + "_jac", {x},
+                                                 {densify(jacobian(x, x))});
 
         SetConstraintFunction(
             std::make_shared<utils::casadi::FunctionWrapper>(f));
