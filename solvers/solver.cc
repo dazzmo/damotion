@@ -4,10 +4,7 @@ namespace damotion {
 namespace optimisation {
 namespace solvers {
 
-SolverBase::SolverBase(Program& prog) : prog_(prog) {
-    // Construct caches
-    // ! Program is currently dense, look at sparse alternative soon
-
+SolverBase::SolverBase(Program& prog, bool sparse) : prog_(prog), sparse_(sparse) {
     // Decision variables
     decision_variable_cache_ =
         Eigen::VectorXd::Zero(prog_.NumberOfDecisionVariables());
@@ -21,13 +18,20 @@ SolverBase::SolverBase(Program& prog) : prog_(prog) {
     constraint_cache_ = Eigen::VectorXd::Zero(prog_.NumberOfConstraints());
     // Dual variables
     dual_variable_cache_ = Eigen::VectorXd::Zero(prog_.NumberOfConstraints());
-    // Dense constraint Jacobian
-    constraint_jacobian_cache_ = Eigen::MatrixXd::Zero(
-        prog_.NumberOfConstraints(), prog_.NumberOfDecisionVariables());
 
-    // Dense constraint Hessian
-    lagrangian_hes_cache_ = Eigen::MatrixXd::Zero(
-        prog_.NumberOfDecisionVariables(), prog_.NumberOfDecisionVariables());
+    if (sparse) {
+        // Compute sparse Jacobian and Lagrangian hessian matrix
+        ConstructSparseConstraintJacobian();
+    } else {
+        // Dense constraint Jacobian
+        constraint_jacobian_cache_ = Eigen::MatrixXd::Zero(
+            prog_.NumberOfConstraints(), prog_.NumberOfDecisionVariables());
+
+        // Dense constraint Hessian
+        lagrangian_hes_cache_ =
+            Eigen::MatrixXd::Zero(prog_.NumberOfDecisionVariables(),
+                                  prog_.NumberOfDecisionVariables());
+    }
 
     CalculateBindingInputs();
 }
@@ -188,7 +192,6 @@ void SolverBase::EvaluateConstraint(Constraint& c, const int& constraint_idx,
     constraint_cache_.middleRows(constraint_idx, nc) =
         c.ConstraintFunction()->getOutput(0);
 
-    // ! Currently a dense jacobian - Look into sparse work
     // Update Jacobian blocks
     for (int i = 0; i < nv; ++i) {
         UpdateJacobianAtVariableLocations(
@@ -262,7 +265,52 @@ bool SolverBase::IsContiguousInDecisionVariableVector(
     return true;
 }
 
-// TODO - Make utility for block-filling
+void SolverBase::ConstructSparseConstraintJacobian() {
+    Program& program = GetCurrentProgram();
+    typedef Eigen::Vector3i binding_index_data_t;
+    Eigen::SparseMatrix<binding_index_data_t> J;
+    LOG(INFO) << "Here\n";
+    int idx = 0;
+    for (auto& b : program.GetAllConstraints()) {
+        // Create data within the map
+        std::vector<std::vector<int>> indices(b.NumberOfVariables());
+        // Add constraint to jacobian
+        for (int i = 0; i < b.GetVariables().size(); ++i) {
+            Eigen::SparseMatrix<double> Ji =
+                b.Get().JacobianFunction()->getOutputSparse(i);
+            LOG(INFO) << Ji;
+            int cnt = 0;
+            // Loop through non-zero entries
+            for (int k = 0; k < Ji.outerSize(); ++k) {
+                for (Eigen::SparseMatrix<double>::InnerIterator it(Ji, k); it;
+                     ++it) {
+                    // Get location of the non-zero entry
+                    int id = b.id();
+                    int jac_idx = i;
+                    J.coeffRef(idx + it.row(), idx) =
+                        binding_index_data_t(id, jac_idx, cnt);
+                    // Increase data array counter
+                    cnt++;
+                }
+            }
+
+            indices[i].resize(Ji.nonZeros());
+        }
+
+        // Add to map
+        sparse_jac_binding_idx_[b.id()] = indices;
+    }
+
+    // With created Jacobian, extract each binding's Jacobian data entries in
+    // the data vector in CCS
+    for (int i = 0; i < J.nonZeros(); ++i) {
+        // Create new entry if it doesn't exist
+        binding_index_data_t data = J.valuePtr()[i];
+        // Add to the map
+        sparse_jac_binding_idx_[data[0]][data[1]][data[2]] = i;
+    }
+}
+
 void SolverBase::UpdateVectorAtVariableLocations(Eigen::VectorXd& res,
                                                  const Eigen::VectorXd& block,
                                                  const sym::VariableVector& var,

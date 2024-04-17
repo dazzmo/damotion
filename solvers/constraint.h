@@ -168,6 +168,8 @@ class Constraint {
     const bool &IsUpdated() const { return updated_; }
     bool &IsUpdated() { return updated_; }
 
+    // bool IsSparse();
+
    protected:
     /**
      * @brief Resizes the constraint dimensions.
@@ -354,7 +356,7 @@ class LinearConstraint : public Constraint {
 
     void ConstructConstraint(const casadi::SX &A, const casadi::SX &b,
                              const casadi::SXVector &p,
-                             const BoundsType &bounds, bool jac = true) {
+                             const BoundsType &bounds, bool jac = true, bool sparse = false) {
         casadi::SXVector in = {};
         int nvar = 0;
         assert(A.rows() == b.rows() && "A and b must be same dimension!");

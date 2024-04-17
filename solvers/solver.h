@@ -9,7 +9,7 @@ namespace solvers {
 
 class SolverBase {
    public:
-    SolverBase(Program& prog);
+    SolverBase(Program& prog, bool sparse = false);
     ~SolverBase() {}
 
     /**
@@ -32,7 +32,7 @@ class SolverBase {
 
     void EvaluateCost(Cost& c, const Eigen::VectorXd& x,
                       const std::vector<sym::VariableVector>& var,
-                      const sym::ParameterVector &par,
+                      const sym::ParameterVector& par,
                       const std::vector<bool>& continuous, bool grd, bool hes,
                       bool update_cache = true);
 
@@ -42,7 +42,7 @@ class SolverBase {
     void EvaluateConstraint(Constraint& c, const int& constraint_idx,
                             const Eigen::VectorXd& x,
                             const std::vector<sym::VariableVector>& var,
-                            const sym::ParameterVector &par,
+                            const sym::ParameterVector& par,
                             const std::vector<bool>& continuous, bool jac,
                             bool update_cache = true);
 
@@ -121,7 +121,7 @@ class SolverBase {
                                            const Eigen::MatrixXd& block,
                                            const sym::VariableVector& var,
                                            bool is_continuous);
-
+    
     void UpdateHessianAtVariableLocations(Eigen::MatrixXd& hes,
                                           const Eigen::MatrixXd& block,
                                           const sym::VariableVector& var_x,
@@ -132,6 +132,8 @@ class SolverBase {
    private:
     Program& prog_;
 
+    bool sparse_ = false;
+
     // Calculate binding inputs for the problem
     void CalculateBindingInputs();
 
@@ -141,7 +143,16 @@ class SolverBase {
     std::vector<std::vector<bool>> constraint_binding_continuous_input_;
     std::vector<std::vector<bool>> cost_binding_continuous_input_;
 
+    // Have jacobians and map the provided data to them
+    Eigen::SparseMatrix<double> sparse_jacobian_;
+    Eigen::SparseMatrix<double> sparse_lagrangian_hessian_;
+
+    std::unordered_map<Binding<Constraint>::Id, std::vector<std::vector<int>>>
+        sparse_jac_binding_idx_;
+
     bool IsContiguousInDecisionVariableVector(const sym::VariableVector& var);
+
+    void ConstructSparseConstraintJacobian();
 };
 
 }  // namespace solvers

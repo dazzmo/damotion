@@ -120,7 +120,7 @@ TEST(Program, AddLinearConstraint) {
 
     program.UpdateBindings();
 
-    program.ListDecisionVariables();  // ! Name this decision variables
+    program.ListDecisionVariables();
     program.ListParameters();
     program.ListCosts();
     program.ListConstraints();
@@ -132,6 +132,54 @@ TEST(Program, AddLinearConstraint) {
 
     solver.Solve();
     solver.Solve();
+
+    damotion::common::Profiler summary;
+}
+
+TEST(Program, SparseProgram) {
+    // Create codegen function
+    sym::VariableVector x = sym::CreateVariableVector("x", 2);
+    sym::VariableVector y = sym::CreateVariableVector("y", 2);
+
+    opt::Program program;
+
+    // Create constraint x0 + 2 y1 + 3 = 0
+    Eigen::Matrix<double, 1, 2> A;
+    A << 1.0, 2.0;
+    Eigen::Vector<double, 1> b(3.0);
+
+    std::shared_ptr<opt::LinearConstraint> con =
+        std::make_shared<opt::LinearConstraint>("", A, b,
+                                                opt::BoundsType::kEquality);
+    
+    con->JacobianFunction()->setSparseOutput(0);
+
+    program.AddDecisionVariables(x);
+    program.AddDecisionVariables(y);
+
+    sym::VariableVector xy(2);
+    xy << x[0], y[1];
+
+    program.AddLinearConstraint(con, {xy}, {});
+
+    // Create optimisation vector
+    program.SetDecisionVariableVector();
+
+    program.AddBoundingBoxConstraint(-1.0, 1.0, x);
+    program.AddBoundingBoxConstraint(-2.0, 2.0, y);
+
+    program.UpdateBindings();
+
+    program.ListDecisionVariables(); 
+    program.ListParameters();
+    program.ListCosts();
+    program.ListConstraints();
+
+    LOG(INFO) << "Here\n";
+    opt::solvers::SolverBase solver(program, true);
+
+    // Create QPOASES solver and test if constraint jacobian gets created
+
 
     damotion::common::Profiler summary;
 }

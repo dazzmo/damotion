@@ -83,7 +83,6 @@ void FunctionWrapper::setSparseOutput(int i) {
 }
 
 void FunctionWrapper::callImpl(const Function::InputRefVector& input) {
-    LOG(INFO) << "FunctionWrapper::callImpl for " << f_.name();
     // Set vector of inputs
     int idx = 0;
     for (const Eigen::Ref<const Eigen::VectorXd>& x : input) {
