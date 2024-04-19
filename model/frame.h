@@ -39,7 +39,7 @@ class TargetFrame {
      *
      * @return const ::casadi::SX&
      */
-    const Eigen::VectorXd &pos() {
+    const Eigen::Ref<const Eigen::VectorXd> pos() {
         pos_ = f_wrapper_.getOutput(0);
         return pos_;
     }
@@ -48,7 +48,7 @@ class TargetFrame {
      *
      * @return const ::casadi::SX&
      */
-    const Eigen::VectorXd &vel() {
+    const Eigen::Ref<const Eigen::VectorXd> vel() {
         vel_ = f_wrapper_.getOutput(1);
         return vel_;
     }
@@ -57,7 +57,7 @@ class TargetFrame {
      *
      * @return const ::casadi::SX&
      */
-    const Eigen::VectorXd &acc() {
+    const Eigen::Ref<const Eigen::VectorXd> acc() {
         acc_ = f_wrapper_.getOutput(2);
         return acc_;
     }
@@ -89,9 +89,9 @@ class TargetFrame {
     // Function to compute the state of the frame
     ::casadi::Function f_;
     // Wrapper for the function of the symbolic function
-    utils::casadi::FunctionWrapper f_wrapper_;
+    utils::casadi::VectorFunctionWrapper f_wrapper_;
 };
 }  // namespace model
 }  // namespace damotion
 
-#endif /* MODEL_FRAME_H */
+#endif/* MODEL_FRAME_H */

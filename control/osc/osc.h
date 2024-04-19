@@ -28,7 +28,7 @@ namespace osc {
 
 typedef model::TargetFrame TargetFrame;
 
-std::shared_ptr<opt::LinearConstraint> LinearisedFrictionConstraint();
+std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>> LinearisedFrictionConstraint();
 
 // TODO - Place this in a utility
 Eigen::Quaternion<double> RPYToQuaterion(const double roll, const double pitch,
@@ -123,7 +123,7 @@ class OSC {
         casadi::SX A, b;
         casadi::SX::linear_coeff(constrained_dynamics_,
                                  constrained_dynamics_sym_, A, b, true);
-        auto con = std::make_shared<opt::LinearConstraint>(
+        auto con = std::make_shared<opt::LinearConstraint<Eigen::MatrixXd>>(
             "dynamics", A, b, constrained_dynamics_par_sym_,
             opt::BoundsType::kEquality);
         // Add constraint to program
@@ -347,10 +347,10 @@ class OSC {
         sym::Parameter normal;
     };
     std::vector<ContactTaskParameters> contact_task_parameters_;
-    std::vector<opt::Binding<opt::BoundingBoxConstraint>> contact_force_bounds_;
+    std::vector<opt::Binding<opt::BoundingBoxConstraint<Eigen::MatrixXd>>> contact_force_bounds_;
 
     // Friction cone constraint
-    std::shared_ptr<opt::LinearConstraint> friction_cone_con_;
+    std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>> friction_cone_con_;
 
     // Constrained dynamics
     casadi::SX constrained_dynamics_sym_;

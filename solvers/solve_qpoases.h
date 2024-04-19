@@ -11,11 +11,12 @@ namespace damotion {
 namespace optimisation {
 namespace solvers {
 
-class QPOASESSolverInstance : public SolverBase {
+class QPOASESSolverInstance : public Solver {
    public:
     QPOASESSolverInstance() = default;
 
-    QPOASESSolverInstance(Program& prog) : SolverBase(prog) {
+    QPOASESSolverInstance(Program& prog) : Solver(prog) {
+
         // Create problem
         qp_ = std::make_unique<qpOASES::SQProblem>(
             GetCurrentProgram().NumberOfDecisionVariables(),
@@ -118,9 +119,7 @@ class QPOASESSolverInstance : public SolverBase {
                 CostBindingContinuousInputCheck(binding);
 
             // Evaluate the cost
-            EvaluateCost(binding.Get(), primal_solution_x_,
-                         binding.GetVariables(), binding.GetParameters(),
-                         continuous, true, true, false);
+            EvaluateCost(binding, primal_solution_x_, true, true, false);
 
             // Update the gradient
             UpdateVectorAtVariableLocations(
@@ -220,6 +219,9 @@ class QPOASESSolverInstance : public SolverBase {
     // std::unique_ptr<qpOASES::SymSparseMat> H_;
     // std::unique_ptr<qpOASES::SparseMatrix> A_;
     std::unique_ptr<qpOASES::SQProblem> qp_;
+
+    std::unique_ptr<Solver> solver_dense_;
+    std::unique_ptr<SparseSolver> solver_sparse_;
 
     Eigen::MatrixXd H_;
     Eigen::VectorXd g_;

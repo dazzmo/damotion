@@ -3,7 +3,7 @@
 namespace damotion {
 namespace optimisation {
 
-void Program::AddDecisionVariable(const sym::Variable &var) {
+void DecisionVariableManager::AddDecisionVariable(const sym::Variable &var) {
     if (!IsDecisionVariable(var)) {
         // Add to variable vector
         decision_variables_.push_back(var);
@@ -15,7 +15,8 @@ void Program::AddDecisionVariable(const sym::Variable &var) {
     }
 }
 
-void Program::AddDecisionVariables(const Eigen::Ref<sym::VariableMatrix> &var) {
+void DecisionVariableManager::AddDecisionVariables(
+    const Eigen::Ref<sym::VariableMatrix> &var) {
     std::vector<sym::Variable> v;
     // Append to our map
     for (int i = 0; i < var.rows(); ++i) {
@@ -25,18 +26,13 @@ void Program::AddDecisionVariables(const Eigen::Ref<sym::VariableMatrix> &var) {
     }
 }
 
-bool Program::IsDecisionVariable(const sym::Variable &var) {
+bool DecisionVariableManager::IsDecisionVariable(const sym::Variable &var) {
     // Check if variable is already added to the program
     return std::find(decision_variables_.begin(), decision_variables_.end(),
                      var) != decision_variables_.end();
 }
 
-bool Program::IsParameter(const sym::Parameter &par) {
-    // Check if variable is already added to the program
-    return parameter_idx_.find(par.id()) != parameter_idx_.end();
-}
-
-void Program::SetDecisionVariableVector() {
+void DecisionVariableManager::SetDecisionVariableVector() {
     // Set indices by order in the decision variable vector
     int idx = 0;
     for (int i = 0; i < decision_variables_.size(); ++i) {
@@ -46,14 +42,9 @@ void Program::SetDecisionVariableVector() {
         // Increment the start index
         idx++;
     }
-
-    // Create default variable bounds
-    double inf = std::numeric_limits<double>::infinity();
-    lbx_ = -inf * Eigen::VectorXd::Ones(NumberOfDecisionVariables());
-    ubx_ = inf * Eigen::VectorXd::Ones(NumberOfDecisionVariables());
 }
 
-bool Program::SetDecisionVariableVector(
+bool DecisionVariableManager::SetDecisionVariableVector(
     const Eigen::Ref<sym::VariableVector> &var) {
     assert(var.size() == NumberOfDecisionVariables() && "Incorrect input!");
 
@@ -77,20 +68,15 @@ bool Program::SetDecisionVariableVector(
         }
     }
 
-    // Create default variable bounds
-    double inf = std::numeric_limits<double>::infinity();
-    lbx_ = -inf * Eigen::VectorXd::Ones(NumberOfDecisionVariables());
-    ubx_ = inf * Eigen::VectorXd::Ones(NumberOfDecisionVariables());
-
     return true;
 }
 
-void Program::RemoveDecisionVariables(
+void DecisionVariableManager::RemoveDecisionVariables(
     const Eigen::Ref<sym::VariableMatrix> &var) {
     // TODO - Implement
 }
 
-int Program::GetDecisionVariableIndex(const sym::Variable &v) {
+int DecisionVariableManager::GetDecisionVariableIndex(const sym::Variable &v) {
     auto it = decision_variable_idx_.find(v.id());
     if (it != decision_variable_idx_.end()) {
         return it->second;
@@ -100,7 +86,22 @@ int Program::GetDecisionVariableIndex(const sym::Variable &v) {
     }
 }
 
-Eigen::Ref<Eigen::MatrixXd> Program::AddParameter(const sym::Parameter &p) {
+void DecisionVariableManager::ListDecisionVariables() {
+    std::cout << "----------------------\n";
+    std::cout << "Variable\n";
+    std::cout << "----------------------\n";
+    for (sym::Variable &v : decision_variables_) {
+        std::cout << v << '\n';
+    }
+}
+
+bool ParameterManager::IsParameter(const sym::Parameter &par) {
+    // Check if variable is already added to the program
+    return parameter_idx_.find(par.id()) != parameter_idx_.end();
+}
+
+Eigen::Ref<Eigen::MatrixXd> ParameterManager::AddParameter(
+    const sym::Parameter &p) {
     // Check if parameter already exists
     if (IsParameter(p)) {
         throw std::runtime_error("Parameter " + p.name() +
@@ -115,7 +116,7 @@ Eigen::Ref<Eigen::MatrixXd> Program::AddParameter(const sym::Parameter &p) {
     }
 }
 
-Eigen::Ref<const Eigen::MatrixXd> Program::GetParameterValues(
+Eigen::Ref<const Eigen::MatrixXd> ParameterManager::GetParameterValues(
     const sym::Parameter &p) {
     auto it = parameter_idx_.find(p.id());
     if (it == parameter_idx_.end()) {
@@ -126,8 +127,8 @@ Eigen::Ref<const Eigen::MatrixXd> Program::GetParameterValues(
     }
 }
 
-void Program::SetParameterValues(const sym::Parameter &p,
-                                 Eigen::Ref<const Eigen::MatrixXd> val) {
+void ParameterManager::SetParameterValues(
+    const sym::Parameter &p, Eigen::Ref<const Eigen::MatrixXd> val) {
     auto it = parameter_idx_.find(p.id());
     if (it == parameter_idx_.end()) {
         throw std::runtime_error("Parameter " + p.name() +
@@ -139,7 +140,7 @@ void Program::SetParameterValues(const sym::Parameter &p,
     }
 }
 
-void Program::RemoveParameters(const sym::Parameter &p) {
+void ParameterManager::RemoveParameters(const sym::Parameter &p) {
     // Check if parameter exists
     auto it = parameter_idx_.find(p.id());
     if (it == parameter_idx_.end()) {
@@ -152,81 +153,7 @@ void Program::RemoveParameters(const sym::Parameter &p) {
     }
 }
 
-Binding<Cost> Program::AddCost(const std::shared_ptr<Cost> &cost,
-                               const sym::VariableRefVector &x,
-                               const sym::ParameterVector &p) {
-    Binding<Cost> binding(cost, x, p);
-    costs_.push_back(binding);
-    return costs_.back();
-}
-
-Binding<LinearCost> Program::AddLinearCost(
-    const std::shared_ptr<LinearCost> &cost, const sym::VariableRefVector &x,
-    const sym::ParameterVector &p) {
-    linear_costs_.push_back(Binding<LinearCost>(cost, x, p));
-    return linear_costs_.back();
-}
-
-Binding<QuadraticCost> Program::AddQuadraticCost(
-    const std::shared_ptr<QuadraticCost> &cost, const sym::VariableRefVector &x,
-    const sym::ParameterVector &p) {
-    quadratic_costs_.push_back(Binding<QuadraticCost>(cost, x, p));
-    return quadratic_costs_.back();
-}
-
-Binding<LinearConstraint> Program::AddLinearConstraint(
-    const std::shared_ptr<LinearConstraint> &con,
-    const sym::VariableRefVector &x, const sym::ParameterVector &p) {
-    linear_constraints_.push_back(Binding<LinearConstraint>(con, x, p));
-    n_constraints_ += con->Dimension();
-    return linear_constraints_.back();
-}
-
-Binding<BoundingBoxConstraint> Program::AddBoundingBoxConstraint(
-    const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
-    const sym::VariableVector &x) {
-    std::shared_ptr<BoundingBoxConstraint> con =
-        std::make_shared<BoundingBoxConstraint>("", lb, ub);
-    bounding_box_constraints_.push_back(
-        Binding<BoundingBoxConstraint>(con, {x}));
-    return bounding_box_constraints_.back();
-}
-
-Binding<BoundingBoxConstraint> Program::AddBoundingBoxConstraint(
-    const double &lb, const double &ub, const sym::VariableVector &x) {
-    Eigen::VectorXd lbv(x.size()), ubv(x.size());
-    lbv.setConstant(lb);
-    ubv.setConstant(ub);
-    return AddBoundingBoxConstraint(lbv, ubv, x);
-}
-
-Binding<Constraint> Program::AddConstraint(
-    const std::shared_ptr<Constraint> &con, const sym::VariableRefVector &x,
-    const sym::ParameterVector &p) {
-    // Check bound variables and parameters exist
-    for (const sym::VariableVector &v : x) {
-        for (int i = 0; i < v.size(); i++) {
-            if (!IsDecisionVariable(v[i])) {
-                std::cout << v[i] << " is not included within this program!\n";
-            }
-        }
-    }
-
-    // Create a binding for the constraint
-    constraints_.push_back(Binding<Constraint>(con, x, p));
-    n_constraints_ += con->Dimension();
-    return constraints_.back();
-}
-
-Binding<Constraint> Program::AddGenericConstraint(
-    std::shared_ptr<Constraint> &con, const sym::VariableRefVector &x,
-    const sym::ParameterVector &p) {
-    constraints_.push_back(Binding<Constraint>(con, x, p));
-    n_constraints_ += con->Dimension();
-    return constraints_.back();
-}
-
-void Program::ListParameters() {
+void ParameterManager::ListParameters() {
     std::cout << "----------------------\n";
     std::cout << "Parameter\tCurrent Value\n";
     std::cout << "----------------------\n";
@@ -235,66 +162,5 @@ void Program::ListParameters() {
                   << '\n';
     }
 }
-
-void Program::ListDecisionVariables() {
-    std::cout << "----------------------\n";
-    std::cout << "Variable\n";
-    std::cout << "----------------------\n";
-    for (sym::Variable &v : decision_variables_) {
-        std::cout << v << '\n';
-    }
-}
-
-void Program::ListConstraints() {
-    std::cout << "----------------------\n";
-    std::cout << "Constraint\tSize\tLower Bound\tUpper Bound\n";
-    std::cout << "----------------------\n";
-    // Get all constraints
-    std::vector<Binding<Constraint>> constraints = GetAllConstraints();
-    for (Binding<Constraint> &b : constraints) {
-        std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
-        for (int i = 0; i < b.Get().Dimension(); ++i) {
-            std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
-                      << b.Get().LowerBound()[i] << "\t"
-                      << b.Get().UpperBound()[i] << "\n";
-        }
-    }
-    for (Binding<BoundingBoxConstraint> &b :
-         GetBoundingBoxConstraintBindings()) {
-        std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
-        for (int i = 0; i < b.Get().Dimension(); ++i) {
-            std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
-                      << b.Get().LowerBound()[i] << "\t"
-                      << b.Get().UpperBound()[i] << "\n";
-        }
-    }
-}
-
-void Program::ListCosts() {
-    std::cout << "----------------------\n";
-    std::cout << "Cost\n";
-    std::cout << "----------------------\n";
-    std::vector<Binding<Cost>> costs = GetAllCostBindings();
-    for (Binding<Cost> &b : costs) {
-        std::cout << b.Get().name() << '\n';
-    }
-}
-
-void Program::PrintProgramSummary() {
-    std::cout << "-----------------------\n";
-    std::cout << "Program Name: " << name() << '\n';
-    std::cout << "Number of Decision Variables: " << NumberOfDecisionVariables()
-              << '\n';
-    std::cout << "Variables\tSize\n";
-
-    std::cout << "Number of Constraints: " << NumberOfConstraints() << '\n';
-    std::cout << "Constraint\tSize\n";
-
-    std::cout << "Number of Parameters: " << NumberOfParameters() << '\n';
-    std::cout << "Parameters\tSize\n";
-
-    std::cout << "-----------------------\n";
-}
-
 }  // namespace optimisation
 }  // namespace damotion

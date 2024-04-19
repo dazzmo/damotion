@@ -35,30 +35,6 @@ class Expression : public ::casadi::SX {
     }
 
     /**
-     * @brief Generates a function that evaluates the provided expression using
-     * the provided inputs
-     *
-     * @param name
-     * @param codegen
-     * @param codegen_dir
-     */
-    void GenerateFunction(const std::string &name, bool codegen = false,
-                          const std::string &codegen_dir = "./") {
-        assert((x_.size() > 0 || p_.size() > 0) &&
-               "No variables or parameters provided to expression!");
-
-        if (codegen) {
-            ::casadi::Function fcg =
-                utils::casadi::codegen(toFunction(name), codegen_dir);
-            f_ = utils::casadi::FunctionWrapper(fcg);
-        } else {
-            f_ = utils::casadi::FunctionWrapper(toFunction(name));
-        }
-    }
-
-    utils::casadi::FunctionWrapper &Function() { return f_; }
-
-    /**
      * @brief Variables used within the expression
      *
      * @return ::casadi::SXVector&
@@ -72,14 +48,12 @@ class Expression : public ::casadi::SX {
      */
     const ::casadi::SXVector &Parameters() const { return p_; }
 
-   private:
-    ::casadi::SXVector x_;
-    ::casadi::SXVector p_;
-
-    // Function to compute the expression
-    utils::casadi::FunctionWrapper f_;
-
-    // Create function from expression
+    /**
+     * @brief Create a casadi::Function from the expression
+     *
+     * @param name
+     * @return
+     */
     ::casadi::Function toFunction(const std::string &name) {
         // Create input
         ::casadi::SXVector in = this->Variables();
@@ -88,6 +62,10 @@ class Expression : public ::casadi::SX {
         }
         return ::casadi::Function(name, in, {*this});
     }
+
+   private:
+    ::casadi::SXVector x_;
+    ::casadi::SXVector p_;
 };
 
 /**
@@ -116,30 +94,6 @@ class ExpressionVector : public ::casadi::SXVector {
     }
 
     /**
-     * @brief Generates a function that evaluates the provided expression
-     * using the provided inputs
-     *
-     * @param name
-     * @param codegen
-     * @param codegen_dir
-     */
-    void GenerateFunction(const std::string &name, bool codegen = false,
-                          const std::string &codegen_dir = "./") {
-        assert((x_.size() > 0 || p_.size() > 0) &&
-               "No variables or parameters provided to expression!");
-
-        if (codegen) {
-            ::casadi::Function fcg =
-                utils::casadi::codegen(toFunction(name), codegen_dir);
-            f_ = utils::casadi::FunctionWrapper(fcg);
-        } else {
-            f_ = utils::casadi::FunctionWrapper(toFunction(name));
-        }
-    }
-
-    utils::casadi::FunctionWrapper &Function() { return f_; }
-
-    /**
      * @brief Variables used within the expression
      *
      * @return ::casadi::SXVector&
@@ -155,14 +109,12 @@ class ExpressionVector : public ::casadi::SXVector {
     ::casadi::SXVector &Parameters() { return p_; }
     const ::casadi::SXVector &Parameters() const { return p_; }
 
-   private:
-    ::casadi::SXVector x_;
-    ::casadi::SXVector p_;
-
-    // Function to compute the expression
-    utils::casadi::FunctionWrapper f_;
-
-    // Create function from expression
+    /**
+     * @brief Create a casadi::Function from the expression
+     *
+     * @param name
+     * @return
+     */
     ::casadi::Function toFunction(const std::string &name) {
         // Create input
         ::casadi::SXVector in = this->Variables();
@@ -171,6 +123,10 @@ class ExpressionVector : public ::casadi::SXVector {
         }
         return ::casadi::Function(name, in, *this);
     }
+
+   private:
+    ::casadi::SXVector x_;
+    ::casadi::SXVector p_;
 };
 
 }  // namespace symbolic

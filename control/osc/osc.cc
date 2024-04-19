@@ -12,7 +12,8 @@ Eigen::Quaterniond RPYToQuaterion(const double roll, const double pitch,
     return Eigen::Quaterniond(r * p * y);
 }
 
-std::shared_ptr<opt::LinearConstraint> LinearisedFrictionConstraint() {
+std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>>
+LinearisedFrictionConstraint() {
     // Square pyramid approximation
     casadi::SX lambda = casadi::SX::sym("lambda", 3);
     casadi::SX normal = casadi::SX::sym("normal", 3);
@@ -30,8 +31,8 @@ std::shared_ptr<opt::LinearConstraint> LinearisedFrictionConstraint() {
     cone(3) = -sqrt(2.0) * l_y + mu * l_z;
     cone.SetInputs({lambda}, {normal, mu});
 
-    return std::make_shared<opt::LinearConstraint>("friction_cone", cone,
-                                                   opt::BoundsType::kPositive);
+    return std::make_shared<opt::LinearConstraint<Eigen::MatrixXd>>(
+        "friction_cone", cone, opt::BoundsType::kPositive);
 }
 
 OSC::OSC(int nq, int nv, int nu) : nq_(nq), nv_(nv), nu_(nu) {
@@ -88,8 +89,9 @@ void OSC::AddMotionTask(const std::shared_ptr<MotionTask> &task) {
     obj.SetInputs({symbolic_terms_->qacc()}, ps);
 
     // Add objective to program
-    std::shared_ptr<opt::QuadraticCost> task_cost =
-        std::make_shared<opt::QuadraticCost>(task->name() + "_motion_obj", obj);
+    std::shared_ptr<opt::QuadraticCost<Eigen::MatrixXd>> task_cost =
+        std::make_shared<opt::QuadraticCost<Eigen::MatrixXd>>(
+            task->name() + "_motion_obj", obj);
 
     // Append any additional parameters
     sym::ParameterVector pv = {qpos_param_, qvel_param_, parameters.xaccd,
@@ -117,7 +119,7 @@ void OSC::AddContactPoint(const std::shared_ptr<ContactTask> &task) {
     // Add to program
     program_.AddDecisionVariables(lambda);
     // Add bounds to constraint forces
-    opt::Binding<opt::BoundingBoxConstraint> force_bounds =
+    opt::Binding<opt::BoundingBoxConstraint<Eigen::MatrixXd>> force_bounds =
         program_.AddBoundingBoxConstraint(task->fmin(), task->fmax(), lambda);
 
     /* Add constraints to the dynamics of the system */
@@ -160,8 +162,9 @@ void OSC::AddContactPoint(const std::shared_ptr<ContactTask> &task) {
         {symbolic_terms_->qpos(), symbolic_terms_->qvel(), xaccd_sym, w_sym});
 
     // Add objective to program
-    std::shared_ptr<opt::QuadraticCost> task_cost =
-        std::make_shared<opt::QuadraticCost>(task->name() + "_contact", obj);
+    std::shared_ptr<opt::QuadraticCost<Eigen::MatrixXd>> task_cost =
+        std::make_shared<opt::QuadraticCost<Eigen::MatrixXd>>(
+            task->name() + "_contact", obj);
 
     program_.AddQuadraticCost(
         task_cost, {variables_->qacc()},
@@ -183,7 +186,7 @@ void OSC::AddHolonomicConstraint(const std::string &name, const casadi::SX &c,
     // Create linear constraint
     casadi::SX A, b;
     casadi::SX::linear_coeff(d2cdt2, symbolic_terms_->qacc(), A, b, true);
-    auto con = std::make_shared<opt::LinearConstraint>(
+    auto con = std::make_shared<opt::LinearConstraint<Eigen::MatrixXd>>(
         name, A, b,
         casadi::SXVector({symbolic_terms_->qpos(), symbolic_terms_->qvel()}),
         opt::BoundsType::kEquality);

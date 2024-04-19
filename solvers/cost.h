@@ -12,19 +12,89 @@ namespace optimisation {
 
 namespace sym = damotion::symbolic;
 
-class Cost {
+template <typename MatrixType>
+class CostBase {
    public:
-    Cost() = default;
-    ~Cost() = default;
+    CostBase() = default;
+    ~CostBase() = default;
 
-    Cost(const std::string &name, const std::string &cost_type);
+    CostBase(const std::string &name, const std::string &cost_type) {
+        // Set default name for constraint
+        if (name != "") {
+            name_ = name;
+        } else {
+            name_ = cost_type + "_" + std::to_string(CreateID());
+        }
+    }
 
-    Cost(const std::string &name, const symbolic::Expression &ex,
-         bool grd = false, bool hes = false);
+    CostBase(const std::string &name, const symbolic::Expression &ex,
+             bool grd = false, bool hes = false)
+        : CostBase(name, "cost") {
+        // Get input sizes
+        nx_ = ex.Variables().size();
+        np_ = ex.Parameters().size();
 
-    std::shared_ptr<common::Function> &ObjectiveFunction() { return obj_; }
-    std::shared_ptr<common::Function> &GradientFunction() { return grad_; }
-    std::shared_ptr<common::Function> &HessianFunction() { return hes_; }
+        // Create functions to compute the constraint and derivatives given the
+        // variables and parameters
+
+        // Input vectors {x, p}
+        casadi::SXVector in = ex.Variables();
+        for (const casadi::SX &pi : ex.Parameters()) {
+            in.push_back(pi);
+        }
+
+        // Create functions for each and wrap them
+        // Constraint
+        SetObjectiveFunction(
+            std::make_shared<utils::casadi::ScalarFunctionWrapper>(
+                casadi::Function(name, in, {ex})));
+        // Jacobian
+        if (grd) {
+            casadi::SXVector gradients;
+            for (const casadi::SX &xi : ex.Variables()) {
+                gradients.push_back(gradient(ex, xi));
+            }
+            // Wrap the functions
+            SetGradientFunction(
+                std::make_shared<utils::casadi::VectorFunctionWrapper>(
+                    casadi::Function(name + "_grd", in, gradients)));
+        }
+
+        // Hessians
+        if (hes) {
+            casadi::SXVector hessians;
+            // For each combination of input variables, compute the hessians
+            for (int i = 0; i < ex.Variables().size(); ++i) {
+                casadi::SX xi = ex.Variables()[i];
+                for (int j = i; j < ex.Variables().size(); ++j) {
+                    casadi::SX xj = ex.Variables()[j];
+                    if (j == i) {
+                        // Diagonal term, only include lower-triangular
+                        // component
+                        hessians.push_back(casadi::SX::tril(
+                            jacobian(gradient(ex, xi), xj), true));
+                    } else {
+                        hessians.push_back(jacobian(gradient(ex, xi), xj));
+                    }
+                }
+            }
+
+            // Wrap the functions
+            SetHessianFunction(
+                std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
+                    casadi::Function(name + "_hes", in, hessians)));
+        }
+    }
+
+    std::shared_ptr<common::ScalarFunction> &ObjectiveFunction() {
+        return obj_;
+    }
+    std::shared_ptr<common::VectorFunction> &GradientFunction() {
+        return grad_;
+    }
+    std::shared_ptr<common::FunctionBase<MatrixType>> &HessianFunction() {
+        return hes_;
+    }
 
     /**
      * @brief Name of the cost
@@ -50,14 +120,16 @@ class Cost {
     const bool HasHessian() const { return has_hes_; }
 
    protected:
-    void SetObjectiveFunction(const std::shared_ptr<common::Function> &f) {
+    void SetObjectiveFunction(
+        const std::shared_ptr<common::ScalarFunction> &f) {
         obj_ = f;
     }
-    void SetGradientFunction(const std::shared_ptr<common::Function> &f) {
+    void SetGradientFunction(const std::shared_ptr<common::VectorFunction> &f) {
         grad_ = f;
         has_grd_ = true;
     }
-    void SetHessianFunction(const std::shared_ptr<common::Function> &f) {
+    void SetHessianFunction(
+        const std::shared_ptr<common::FunctionBase<MatrixType>> &f) {
         hes_ = f;
         has_hes_ = true;
     }
@@ -78,19 +150,19 @@ class Cost {
      * @brief Objective function
      *
      */
-    std::shared_ptr<common::Function> obj_;
+    std::shared_ptr<common::ScalarFunction> obj_;
 
     /**
      * @brief Gradient function
      *
      */
-    std::shared_ptr<common::Function> grad_;
+    std::shared_ptr<common::VectorFunction> grad_;
 
     /**
      * @brief Hessian function
      *
      */
-    std::shared_ptr<common::Function> hes_;
+    std::shared_ptr<common::FunctionBase<MatrixType>> hes_;
 
     /**
      * @brief Creates a unique id for each cost
@@ -105,15 +177,19 @@ class Cost {
     }
 };
 
+typedef CostBase<Eigen::MatrixXd> Cost;
+typedef CostBase<Eigen::SparseMatrix<double>> SparseCost;
+
 /**
  * @brief Cost of the form \f$ c^T x + b \f$
  *
  */
-class LinearCost : public Cost {
+template <typename MatrixType>
+class LinearCostBase : public CostBase<MatrixType> {
    public:
-    LinearCost(const std::string &name, const Eigen::VectorXd &c,
+    LinearCostBase(const std::string &name, const Eigen::VectorXd &c,
                const double &b, bool jac = true)
-        : Cost(name, "linear_cost") {
+        : CostBase<MatrixType>(name, "linear_cost") {
         // Create Costs
         casadi::DM cd, bd = b;
         damotion::utils::casadi::toCasadi(c, cd);
@@ -122,13 +198,13 @@ class LinearCost : public Cost {
         ConstructConstraint(cs, bs, {}, jac, true);
     }
 
-    LinearCost(const std::string &name, const casadi::SX &c,
+    LinearCostBase(const std::string &name, const casadi::SX &c,
                const casadi::SX &b, const casadi::SXVector &p, bool jac = true)
         : Cost(name, "linear_cost") {
         ConstructConstraint(c, b, p, jac, true);
     }
 
-    LinearCost(const std::string &name, const sym::Expression &ex,
+    LinearCostBase(const std::string &name, const sym::Expression &ex,
                bool jac = true, bool hes = true)
         : Cost(name, "linear_cost") {
         int nvar = 0;
@@ -152,11 +228,11 @@ class LinearCost : public Cost {
      *
      * @return const double
      */
-    const double b() { return fb_->getOutput(0).data()[0]; }
+    const double b() { return fb_->getOutput(0); }
 
    private:
-    std::shared_ptr<common::Function> fc_;
-    std::shared_ptr<common::Function> fb_;
+    std::shared_ptr<common::VectorFunction> fc_;
+    std::shared_ptr<common::ScalarFunction> fb_;
 
     /**
      * @brief Compute the constraint with use of A and b
@@ -164,12 +240,11 @@ class LinearCost : public Cost {
      * @param input
      * @param out
      */
-    void ObjectiveCallback(const common::Function::InputRefVector &input,
-                           std::vector<Eigen::MatrixXd> &out) {
+    void ObjectiveCallback(const common::InputRefVector &input,
+                           std::vector<double> &out) {
         fc_->call(input);
         fb_->call(input);
-        out[0].data()[0] = fc_->getOutput<Eigen::VectorXd>(0).dot(input[0]) +
-                           fb_->getOutput(0).data()[0];
+        out[0] = fc_->getOutput(0).dot(input[0]) + fb_->getOutput(0);
     }
 
     /**
@@ -178,8 +253,8 @@ class LinearCost : public Cost {
      * @param input
      * @param out
      */
-    void GradientCallback(const common::Function::InputRefVector &input,
-                          std::vector<Eigen::MatrixXd> &out) {
+    void GradientCallback(const common::InputRefVector &input,
+                          std::vector<Eigen::VectorXd> &out) {
         fc_->call(input);
         out[0] = fc_->getOutput(0);
     }
@@ -194,47 +269,51 @@ class LinearCost : public Cost {
         }
 
         // Create coefficient functions
-        fc_ = std::make_shared<utils::casadi::FunctionWrapper>(
+        fc_ = std::make_shared<utils::casadi::VectorFunctionWrapper>(
             casadi::Function(this->name() + "_A", in, {densify(c)}));
-        fb_ = std::make_shared<utils::casadi::FunctionWrapper>(
+        fb_ = std::make_shared<utils::casadi::ScalarFunctionWrapper>(
             casadi::Function(this->name() + "_b", in, {densify(b)}));
 
         // Create callback functions
-        std::shared_ptr<common::CallbackFunction> obj_cb =
-            std::make_shared<common::CallbackFunction>(
+        std::shared_ptr<common::CallbackFunction<double>> obj_cb =
+            std::make_shared<common::CallbackFunction<double>>(
                 in.size(), 1,
-                [this](const common::Function::InputRefVector &in,
-                       std::vector<Eigen::MatrixXd> &out) {
+                [this](const common::InputRefVector &in,
+                       std::vector<double> &out) {
                     this->ObjectiveCallback(in, out);
                 });
-        std::shared_ptr<common::CallbackFunction> grd_cb =
-            std::make_shared<common::CallbackFunction>(
+        std::shared_ptr<common::CallbackFunction<Eigen::VectorXd>> grd_cb =
+            std::make_shared<common::CallbackFunction<Eigen::VectorXd>>(
                 in.size(), 1,
-                [this](const common::Function::InputRefVector &in,
-                       std::vector<Eigen::MatrixXd> &out) {
+                [this](const common::InputRefVector &in,
+                       std::vector<Eigen::VectorXd> &out) {
                     this->GradientCallback(in, out);
                 });
 
         // Set output sizes for the callbacks
-        obj_cb->setOutputSize(0, 1, 1);
-        grd_cb->setOutputSize(0, c.size1(), 1);
+        obj_cb->InitOutput(0, 0.0);
+        grd_cb->InitOutput(0, Eigen::VectorXd::Zero(c.size1()));
 
         // Create functions through callbacks
-        SetObjectiveFunction(obj_cb);
-        SetGradientFunction(grd_cb);
+        this->SetObjectiveFunction(obj_cb);
+        this->SetGradientFunction(grd_cb);
     }
 };
+
+typedef LinearCostBase<Eigen::MatrixXd> LinearCost;
+typedef LinearCostBase<Eigen::SparseMatrix<double>> SparseLinearCost;
 
 /**
  * @brief A cost of the form 0.5 x^T Q x + g^T x + c
  *
  */
-class QuadraticCost : public Cost {
+template <typename MatrixType>
+class QuadraticCostBase : public CostBase<MatrixType> {
    public:
-    QuadraticCost(const std::string &name, const Eigen::MatrixXd &A,
+    QuadraticCostBase(const std::string &name, const Eigen::MatrixXd &A,
                   const Eigen::VectorXd &b, const double &c, bool jac = true,
                   bool hes = true)
-        : Cost(name, "quadratic_cost") {
+        : CostBase<MatrixType>(name, "quadratic_cost") {
         // Cost
         casadi::DM Ad, bd;
         casadi::SX csx = c;
@@ -244,14 +323,14 @@ class QuadraticCost : public Cost {
         ConstructConstraint(Asx, bsx, csx, {}, jac, hes);
     }
 
-    QuadraticCost(const std::string &name, const casadi::SX &A,
+    QuadraticCostBase(const std::string &name, const casadi::SX &A,
                   const casadi::SX &b, const casadi::SX &c,
                   const casadi::SXVector &p, bool jac = true, bool hes = true)
         : Cost(name, "quadratic_cost") {
         ConstructConstraint(A, b, c, p, jac, hes);
     }
 
-    QuadraticCost(const std::string &name, const sym::Expression &ex,
+    QuadraticCostBase(const std::string &name, const sym::Expression &ex,
                   bool jac = true, bool hes = true)
         : Cost(name, "quadratic_cost") {
         int nvar = 0;
@@ -266,16 +345,14 @@ class QuadraticCost : public Cost {
         ConstructConstraint(A, b, c, ex.Parameters(), jac, hes);
     }
 
-    const Eigen::Ref<const Eigen::MatrixXd> A() { return fA_->getOutput(0); }
-    const Eigen::Ref<const Eigen::VectorXd> b() {
-        return fb_->getOutput<Eigen::VectorXd>(0);
-    }
-    const double &c() { return fc_->getOutput(0).data()[0]; }
+    const MatrixType &A() const { return fA_->getOutput(0); }
+    const Eigen::VectorXd &b() const { return fb_->getOutput(0); }
+    const double &c() const { return fc_->getOutput(0); }
 
    private:
-    std::shared_ptr<common::Function> fA_;
-    std::shared_ptr<common::Function> fb_;
-    std::shared_ptr<common::Function> fc_;
+    std::shared_ptr<common::FunctionBase<MatrixType>> fA_;
+    std::shared_ptr<common::VectorFunction> fb_;
+    std::shared_ptr<common::ScalarFunction> fc_;
 
     /**
      * @brief Compute the cost with use of A, b and c
@@ -283,15 +360,14 @@ class QuadraticCost : public Cost {
      * @param input
      * @param out
      */
-    void ObjectiveCallback(const common::Function::InputRefVector &input,
-                           std::vector<Eigen::MatrixXd> &out) {
+    void ObjectiveCallback(const common::InputRefVector &input,
+                           std::vector<double> &out) {
         fA_->call(input);
         fb_->call(input);
         fc_->call(input);
         LOG(INFO) << "Objective";
-        out[0].data()[0] = input[0].dot(fA_->getOutput(0) * input[0]) +
-                           fb_->getOutput<Eigen::VectorXd>(0).dot(input[0]) +
-                           fc_->getOutput(0).data()[0];
+        out[0] = input[0].dot(fA_->getOutput(0) * input[0]) +
+                 fb_->getOutput(0).dot(input[0]) + fc_->getOutput(0);
         LOG(INFO) << "Objective complete";
     }
 
@@ -301,8 +377,8 @@ class QuadraticCost : public Cost {
      * @param input
      * @param out
      */
-    void GradientCallback(const common::Function::InputRefVector &input,
-                          std::vector<Eigen::MatrixXd> &out) {
+    void GradientCallback(const common::InputRefVector &input,
+                          std::vector<Eigen::VectorXd> &out) {
         fA_->call(input);
         fb_->call(input);
         out[0] = 2.0 * fA_->getOutput(0) * input[0] + fb_->getOutput(0);
@@ -314,8 +390,8 @@ class QuadraticCost : public Cost {
      * @param input
      * @param out
      */
-    void HessianCallback(const common::Function::InputRefVector &input,
-                         std::vector<Eigen::MatrixXd> &out) {
+    void HessianCallback(const common::InputRefVector &input,
+                         std::vector<MatrixType> &out) {
         fA_->call(input);
         out[0] = 2.0 * fA_->getOutput(0);
     }
@@ -334,49 +410,52 @@ class QuadraticCost : public Cost {
         }
 
         // Create coefficient functions
-        fA_ = std::make_shared<utils::casadi::FunctionWrapper>(
+        fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
             casadi::Function(this->name() + "_A", in, {densify(A)}));
-        fb_ = std::make_shared<utils::casadi::FunctionWrapper>(
+        fb_ = std::make_shared<utils::casadi::VectorFunctionWrapper>(
             casadi::Function(this->name() + "_b", in, {densify(b)}));
-        fc_ = std::make_shared<utils::casadi::FunctionWrapper>(
+        fc_ = std::make_shared<utils::casadi::ScalarFunctionWrapper>(
             casadi::Function(this->name() + "_c", in, {densify(c)}));
 
         // Create callback functions
-        std::shared_ptr<common::CallbackFunction> obj_cb =
-            std::make_shared<common::CallbackFunction>(
+        std::shared_ptr<common::CallbackFunction<double>> obj_cb =
+            std::make_shared<common::CallbackFunction<double>>(
                 in.size(), 1,
-                [this](const common::Function::InputRefVector &in,
-                       std::vector<Eigen::MatrixXd> &out) {
+                [this](const common::InputRefVector &in,
+                       std::vector<double> &out) {
                     this->ObjectiveCallback(in, out);
                 });
-        std::shared_ptr<common::CallbackFunction> grd_cb =
-            std::make_shared<common::CallbackFunction>(
+        std::shared_ptr<common::CallbackFunction<Eigen::VectorXd>> grd_cb =
+            std::make_shared<common::CallbackFunction<Eigen::VectorXd>>(
                 in.size(), 1,
-                [this](const common::Function::InputRefVector &in,
-                       std::vector<Eigen::MatrixXd> &out) {
+                [this](const common::InputRefVector &in,
+                       std::vector<Eigen::VectorXd> &out) {
                     this->GradientCallback(in, out);
                 });
-        std::shared_ptr<common::CallbackFunction> hes_cb =
-            std::make_shared<common::CallbackFunction>(
+        std::shared_ptr<common::CallbackFunction<MatrixType>> hes_cb =
+            std::make_shared<common::CallbackFunction<MatrixType>>(
                 in.size(), 1,
-                [this](const common::Function::InputRefVector &in,
-                       std::vector<Eigen::MatrixXd> &out) {
+                [this](const common::InputRefVector &in,
+                       std::vector<MatrixType> &out) {
                     this->HessianCallback(in, out);
                 });
 
         // Set output sizes for the callbacks
-        obj_cb->setOutputSize(0, 1, 1);
-        grd_cb->setOutputSize(0, b.size1(), 1);
-        hes_cb->setOutputSize(0, A.size1(), A.size2());
+        obj_cb->InitOutput(0, 0.0);
+        grd_cb->InitOutput(0, Eigen::VectorXd::Zero(b.size1()));
+        hes_cb->InitOutput(0, Eigen::MatrixXd::Zero(A.size1(), A.size2()));
 
         // Create functions through callbacks
-        SetObjectiveFunction(obj_cb);
-        SetGradientFunction(grd_cb);
-        SetHessianFunction(hes_cb);
+        this->SetObjectiveFunction(obj_cb);
+        this->SetGradientFunction(grd_cb);
+        this->SetHessianFunction(hes_cb);
     }
 };
+
+typedef QuadraticCostBase<Eigen::MatrixXd> QuadraticCost;
+typedef QuadraticCostBase<Eigen::SparseMatrix<double>> SparseQuadraticCost;
 
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* SOLVERS_COST_H */
+#endif/* SOLVERS_COST_H */

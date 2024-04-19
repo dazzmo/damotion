@@ -89,19 +89,38 @@ void toCasadi(const Eigen::Matrix<::casadi::Matrix<T>, rows, cols> &E,
     }
 }
 
+Eigen::SparseMatrix<double> CreateSparseEigenMatrix(
+    const ::casadi::Sparsity &sparsity, std::vector<casadi_int> &rows,
+    std::vector<casadi_int> &cols);
+
 /**
  * @brief Function wrapper base class for casadi functions to Eigen
  * representation
  *
  */
-class FunctionWrapperBase {
+template <typename MatrixType>
+class FunctionWrapper : public common::FunctionBase<MatrixType> {
    public:
-    FunctionWrapperBase() = default;
-    ~FunctionWrapperBase() {
+    FunctionWrapper() = default;
+    ~FunctionWrapper() {
         // Release memory for casadi function
         if (!f_.is_null()) {
             f_.release(mem_);
         }
+    }
+
+    FunctionWrapper(const ::casadi::Function &f)
+        : common::FunctionBase<MatrixType>(f.n_in(), f.n_out()) {
+        *this = f;
+    }
+
+    FunctionWrapper(const FunctionWrapper &other) { *this = other.f_; }
+
+    FunctionWrapper &operator=(::casadi::Function f) { return *this; }
+
+    FunctionWrapper &operator=(const FunctionWrapper &other) {
+        *this = other.f_;
+        return *this;
     }
 
     /**
@@ -110,6 +129,20 @@ class FunctionWrapperBase {
      * @return casadi::Function&
      */
     ::casadi::Function &f() { return f_; }
+
+    /**
+     * @brief Calls the function with the current inputs
+     *
+     */
+    void callImpl(const common::InputRefVector &input) override {
+        // Set vector of inputs
+        for (int i = 0; i < input.size(); ++i) {
+            in_data_ptr_[i] = input[i].data();
+        }
+        // Call the function
+        f_(in_data_ptr_.data(), out_data_ptr_.data(), iw_.data(), dw_.data(),
+           mem_);
+    }
 
    protected:
     // Data input vector for casadi function
@@ -134,56 +167,131 @@ class FunctionWrapperBase {
     ::casadi::Function f_;
 };
 
-/**
- * @brief Class that takes a casadi::Function and allows inputs and outputs to
- * be extracted as Eigen matrices
- *
- */
-class FunctionWrapper : public FunctionWrapperBase, common::Function {
-   public:
-    FunctionWrapper() = default;
-    FunctionWrapper(::casadi::Function f);
-    FunctionWrapper &operator=(::casadi::Function f);
+typedef FunctionWrapper<double> ScalarFunctionWrapper;
+typedef FunctionWrapper<Eigen::VectorXd> VectorFunctionWrapper;
+typedef FunctionWrapper<Eigen::MatrixXd> MatrixFunctionWrapper;
+typedef FunctionWrapper<Eigen::SparseMatrix<double>> SparseFunctionWrapper;
 
-    FunctionWrapper(const FunctionWrapper &other);
-    FunctionWrapper &operator=(const FunctionWrapper &other);
+// Class specialisations
+template <>
+FunctionWrapper<double> &FunctionWrapper<double>::operator=(
+    ::casadi::Function f) {
+    if (f.is_null()) {
+        return *this;
+    }
 
-    ~FunctionWrapper();
+    // Copy function
+    f_ = f;
 
-    /**
-     * @brief Calls the function with the current inputs
-     *
-     */
-    void callImpl(const common::FunctionBase::InputRefVector &input) override;
-};
+    SetNumberOfInputs(f.n_in());
+    SetNumberOfOutputs(f.n_out());
 
-/**
- * @brief Class that takes a casadi::Function and allows inputs and outputs to
- * be extracted as sparse Eigen matrices
- *
- */
-class SparseFunctionWrapper : public FunctionWrapperBase,
-                              common::SparseFunction {
-   public:
-    SparseFunctionWrapper() = default;
-    SparseFunctionWrapper(::casadi::Function f);
-    SparseFunctionWrapper &operator=(::casadi::Function f);
+    // Initialise output data
+    OutputVector() = {};
+    out_data_ptr_ = {};
 
-    SparseFunctionWrapper(const SparseFunctionWrapper &other);
-    SparseFunctionWrapper &operator=(const SparseFunctionWrapper &other);
+    // Checkout memory object for function
+    mem_ = f.checkout();
 
-    ~SparseFunctionWrapper();
+    // Resize work vectors
+    in_data_ptr_.assign(f_.sz_arg(), nullptr);
 
-    /**
-     * @brief Calls the function with the current inputs
-     *
-     */
-    void callImpl(const common::FunctionBase::InputRefVector &input) override;
+    iw_.assign(f_.sz_iw(), 0);
+    dw_.assign(f_.sz_w(), 0.0);
 
-    Eigen::SparseMatrix<double> createSparseMatrix(
-        const ::casadi::Sparsity &sparsity, std::vector<casadi_int> &rows,
-        std::vector<casadi_int> &cols);
-};
+    // Create dense matrices for the output
+    for (int i = 0; i < f_.n_out(); ++i) {
+        const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
+        // Create dense matrix for output and add data to output data pointer
+        // vector
+        OutputVector().push_back(0.0);
+        out_data_ptr_.push_back(&OutputVector().back());
+    }
+
+    return *this;
+}
+
+template <>
+FunctionWrapper<Eigen::MatrixXd> &FunctionWrapper<Eigen::MatrixXd>::operator=(
+    ::casadi::Function f) {
+    if (f.is_null()) {
+        return *this;
+    }
+
+    // Copy function
+    f_ = f;
+
+    SetNumberOfInputs(f.n_in());
+    SetNumberOfOutputs(f.n_out());
+
+    // Initialise output data
+    OutputVector() = {};
+    out_data_ptr_ = {};
+
+    // Checkout memory object for function
+    mem_ = f.checkout();
+
+    // Resize work vectors
+    in_data_ptr_.assign(f_.sz_arg(), nullptr);
+
+    iw_.assign(f_.sz_iw(), 0);
+    dw_.assign(f_.sz_w(), 0.0);
+
+    // Create dense matrices for the output
+    for (int i = 0; i < f_.n_out(); ++i) {
+        const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
+        // Create dense matrix for output and add data to output data pointer
+        // vector
+        OutputVector().push_back(
+            Eigen::MatrixXd::Zero(sparsity.rows(), sparsity.columns()));
+        out_data_ptr_.push_back(OutputVector().back().data());
+    }
+
+    return *this;
+}
+
+template <>
+FunctionWrapper<Eigen::SparseMatrix<double>> &
+FunctionWrapper<Eigen::SparseMatrix<double>>::operator=(::casadi::Function f) {
+    if (f.is_null()) {
+        return *this;
+    }
+
+    // Copy function
+    f_ = f;
+
+    SetNumberOfInputs(f.n_in());
+    SetNumberOfOutputs(f.n_out());
+
+    // Initialise output data
+    OutputVector() = {};
+    out_data_ptr_ = {};
+
+    // Checkout memory object for function
+    mem_ = f.checkout();
+
+    // Resize work vectors
+    in_data_ptr_.assign(f_.sz_arg(), nullptr);
+
+    iw_.assign(f_.sz_iw(), 0);
+    dw_.assign(f_.sz_w(), 0.0);
+
+    // Create dense matrices for the output
+    for (int i = 0; i < f_.n_out(); ++i) {
+        const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
+        // Get sparsity data for matrix
+        std::vector<casadi_int> rows, cols;
+        sparsity.get_triplet(rows, cols);
+        rows_.push_back(rows);
+        cols_.push_back(cols);
+        // Create sparse matrix with sparsity structure
+        Eigen::SparseMatrix<double> M =
+            CreateSparseEigenMatrix(sparsity, rows, cols);
+        OutputVector().push_back(M);
+    }
+
+    return *this;
+}
 
 }  // namespace casadi
 }  // namespace utils
