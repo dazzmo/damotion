@@ -1,4 +1,4 @@
-#include "solvers/program.h"
+#include "optimisation/program.h"
 
 namespace damotion {
 namespace optimisation {

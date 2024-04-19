@@ -18,14 +18,13 @@ namespace common {
 typedef std::vector<Eigen::Ref<const Eigen::VectorXd>> InputRefVector;
 
 template <typename MatrixType>
-class FunctionBase {
+class Function {
    public:
-    FunctionBase() : n_in_(0), n_out_(0) {}
+    Function() : n_in_(0), n_out_(0) {}
 
-    FunctionBase(const int n_in, const int n_out)
-        : n_in_(n_in), n_out_(n_out) {}
+    Function(const int n_in, const int n_out) : n_in_(n_in), n_out_(n_out) {}
 
-    ~FunctionBase() = default;
+    ~Function() = default;
 
     /**
      * @brief Number of inputs for the function
@@ -109,36 +108,31 @@ class FunctionBase {
     std::vector<MatrixType> out_;
 };
 
-typedef FunctionBase<double> ScalarFunction;
-typedef FunctionBase<Eigen::VectorXd> VectorFunction;
-typedef FunctionBase<Eigen::MatrixXd> MatrixFunction;
-typedef FunctionBase<Eigen::SparseMatrix<double>> SparseFunction;
-
 /**
  * @brief Function that operates by callback
  *
  */
 template <typename MatrixType>
-class CallbackFunctionBase : public FunctionBase<MatrixType> {
+class CallbackFunction : public Function<MatrixType> {
    public:
     typedef std::function<void(const InputRefVector &,
                                std::vector<MatrixType> &)>
         f_callback_;
 
-    CallbackFunctionBase() = default;
-    ~CallbackFunctionBase() = default;
+    CallbackFunction() = default;
+    ~CallbackFunction() = default;
 
-    CallbackFunctionBase(const int n_in, const int n_out,
+    CallbackFunction(const int n_in, const int n_out,
                      const f_callback_ &callback)
-        : FunctionBase<MatrixType>(n_in, n_out) {
+        : Function<MatrixType>(n_in, n_out) {
         SetCallback(callback);
     }
 
     /**
      * @brief Initialise the output i with the values given by val
-     * 
-     * @param i 
-     * @param val 
+     *
+     * @param i
+     * @param val
      */
     void InitOutput(const int i, const MatrixType &val) {
         this->OutputVector()[i] = val;
@@ -167,11 +161,6 @@ class CallbackFunctionBase : public FunctionBase<MatrixType> {
    private:
     f_callback_ f_ = nullptr;
 };
-
-typedef CallbackFunctionBase<double> ScalarCallbackFunction; 
-typedef CallbackFunctionBase<Eigen::VectorXd> VectorCallbackFunction; 
-typedef CallbackFunctionBase<Eigen::MatrixXd> MatrixCallbackFunction;
-typedef CallbackFunctionBase<Eigen::SparseMatrix<double>> SparseCallbackFunction; 
 
 }  // namespace common
 }  // namespace damotion

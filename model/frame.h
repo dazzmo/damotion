@@ -89,7 +89,7 @@ class TargetFrame {
     // Function to compute the state of the frame
     ::casadi::Function f_;
     // Wrapper for the function of the symbolic function
-    utils::casadi::VectorFunctionWrapper f_wrapper_;
+    utils::casadi::FunctionWrapper<Eigen::VectorXd> f_wrapper_;
 };
 }  // namespace model
 }  // namespace damotion

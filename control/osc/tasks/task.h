@@ -9,9 +9,9 @@
 
 #include "common/profiler.h"
 #include "model/frame.h"
-#include "solvers/constraint.h"
-#include "solvers/cost.h"
-#include "solvers/program.h"
+#include "optimisation/constraints/constraints.h"
+#include "optimisation/costs/costs.h"
+#include "optimisation/program.h"
 #include "utils/casadi.h"
 #include "utils/codegen.h"
 #include "utils/eigen_wrapper.h"

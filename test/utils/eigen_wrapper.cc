@@ -1,6 +1,7 @@
 #include "utils/eigen_wrapper.h"
 
 #include <gtest/gtest.h>
+
 #include "common/logging.h"
 #include "utils/codegen.h"
 
@@ -9,18 +10,17 @@ TEST(EigenWrapper, EigenWrapperLoad) {
     casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
     casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});
 
-    damotion::utils::casadi::FunctionWrapper wrapper(f);
+    damotion::utils::casadi::FunctionWrapper<double> wrapper(f);
 
     // Evaluate function
-    Eigen::VectorXd x_in(1), y_in(1), output(1);
+    Eigen::VectorXd x_in(1), y_in(1);
     x_in.setRandom();
     y_in.setRandom();
     LOG(INFO) << "Calling";
     wrapper.call({x_in, y_in});
     LOG(INFO) << "Getting Output";
-    output = wrapper.getOutput(0);
 
-    EXPECT_DOUBLE_EQ(output[0], (x_in[0] + y_in[0]));
+    EXPECT_DOUBLE_EQ(wrapper.getOutput(0), (x_in[0] + y_in[0]));
 }
 
 TEST(EigenWrapper, ToCasadiDM) {
@@ -49,8 +49,8 @@ TEST(EigenWrapper, EigenWrapperSparse) {
 
     casadi::Function f("sparse_test", {x}, {y}, {"x"}, {"y"});
 
-    damotion::utils::casadi::FunctionWrapper wrapper(
-        damotion::utils::casadi::codegen(f, "./tmp"));
+    damotion::utils::casadi::FunctionWrapper<Eigen::SparseMatrix<double>>
+        wrapper(damotion::utils::casadi::codegen(f, "./tmp"));
 
     // Evaluate function
     Eigen::VectorXd x_in(1);
@@ -59,9 +59,8 @@ TEST(EigenWrapper, EigenWrapperSparse) {
     Eigen::Matrix2d I;
     I.setIdentity();
 
-    wrapper.setSparseOutput(0);
     wrapper.call({x_in});
-    Eigen::SparseMatrix<double> res = wrapper.getOutputSparse(0);
+    Eigen::SparseMatrix<double> res = wrapper.getOutput(0);
 
     EXPECT_TRUE(res.isApprox(I));
 }
@@ -71,16 +70,15 @@ TEST(EigenWrapper, EigenWrapperCodegenLoad) {
     casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
     casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});
 
-    damotion::utils::casadi::FunctionWrapper wrapper(
+    damotion::utils::casadi::FunctionWrapper<double> wrapper(
         damotion::utils::casadi::codegen(f, "./tmp"));
 
     // Evaluate function
-    Eigen::VectorXd x_in(1), y_in(1), output(1);
+    Eigen::VectorXd x_in(1), y_in(1);
     x_in.setRandom();
     y_in.setRandom();
 
     wrapper.call({x_in, y_in});
-    output = wrapper.getOutput(0);
 
-    EXPECT_DOUBLE_EQ(output[0], (x_in[0] + y_in[0]));
+    EXPECT_DOUBLE_EQ(wrapper.getOutput(0), (x_in[0] + y_in[0]));
 }

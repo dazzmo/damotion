@@ -99,7 +99,7 @@ Eigen::SparseMatrix<double> CreateSparseEigenMatrix(
  *
  */
 template <typename MatrixType>
-class FunctionWrapper : public common::FunctionBase<MatrixType> {
+class FunctionWrapper : public common::Function<MatrixType> {
    public:
     FunctionWrapper() = default;
     ~FunctionWrapper() {
@@ -110,7 +110,7 @@ class FunctionWrapper : public common::FunctionBase<MatrixType> {
     }
 
     FunctionWrapper(const ::casadi::Function &f)
-        : common::FunctionBase<MatrixType>(f.n_in(), f.n_out()) {
+        : common::Function<MatrixType>(f.n_in(), f.n_out()) {
         *this = f;
     }
 
@@ -167,131 +167,18 @@ class FunctionWrapper : public common::FunctionBase<MatrixType> {
     ::casadi::Function f_;
 };
 
-typedef FunctionWrapper<double> ScalarFunctionWrapper;
-typedef FunctionWrapper<Eigen::VectorXd> VectorFunctionWrapper;
-typedef FunctionWrapper<Eigen::MatrixXd> MatrixFunctionWrapper;
-typedef FunctionWrapper<Eigen::SparseMatrix<double>> SparseFunctionWrapper;
-
 // Class specialisations
 template <>
 FunctionWrapper<double> &FunctionWrapper<double>::operator=(
-    ::casadi::Function f) {
-    if (f.is_null()) {
-        return *this;
-    }
-
-    // Copy function
-    f_ = f;
-
-    SetNumberOfInputs(f.n_in());
-    SetNumberOfOutputs(f.n_out());
-
-    // Initialise output data
-    OutputVector() = {};
-    out_data_ptr_ = {};
-
-    // Checkout memory object for function
-    mem_ = f.checkout();
-
-    // Resize work vectors
-    in_data_ptr_.assign(f_.sz_arg(), nullptr);
-
-    iw_.assign(f_.sz_iw(), 0);
-    dw_.assign(f_.sz_w(), 0.0);
-
-    // Create dense matrices for the output
-    for (int i = 0; i < f_.n_out(); ++i) {
-        const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
-        // Create dense matrix for output and add data to output data pointer
-        // vector
-        OutputVector().push_back(0.0);
-        out_data_ptr_.push_back(&OutputVector().back());
-    }
-
-    return *this;
-}
+    ::casadi::Function f);
 
 template <>
 FunctionWrapper<Eigen::MatrixXd> &FunctionWrapper<Eigen::MatrixXd>::operator=(
-    ::casadi::Function f) {
-    if (f.is_null()) {
-        return *this;
-    }
-
-    // Copy function
-    f_ = f;
-
-    SetNumberOfInputs(f.n_in());
-    SetNumberOfOutputs(f.n_out());
-
-    // Initialise output data
-    OutputVector() = {};
-    out_data_ptr_ = {};
-
-    // Checkout memory object for function
-    mem_ = f.checkout();
-
-    // Resize work vectors
-    in_data_ptr_.assign(f_.sz_arg(), nullptr);
-
-    iw_.assign(f_.sz_iw(), 0);
-    dw_.assign(f_.sz_w(), 0.0);
-
-    // Create dense matrices for the output
-    for (int i = 0; i < f_.n_out(); ++i) {
-        const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
-        // Create dense matrix for output and add data to output data pointer
-        // vector
-        OutputVector().push_back(
-            Eigen::MatrixXd::Zero(sparsity.rows(), sparsity.columns()));
-        out_data_ptr_.push_back(OutputVector().back().data());
-    }
-
-    return *this;
-}
+    ::casadi::Function f);
 
 template <>
 FunctionWrapper<Eigen::SparseMatrix<double>> &
-FunctionWrapper<Eigen::SparseMatrix<double>>::operator=(::casadi::Function f) {
-    if (f.is_null()) {
-        return *this;
-    }
-
-    // Copy function
-    f_ = f;
-
-    SetNumberOfInputs(f.n_in());
-    SetNumberOfOutputs(f.n_out());
-
-    // Initialise output data
-    OutputVector() = {};
-    out_data_ptr_ = {};
-
-    // Checkout memory object for function
-    mem_ = f.checkout();
-
-    // Resize work vectors
-    in_data_ptr_.assign(f_.sz_arg(), nullptr);
-
-    iw_.assign(f_.sz_iw(), 0);
-    dw_.assign(f_.sz_w(), 0.0);
-
-    // Create dense matrices for the output
-    for (int i = 0; i < f_.n_out(); ++i) {
-        const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
-        // Get sparsity data for matrix
-        std::vector<casadi_int> rows, cols;
-        sparsity.get_triplet(rows, cols);
-        rows_.push_back(rows);
-        cols_.push_back(cols);
-        // Create sparse matrix with sparsity structure
-        Eigen::SparseMatrix<double> M =
-            CreateSparseEigenMatrix(sparsity, rows, cols);
-        OutputVector().push_back(M);
-    }
-
-    return *this;
-}
+FunctionWrapper<Eigen::SparseMatrix<double>>::operator=(::casadi::Function f);
 
 }  // namespace casadi
 }  // namespace utils

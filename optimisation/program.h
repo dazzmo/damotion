@@ -4,9 +4,9 @@
 #include <casadi/casadi.hpp>
 
 #include "common/profiler.h"
-#include "solvers/binding.h"
-#include "solvers/constraint.h"
-#include "solvers/cost.h"
+#include "optimisation/binding.h"
+#include "optimisation/constraints/constraints.h"
+#include "optimisation/costs/costs.h"
 #include "symbolic/expression.h"
 #include "symbolic/parameter.h"
 #include "symbolic/variable.h"
@@ -21,6 +21,7 @@ namespace optimisation {
 
 // Forward declaration of SolverBase
 namespace solvers {
+template<typename MatrixType>
 class SolverBase;
 }
 
@@ -187,10 +188,10 @@ class ParameterManager {
     std::vector<Eigen::MatrixXd> parameter_vals_;
 };
 
-template <typename MatrixType = Eigen::MatrixXd>
+template <typename MatrixType>
 class CostManager {
    public:
-    typedef CostBase<MatrixType> Cost;
+    typedef CostBase<MatrixType> CostType;
 
     CostManager() = default;
     ~CostManager() = default;
@@ -203,10 +204,10 @@ class CostManager {
      * @param p
      * @return Binding<Cost<MatrixType>>
      */
-    Binding<Cost> AddCost(const std::shared_ptr<Cost> &cost,
-                          const sym::VariableRefVector &x,
-                          const sym::ParameterVector &p) {
-        Binding<Cost> binding(cost, x, p);
+    Binding<CostType> AddCost(const std::shared_ptr<CostType> &cost,
+                              const sym::VariableRefVector &x,
+                              const sym::ParameterVector &p) {
+        Binding<CostType> binding(cost, x, p);
         costs_.push_back(binding);
         return costs_.back();
     }
@@ -226,8 +227,8 @@ class CostManager {
         return quadratic_costs_.back();
     }
 
-    std::vector<Binding<Cost>> GetAllCostBindings() {
-        std::vector<Binding<Cost>> costs;
+    std::vector<Binding<CostType>> GetAllCostBindings() {
+        std::vector<Binding<CostType>> costs;
         costs.insert(costs.begin(), linear_costs_.begin(), linear_costs_.end());
         costs.insert(costs.begin(), quadratic_costs_.begin(),
                      quadratic_costs_.end());
@@ -253,12 +254,12 @@ class CostManager {
 
    private:
     // Costs
-    std::vector<Binding<Cost>> costs_;
+    std::vector<Binding<CostType>> costs_;
     std::vector<Binding<LinearCost<MatrixType>>> linear_costs_;
     std::vector<Binding<QuadraticCost<MatrixType>>> quadratic_costs_;
 };
 
-template <typename MatrixType = Eigen::MatrixXd>
+template <typename MatrixType>
 class ConstraintManager {
    public:
     ConstraintManager() : n_constraints_(0) {}
@@ -280,11 +281,11 @@ class ConstraintManager {
      * @param p
      * @return Binding<ConstraintBase>
      */
-    Binding<Constraint> AddConstraint(const std::shared_ptr<Constraint> &con,
-                                      const sym::VariableRefVector &x,
-                                      const sym::ParameterVector &p) {
+    Binding<ConstraintBase<MatrixType>> AddConstraint(
+        const std::shared_ptr<ConstraintBase<MatrixType>> &con,
+        const sym::VariableRefVector &x, const sym::ParameterVector &p) {
         // Create a binding for the constraint
-        constraints_.push_back(Binding<Constraint>(con, x, p));
+        constraints_.push_back(Binding<ConstraintBase<MatrixType>>(con, x, p));
         n_constraints_ += con->Dimension();
         return constraints_.back();
     }
@@ -404,7 +405,7 @@ class ProgramBase : public DecisionVariableManager,
     ProgramBase() = default;
     ~ProgramBase() = default;
 
-    friend class solvers::SolverBase;
+    friend class solvers::SolverBase<MatrixType>;
 
     ProgramBase(const std::string &name) : name_(name) {}
 
@@ -437,10 +438,12 @@ class ProgramBase : public DecisionVariableManager,
                   << this->NumberOfDecisionVariables() << '\n';
         std::cout << "Variables\tSize\n";
 
-        std::cout << "Number of Constraints: " << this->NumberOfConstraints() << '\n';
+        std::cout << "Number of Constraints: " << this->NumberOfConstraints()
+                  << '\n';
         std::cout << "Constraint\tSize\n";
 
-        std::cout << "Number of Parameters: " << this->NumberOfParameters() << '\n';
+        std::cout << "Number of Parameters: " << this->NumberOfParameters()
+                  << '\n';
         std::cout << "Parameters\tSize\n";
 
         std::cout << "-----------------------\n";
