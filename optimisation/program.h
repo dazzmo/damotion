@@ -21,7 +21,7 @@ namespace optimisation {
 
 // Forward declaration of SolverBase
 namespace solvers {
-template<typename MatrixType>
+template <typename MatrixType>
 class SolverBase;
 }
 
@@ -235,6 +235,29 @@ class CostManager {
 
         // Return vector of all costs
         return costs;
+    }
+
+    /**
+     * @brief Get the vector of current LinearCost objects within the
+     * program.
+     *
+     * @return std::vector<Binding<LinearCost>>&
+     */
+    std::vector<Binding<LinearCost<MatrixType>>> &GetLinearCostBindings() {
+        // Create constraints
+        return linear_costs_;
+    }
+
+    /**
+     * @brief Get the vector of current QuadraticCost objects within the
+     * program.
+     *
+     * @return std::vector<Binding<QuadraticCost>>&
+     */
+    std::vector<Binding<QuadraticCost<MatrixType>>> &
+    GetQuadraticCostBindings() {
+        // Create constraints
+        return quadratic_costs_;
     }
 
     /**

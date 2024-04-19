@@ -4,7 +4,7 @@
 #include <qpOASES.hpp>
 
 #include "common/profiler.h"
-#include "solvers/program.h"
+#include "optimisation/program.h"
 #include "solvers/solver.h"
 
 namespace damotion {
@@ -18,18 +18,15 @@ class QPOASESSolverInstance : public Solver {
     QPOASESSolverInstance() = default;
 
     QPOASESSolverInstance(Program& prog) : Solver(prog) {
-
         // Create problem
-        qp_ = std::make_unique<qpOASES::SQProblem>(
-            GetCurrentProgram().NumberOfDecisionVariables(),
-            GetCurrentProgram().NumberOfConstraints());
-        lbx_ = Eigen::VectorXd::Zero(
-            GetCurrentProgram().NumberOfDecisionVariables());
-        ubx_ = Eigen::VectorXd::Zero(
-            GetCurrentProgram().NumberOfDecisionVariables());
+        int nx = GetCurrentProgram().NumberOfDecisionVariables();
+        int nc = GetCurrentProgram().NumberOfConstraints();
+        qp_ = std::make_unique<qpOASES::SQProblem>(nx, nc);
+        lbx_ = Eigen::VectorXd::Zero(nx);
+        ubx_ = Eigen::VectorXd::Zero(nx);
 
         // Create variable bounds from bounding box constraints
-        for (Binding<BoundingBoxConstraint>& binding :
+        for (Binding<BoundingBoxConstraint<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
             // For each variable of the constraint
             const sym::VariableVector& v = binding.GetVariable(0);
@@ -44,40 +41,12 @@ class QPOASESSolverInstance : public Solver {
         }
 
         // Constraint bounds
-        ubA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
-        lbA_ = Eigen::VectorXd::Zero(GetCurrentProgram().NumberOfConstraints());
+        ubA_ = Eigen::VectorXd::Zero(nc);
+        lbA_ = Eigen::VectorXd::Zero(nc);
 
-        H_ = Eigen::MatrixXd::Zero(
-            GetCurrentProgram().NumberOfDecisionVariables(),
-            GetCurrentProgram().NumberOfDecisionVariables());
+        H_ = Eigen::MatrixXd::Zero(nx, nx);
 
-        g_ = Eigen::VectorXd::Zero(
-            GetCurrentProgram().NumberOfDecisionVariables());
-
-        // Sparse Method
-
-        // /* Construct sparse symmetric Hessian in qpOASES environment  */
-        // const Eigen::SparseMatrix<double>& H =
-        //     GetCurrentProgram().LagrangianHessian();
-
-        // int* h_colind = const_cast<int*>(H.outerIndexPtr());
-        // int* h_row = const_cast<int*>(H.innerIndexPtr());
-        // double* h = const_cast<double*>(H.valuePtr());
-        // // Get matrix data in CCS
-        // H_ = std::make_unique<qpOASES::SymSparseMat>(H.rows(), H.cols(),
-        // h_row,
-        //                                              h_colind, h);
-        // H_->createDiagInfo();
-        // /* Construct sparse constraint Jacobian in qpOASES environment  */
-        // const Eigen::SparseMatrix<double>& A =
-        //     GetCurrentProgram().ConstraintJacobian();
-        // int* a_colind = const_cast<int*>(A.outerIndexPtr());
-        // int* a_row = const_cast<int*>(A.innerIndexPtr());
-        // double* a = const_cast<double*>(A.valuePtr());
-
-        // A_ = std::make_unique<qpOASES::SparseMatrix>(A.rows(), A.cols(),
-        // a_row,
-        //                                              a_colind, a);
+        g_ = Eigen::VectorXd::Zero(nx);
     }
 
     ~QPOASESSolverInstance() {}
@@ -98,7 +67,7 @@ class QPOASESSolverInstance : public Solver {
         H_.setZero();
 
         // Update variable bounds, if any have changed
-        for (Binding<BoundingBoxConstraint>& binding :
+        for (Binding<BoundingBoxConstraint<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
             if (binding.Get().IsUpdated()) {
                 // For each variable of the constraint
@@ -115,7 +84,7 @@ class QPOASESSolverInstance : public Solver {
         }
 
         // Linear costs
-        for (Binding<LinearCost>& binding :
+        for (Binding<LinearCost<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetLinearCostBindings()) {
             const std::vector<bool>& continuous =
                 CostBindingContinuousInputCheck(binding);
@@ -128,15 +97,13 @@ class QPOASESSolverInstance : public Solver {
                 g_, binding.Get().c(), binding.GetVariable(0), continuous[0]);
         }
         // Quadratic costs
-        for (Binding<QuadraticCost>& binding :
+        for (Binding<QuadraticCost<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetQuadraticCostBindings()) {
             const std::vector<bool>& continuous =
                 CostBindingContinuousInputCheck(binding);
 
             // Evaluate the cost
-            EvaluateCost(binding.Get(), primal_solution_x_,
-                         binding.GetVariables(), binding.GetParameters(),
-                         continuous, true, true, false);
+            EvaluateCost(binding, primal_solution_x_, true, true, false);
 
             // Update the gradient
             UpdateVectorAtVariableLocations(
@@ -222,9 +189,6 @@ class QPOASESSolverInstance : public Solver {
     // std::unique_ptr<qpOASES::SparseMatrix> A_;
     std::unique_ptr<qpOASES::SQProblem> qp_;
 
-    std::unique_ptr<Solver> solver_dense_;
-    std::unique_ptr<SparseSolver> solver_sparse_;
-
     Eigen::MatrixXd H_;
     Eigen::VectorXd g_;
 
@@ -240,7 +204,6 @@ class SparseQPOASESSolverInstance : public SparseSolver {
     SparseQPOASESSolverInstance() = default;
 
     SparseQPOASESSolverInstance(SparseProgram& prog) : SparseSolver(prog) {
-
         // Create problem
         qp_ = std::make_unique<qpOASES::SQProblem>(
             GetCurrentProgram().NumberOfDecisionVariables(),
@@ -279,8 +242,7 @@ class SparseQPOASESSolverInstance : public SparseSolver {
         int* h_row = const_cast<int*>(H.innerIndexPtr());
         double* h = const_cast<double*>(H.valuePtr());
         // Get matrix data in CCS
-        H_ = std::make_unique<qpOASES::SymSparseMat>(H.rows(), H.cols(),
-        h_row,
+        H_ = std::make_unique<qpOASES::SymSparseMat>(H.rows(), H.cols(), h_row,
                                                      h_colind, h);
         H_->createDiagInfo();
         /* Construct sparse constraint Jacobian in qpOASES environment  */
@@ -290,8 +252,7 @@ class SparseQPOASESSolverInstance : public SparseSolver {
         int* a_row = const_cast<int*>(A.innerIndexPtr());
         double* a = const_cast<double*>(A.valuePtr());
 
-        A_ = std::make_unique<qpOASES::SparseMatrix>(A.rows(), A.cols(),
-        a_row,
+        A_ = std::make_unique<qpOASES::SparseMatrix>(A.rows(), A.cols(), a_row,
                                                      a_colind, a);
     }
 
@@ -390,7 +351,6 @@ class SparseQPOASESSolverInstance : public SparseSolver {
             LOG(INFO) << binding.Get().b();
         }
 
-
         // std::cout << H << std::endl;
         // std::cout << g_.transpose() << std::endl;
         // std::cout << A << std::endl;
@@ -402,7 +362,8 @@ class SparseQPOASESSolverInstance : public SparseSolver {
         // Solve
         // int nWSR = 100;
         // if (first_solve_) {
-        //     qp_->init(H.data(), g_.data(), A.data(), lbx_.data(), ubx_.data(),
+        //     qp_->init(H.data(), g_.data(), A.data(), lbx_.data(),
+        //     ubx_.data(),
         //               lbA_.data(), ubA_.data(), nWSR);
         //     first_solve_ = false;
         // } else {
