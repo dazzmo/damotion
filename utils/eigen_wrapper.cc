@@ -120,14 +120,15 @@ FunctionWrapper<Eigen::SparseMatrix<double>>::operator=(::casadi::Function f) {
         Eigen::SparseMatrix<double> M =
             CreateSparseEigenMatrix(sparsity, rows, cols);
         OutputVector().push_back(M);
+        out_data_ptr_.push_back(OutputVector().back().valuePtr());
     }
 
     return *this;
 }
 
 Eigen::SparseMatrix<double> CreateSparseEigenMatrix(
-    const ::casadi::Sparsity& sparsity, std::vector<casadi_int>& rows,
-    std::vector<casadi_int>& cols) {
+    const ::casadi::Sparsity &sparsity, std::vector<casadi_int> &rows,
+    std::vector<casadi_int> &cols) {
     // Create Eigen::SparseMatrix from sparsity information
     Eigen::SparseMatrix<double> M(sparsity.rows(), sparsity.columns());
 

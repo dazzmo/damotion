@@ -184,4 +184,4 @@ FunctionWrapper<Eigen::SparseMatrix<double>>::operator=(::casadi::Function f);
 }  // namespace utils
 }  // namespace damotion
 
-#endif /* UTILS_EIGEN_WRAPPER_H */
+#endif/* UTILS_EIGEN_WRAPPER_H */
