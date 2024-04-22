@@ -17,16 +17,22 @@ class Solver : public SolverBase<Eigen::MatrixXd> {
    public:
     Solver(Program& program) : SolverBase<Eigen::MatrixXd>(program) {
         // Initialise dense constraint Jacobian and Lagrangian Hessian
+        constraint_jacobian_cache_ = Eigen::MatrixXd::Zero(
+            program.NumberOfConstraints(), program.NumberOfDecisionVariables());
+        lagrangian_hes_cache_ =
+            Eigen::MatrixXd::Zero(program.NumberOfDecisionVariables(),
+                                  program.NumberOfDecisionVariables());
     }
     ~Solver() = default;
 
-    void EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
-                      bool grd, bool hes, bool update_cache = true);
+    void EvaluateCost(Binding<CostType> const& binding,
+                      const Eigen::VectorXd& x, bool grd, bool hes,
+                      bool update_cache = true);
 
     void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes);
 
     // Evaluates the constraint and updates the cache for the gradients
-    void EvaluateConstraint(Binding<ConstraintType>& binding,
+    void EvaluateConstraint(const Binding<ConstraintType>& binding,
                             const int& constraint_idx, const Eigen::VectorXd& x,
                             bool jac, bool update_cache = true);
 
@@ -43,14 +49,15 @@ class Solver : public SolverBase<Eigen::MatrixXd> {
                                           const sym::VariableVector& var_y,
                                           bool is_block_x, bool is_block_y);
 
-   private:
+   protected:
     Eigen::VectorXd constraint_cache_;
     Eigen::MatrixXd constraint_jacobian_cache_;
-};
 
+   private:
+};
 
 }  // namespace solvers
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* SOLVERS_SOLVER_H */
+#endif /* SOLVERS_SOLVER_H */

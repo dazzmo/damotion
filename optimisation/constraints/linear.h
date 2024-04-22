@@ -23,14 +23,14 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
     LinearConstraint(const std::string &name, const casadi::SX &A,
                      const casadi::SX &b, const casadi::SXVector &p,
                      const BoundsType &bounds, bool jac = true)
-        : Constraint(name, "linear_constraint") {
+        : ConstraintBase<MatrixType>(name, "linear_constraint") {
         ConstructConstraint(A, b, p, bounds, jac);
     }
 
     LinearConstraint(const std::string &name, const Eigen::MatrixXd &A,
                      const Eigen::VectorXd &b, const BoundsType &bounds,
                      bool jac = true)
-        : Constraint(name, "linear_constraint") {
+        : ConstraintBase<MatrixType>(name, "linear_constraint") {
         // Constant vector b
         casadi::DM Ad, bd;
         damotion::utils::casadi::toCasadi(b, bd);
@@ -44,7 +44,7 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
 
     LinearConstraint(const std::string &name, const sym::Expression &ex,
                      const BoundsType &bounds, bool jac = true)
-        : Constraint(name, "linear_constraint") {
+        : ConstraintBase<MatrixType>(name, "linear_constraint") {
         // Extract linear form
         casadi::SX A, b;
         casadi::SX::linear_coeff(ex, ex.Variables()[0], A, b, true);
@@ -87,6 +87,9 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
      */
     void ConstraintCallback(const common::InputRefVector &input,
                             std::vector<Eigen::VectorXd> &out) {
+                                LOG(INFO) << input[0];
+                                LOG(INFO) << fA_->getOutput(0);
+                                LOG(INFO) << fb_->getOutput(0);
         out[0] = fA_->getOutput(0) * input[0] + fb_->getOutput(0);
     }
 
@@ -129,6 +132,8 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
         fb_ = std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
             casadi::Function(this->name() + "_b", in, {densify(b)}));
 
+        LOG(INFO) << "fA and fb made";
+
         std::shared_ptr<common::CallbackFunction<Eigen::VectorXd>> con_cb =
             std::make_shared<common::CallbackFunction<Eigen::VectorXd>>(
                 in.size(), 1,
@@ -144,6 +149,8 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
                     this->JacobianCallback(in, out);
                 });
 
+        LOG(INFO) << "Callbacks registered";
+
         // Set output sizes for the callback
         con_cb->InitOutput(0, Eigen::VectorXd::Zero(A.size1()));
         // Construct jacobian
@@ -156,6 +163,8 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
             jac_cb->InitOutput(0, Eigen::MatrixXd::Zero(A.size1(), A.size2()));
         }
 
+        LOG(INFO) << "Initialised";
+
         // Create functions through callbacks
         this->SetConstraintFunction(con_cb);
         this->SetJacobianFunction(jac_cb);
@@ -165,4 +174,4 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* CONSTRAINTS_LINEAR_H */
+#endif/* CONSTRAINTS_LINEAR_H */

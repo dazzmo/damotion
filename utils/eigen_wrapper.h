@@ -116,7 +116,42 @@ class FunctionWrapper : public common::Function<MatrixType> {
 
     FunctionWrapper(const FunctionWrapper &other) { *this = other.f_; }
 
-    FunctionWrapper &operator=(::casadi::Function f) { return *this; }
+    FunctionWrapper &operator=(::casadi::Function f) {
+        if (f.is_null()) {
+            return *this;
+        }
+
+        // Copy function
+        this->f_ = f;
+
+        this->SetNumberOfInputs(f.n_in());
+        this->SetNumberOfOutputs(f.n_out());
+
+        // Initialise output data
+        this->OutputVector() = {};
+        this->out_data_ptr_ = {};
+
+        // Checkout memory object for function
+        this->mem_ = f.checkout();
+
+        // Resize work vectors
+        this->in_data_ptr_.assign(f_.sz_arg(), nullptr);
+
+        this->iw_.assign(f_.sz_iw(), 0);
+        this->dw_.assign(f_.sz_w(), 0.0);
+
+        // Create dense matrices for the output
+        for (int i = 0; i < f_.n_out(); ++i) {
+            const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
+            // Create dense matrix for output and add data to output data
+            // pointer vector
+            this->OutputVector().push_back(
+                Eigen::MatrixXd::Zero(sparsity.rows(), sparsity.columns()));
+            this->out_data_ptr_.push_back(this->OutputVector().back().data());
+        }
+
+        return *this;
+    }
 
     FunctionWrapper &operator=(const FunctionWrapper &other) {
         *this = other.f_;
@@ -146,9 +181,9 @@ class FunctionWrapper : public common::Function<MatrixType> {
 
    protected:
     // Data input vector for casadi function
-    std::vector<const double *> in_data_ptr_;
+    mutable std::vector<const double *> in_data_ptr_;
     // Data output pointers for casadi function
-    std::vector<double *> out_data_ptr_;
+    mutable std::vector<double *> out_data_ptr_;
 
     // Row triplet data for nnz of each output
     std::vector<std::vector<casadi_int>> rows_;
@@ -159,21 +194,17 @@ class FunctionWrapper : public common::Function<MatrixType> {
     int mem_;
 
     // Integer working vector
-    std::vector<casadi_int> iw_;
+    mutable std::vector<casadi_int> iw_;
     // Double working vector
-    std::vector<double> dw_;
+    mutable std::vector<double> dw_;
 
     // Underlying function
-    ::casadi::Function f_;
+    mutable ::casadi::Function f_;
 };
 
 // Class specialisations
 template <>
 FunctionWrapper<double> &FunctionWrapper<double>::operator=(
-    ::casadi::Function f);
-
-template <>
-FunctionWrapper<Eigen::MatrixXd> &FunctionWrapper<Eigen::MatrixXd>::operator=(
     ::casadi::Function f);
 
 template <>
@@ -184,4 +215,4 @@ FunctionWrapper<Eigen::SparseMatrix<double>>::operator=(::casadi::Function f);
 }  // namespace utils
 }  // namespace damotion
 
-#endif/* UTILS_EIGEN_WRAPPER_H */
+#endif /* UTILS_EIGEN_WRAPPER_H */

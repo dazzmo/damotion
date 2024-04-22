@@ -87,13 +87,15 @@ class CostBase {
         }
     }
 
-    std::shared_ptr<common::Function<double>> &ObjectiveFunction() {
+    const std::shared_ptr<common::Function<double>> &ObjectiveFunction() const {
         return obj_;
     }
-    std::shared_ptr<common::Function<Eigen::VectorXd>> &GradientFunction() {
+    const std::shared_ptr<common::Function<Eigen::VectorXd>> &GradientFunction()
+        const {
         return grad_;
     }
-    std::shared_ptr<common::Function<MatrixType>> &HessianFunction() {
+    const std::shared_ptr<common::Function<MatrixType>> &HessianFunction()
+        const {
         return hes_;
     }
 

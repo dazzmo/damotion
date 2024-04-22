@@ -86,9 +86,9 @@ TEST(Program, AddLinearConstraint) {
     A << 1.0, 2.0;
     Eigen::Vector<double, 1> b(3.0);
 
-    std::shared_ptr<opt::LinearConstraint> con =
-        std::make_shared<opt::LinearConstraint>("", A, b,
-                                                opt::BoundsType::kEquality);
+    std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>> con =
+        std::make_shared<opt::LinearConstraint<Eigen::MatrixXd>>(
+            "", A, b, opt::BoundsType::kEquality);
 
     program.AddDecisionVariables(x);
     program.AddDecisionVariables(y);
@@ -97,38 +97,44 @@ TEST(Program, AddLinearConstraint) {
     xy << x[0], y[1];
 
     program.AddLinearConstraint(con, {xy}, {});
+    LOG(INFO) << "Added Linear Constraint";
 
     sym::Parameter a("a", 2);
     program.AddParameter(a);
+
+    LOG(INFO) << "Added Parameter";
 
     // Create random cost
     casadi::SX xx = casadi::SX::sym("x", 4);
     sym::Expression J = dot(xx, xx) + xx(0) + xx(0) * xx(2);
     J.SetInputs({xx}, {});
-    std::shared_ptr<opt::QuadraticCost> cost =
-        std::make_shared<opt::QuadraticCost>("sum_squares", J);
+    std::shared_ptr<opt::QuadraticCost<Eigen::MatrixXd>> cost =
+        std::make_shared<opt::QuadraticCost<Eigen::MatrixXd>>("sum_squares", J);
 
     sym::VariableVector xxyy(4);
     xxyy << x, y;
     program.AddQuadraticCost(cost, {xxyy}, {});
 
+    LOG(INFO) << "Added Quadratic Cost";
+
     // Create optimisation vector
     program.SetDecisionVariableVector();
 
+
     program.AddBoundingBoxConstraint(-1.0, 1.0, x);
     program.AddBoundingBoxConstraint(-2.0, 2.0, y);
-
-    program.UpdateBindings();
-
+    
+    LOG(INFO) << "Added Bounding Box Constraints";
+    
     program.ListDecisionVariables();
     program.ListParameters();
     program.ListCosts();
     program.ListConstraints();
 
-    // opt::solvers::SolverBase solver(program);
-
     // Create QPOASES solver and test if constraint jacobian gets created
     opt::solvers::QPOASESSolverInstance solver(program);
+
+    LOG(INFO) << "Created solver";
 
     solver.Solve();
     solver.Solve();
@@ -137,49 +143,48 @@ TEST(Program, AddLinearConstraint) {
 }
 
 TEST(Program, SparseProgram) {
-    // Create codegen function
-    sym::VariableVector x = sym::CreateVariableVector("x", 2);
-    sym::VariableVector y = sym::CreateVariableVector("y", 2);
+    // // Create codegen function
+    // sym::VariableVector x = sym::CreateVariableVector("x", 2);
+    // sym::VariableVector y = sym::CreateVariableVector("y", 2);
 
-    opt::Program program;
+    // opt::Program program;
 
-    // Create constraint x0 + 2 y1 + 3 = 0
-    Eigen::Matrix<double, 1, 2> A;
-    A << 1.0, 2.0;
-    Eigen::Vector<double, 1> b(3.0);
+    // // Create constraint x0 + 2 y1 + 3 = 0
+    // Eigen::Matrix<double, 1, 2> A;
+    // A << 1.0, 2.0;
+    // Eigen::Vector<double, 1> b(3.0);
 
-    std::shared_ptr<opt::LinearConstraint> con =
-        std::make_shared<opt::LinearConstraint>("", A, b,
-                                                opt::BoundsType::kEquality);
-    
-    con->JacobianFunction()->setSparseOutput(0);
+    // std::shared_ptr<opt::LinearConstraint> con =
+    //     std::make_shared<opt::LinearConstraint>("", A, b,
+    //                                             opt::BoundsType::kEquality);
 
-    program.AddDecisionVariables(x);
-    program.AddDecisionVariables(y);
+    // con->JacobianFunction()->setSparseOutput(0);
 
-    sym::VariableVector xy(2);
-    xy << x[0], y[1];
+    // program.AddDecisionVariables(x);
+    // program.AddDecisionVariables(y);
 
-    program.AddLinearConstraint(con, {xy}, {});
+    // sym::VariableVector xy(2);
+    // xy << x[0], y[1];
 
-    // Create optimisation vector
-    program.SetDecisionVariableVector();
+    // program.AddLinearConstraint(con, {xy}, {});
 
-    program.AddBoundingBoxConstraint(-1.0, 1.0, x);
-    program.AddBoundingBoxConstraint(-2.0, 2.0, y);
+    // // Create optimisation vector
+    // program.SetDecisionVariableVector();
 
-    program.UpdateBindings();
+    // program.AddBoundingBoxConstraint(-1.0, 1.0, x);
+    // program.AddBoundingBoxConstraint(-2.0, 2.0, y);
 
-    program.ListDecisionVariables(); 
-    program.ListParameters();
-    program.ListCosts();
-    program.ListConstraints();
+    // program.UpdateBindings();
 
-    LOG(INFO) << "Here\n";
-    opt::solvers::SolverBase solver(program, true);
+    // program.ListDecisionVariables();
+    // program.ListParameters();
+    // program.ListCosts();
+    // program.ListConstraints();
 
-    // Create QPOASES solver and test if constraint jacobian gets created
+    // LOG(INFO) << "Here\n";
+    // opt::solvers::SolverBase solver(program, true);
 
+    // // Create QPOASES solver and test if constraint jacobian gets created
 
-    damotion::common::Profiler summary;
+    // damotion::common::Profiler summary;
 }

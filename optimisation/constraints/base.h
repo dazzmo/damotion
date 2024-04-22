@@ -103,13 +103,16 @@ class ConstraintBase {
      */
     const int Dimension() const { return dim_; }
 
-    std::shared_ptr<common::Function<Eigen::VectorXd>> &ConstraintFunction() {
+    const std::shared_ptr<common::Function<Eigen::VectorXd>> &
+    ConstraintFunction() const {
         return con_;
     }
-    std::shared_ptr<common::Function<MatrixType>> &JacobianFunction() {
+    const std::shared_ptr<common::Function<MatrixType>> &JacobianFunction()
+        const {
         return jac_;
     }
-    std::shared_ptr<common::Function<MatrixType>> &HessianFunction() {
+    const std::shared_ptr<common::Function<MatrixType>> &HessianFunction()
+        const {
         return hes_;
     }
 
@@ -323,4 +326,4 @@ typedef ConstraintBase<Eigen::SparseMatrix<double>> SparseConstraint;
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* CONSTRAINTS_BASE_H */
+#endif /* CONSTRAINTS_BASE_H */

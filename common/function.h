@@ -20,9 +20,22 @@ typedef std::vector<Eigen::Ref<const Eigen::VectorXd>> InputRefVector;
 template <typename MatrixType>
 class Function {
    public:
+    /**
+     * @brief Empty constructor for the Function class
+     *
+     */
     Function() : n_in_(0), n_out_(0) {}
 
-    Function(const int n_in, const int n_out) : n_in_(n_in), n_out_(n_out) {}
+    /**
+     * @brief Construct a new Function object with number of inputs n_in and
+     * number of outputs n_out.
+     *
+     * @param n_in Number of inputs
+     * @param n_out Number of outputs
+     */
+    Function(const int n_in, const int n_out) : n_in_(n_in), n_out_(n_out) {
+        out_.resize(n_out);
+    }
 
     ~Function() = default;
 
@@ -86,7 +99,7 @@ class Function {
      * @return true
      * @return false
      */
-    bool CheckInputRefVector(const InputRefVector &input) {
+    bool CheckInputRefVector(const InputRefVector &input) const {
         int idx = 0;
         for (const Eigen::Ref<const Eigen::VectorXd> &x : input) {
             if (x.hasNaN() || !x.allFinite()) {
@@ -105,7 +118,8 @@ class Function {
     int n_in_;
     int n_out_;
 
-    std::vector<MatrixType> out_;
+    // Output data vector
+    mutable std::vector<MatrixType> out_;
 };
 
 /**

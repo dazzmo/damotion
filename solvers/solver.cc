@@ -4,11 +4,14 @@ namespace damotion {
 namespace optimisation {
 namespace solvers {
 
-void Solver::EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
-                          bool grd, bool hes, bool update_cache) {
+void Solver::EvaluateCost(const Binding<CostType>& binding,
+                          const Eigen::VectorXd& x, bool grd, bool hes,
+                          bool update_cache) {
     // Get binding inputs
-    const std::vector<sym::VariableVector>& var = binding.GetVariables();
-    const sym::ParameterVector& par = binding.GetParameters();
+    const Binding<CostType>::VariablePtrVector& var =
+        binding.GetVariables();
+    const Binding<CostType>::ParameterPtrVector& par =
+        binding.GetParameters();
     int nv = var.size();
     int np = par.size();
     // Optional creation of vectors for inputs to the functions (if vector input
@@ -18,6 +21,8 @@ void Solver::EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
     // vector
     const std::vector<bool> continuous =
         CostBindingContinuousInputCheck(binding);
+
+    std::cout << "Mapping Variables\n";
 
     // Mapped vectors from existing data
     std::vector<Eigen::Map<const Eigen::VectorXd>> m_vecs = {};
@@ -30,15 +35,15 @@ void Solver::EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
             // Set input to the start of the vector input
             m_vecs.push_back(Eigen::Map<const Eigen::VectorXd>(
                 x.data() +
-                    GetCurrentProgram().GetDecisionVariableIndex(var[i][0]),
-                var[i].size()));
+                    GetCurrentProgram().GetDecisionVariableIndex((*var[i])[0]),
+                var[i]->size()));
             inputs.push_back(m_vecs.back());
         } else {
             // Construct a vector for this input
-            Eigen::VectorXd xi(var[i].size());
-            for (int ii = 0; ii < var[i].size(); ++ii) {
-                xi[ii] =
-                    x[GetCurrentProgram().GetDecisionVariableIndex(var[i][ii])];
+            Eigen::VectorXd xi(var[i]->size());
+            for (int ii = 0; ii < var[i]->size(); ++ii) {
+                xi[ii] = x[GetCurrentProgram().GetDecisionVariableIndex(
+                    (*var[i])[ii])];
             }
             vecs.push_back(xi);
             inputs.push_back(vecs.back());
@@ -47,10 +52,10 @@ void Solver::EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
 
     // Set parameters
     for (int i = 0; i < np; ++i) {
-        inputs.push_back(GetCurrentProgram().GetParameterValues(par[i]));
+        inputs.push_back(GetCurrentProgram().GetParameterValues(*par[i]));
     }
 
-    CostType& cost = binding.Get();
+    const CostType& cost = binding.Get();
 
     // Check if gradient exists
     if (grd && !cost.HasGradient()) {
@@ -61,9 +66,13 @@ void Solver::EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
         throw std::runtime_error("Cost does not have a hessian!");
     }
 
+    std::cout << "Evaluating\n";
     cost.ObjectiveFunction()->call(inputs);
+    std::cout << "Cost\n";
     if (grd) cost.GradientFunction()->call(inputs);
+    std::cout << "Gradient\n";
     if (hes) cost.HessianFunction()->call(inputs);
+    std::cout << "Hessian\n";
 
     if (update_cache == false) return;
 
@@ -73,7 +82,7 @@ void Solver::EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
         for (int i = 0; i < nv; ++i) {
             UpdateVectorAtVariableLocations(
                 objective_gradient_cache_,
-                cost.GradientFunction()->getOutput(i), var[i], continuous[i]);
+                cost.GradientFunction()->getOutput(i), *var[i], continuous[i]);
         }
     }
 
@@ -84,7 +93,7 @@ void Solver::EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
                 // Increase the count for the Hessian
                 UpdateHessianAtVariableLocations(
                     lagrangian_hes_cache_,
-                    cost.HessianFunction()->getOutput(cnt), var[i], var[j],
+                    cost.HessianFunction()->getOutput(cnt), *var[i], *var[j],
                     continuous[i], continuous[j]);
                 cnt++;
             }
@@ -109,18 +118,20 @@ void Solver::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
 }
 
 // Evaluates the constraint and updates the cache for the gradients
-void Solver::EvaluateConstraint(Binding<ConstraintType>& binding,
+void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                                 const int& constraint_idx,
                                 const Eigen::VectorXd& x, bool jac,
                                 bool update_cache) {
     // Get underlying constraint
-    ConstraintType& c = binding.Get();
+    const ConstraintType& c = binding.Get();
 
     // Get size of constraint
     int nc = c.Dimension();
 
-    const std::vector<sym::VariableVector>& var = binding.GetVariables();
-    const sym::ParameterVector& par = binding.GetParameters();
+    const std::vector<std::shared_ptr<sym::VariableVector>>& var =
+        binding.GetVariables();
+    const std::vector<std::shared_ptr<sym::Parameter>>& par =
+        binding.GetParameters();
     int nv = var.size();
     int np = par.size();
 
@@ -142,15 +153,15 @@ void Solver::EvaluateConstraint(Binding<ConstraintType>& binding,
             // Set input to the start of the vector input
             m_vecs.push_back(Eigen::Map<const Eigen::VectorXd>(
                 x.data() +
-                    GetCurrentProgram().GetDecisionVariableIndex(var[i][0]),
-                var.size()));
+                    GetCurrentProgram().GetDecisionVariableIndex((*var[i])[0]),
+                var[i]->size()));
             inputs.push_back(m_vecs.back());
         } else {
             // Construct a vector for this input
-            Eigen::VectorXd xi(var[i].size());
-            for (int ii = 0; ii < var[i].size(); ++ii) {
-                xi[ii] =
-                    x[GetCurrentProgram().GetDecisionVariableIndex(var[i][ii])];
+            Eigen::VectorXd xi(var[i]->size());
+            for (int ii = 0; ii < var[i]->size(); ++ii) {
+                xi[ii] = x[GetCurrentProgram().GetDecisionVariableIndex(
+                    (*var[i])[ii])];
             }
             vecs.push_back(xi);
             inputs.push_back(vecs.back());
@@ -159,7 +170,7 @@ void Solver::EvaluateConstraint(Binding<ConstraintType>& binding,
 
     // Set parameters
     for (int i = 0; i < np; ++i) {
-        inputs.push_back(GetCurrentProgram().GetParameterValues(par[i]));
+        inputs.push_back(GetCurrentProgram().GetParameterValues(*par[i]));
     }
 
     // Check if gradient exists
@@ -167,7 +178,9 @@ void Solver::EvaluateConstraint(Binding<ConstraintType>& binding,
         throw std::runtime_error("Constraint does not have a Jacobian!");
     }
 
+    LOG(INFO) << "Constraint";
     c.ConstraintFunction()->call(inputs);
+    LOG(INFO) << "Jacobian";
     if (jac) c.JacobianFunction()->call(inputs);
 
     if (update_cache == false) return;
@@ -179,7 +192,7 @@ void Solver::EvaluateConstraint(Binding<ConstraintType>& binding,
     for (int i = 0; i < nv; ++i) {
         UpdateJacobianAtVariableLocations(
             constraint_jacobian_cache_, constraint_idx,
-            c.JacobianFunction()->getOutput(i), var[i], continuous[i]);
+            c.JacobianFunction()->getOutput(i), *var[i], continuous[i]);
     }
 }
 
@@ -251,7 +264,6 @@ void Solver::UpdateHessianAtVariableLocations(Eigen::MatrixXd& hes,
         }
     }
 }
-
 
 }  // namespace solvers
 }  // namespace optimisation

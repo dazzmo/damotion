@@ -64,8 +64,12 @@ class QuadraticCost : public CostBase<MatrixType> {
      */
     void ObjectiveCallback(const common::InputRefVector &input,
                            std::vector<double> &out) {
+        LOG(INFO) << "A";
         fA_->call(input);
+        LOG(INFO) << fA_->getOutput(0);
+        LOG(INFO) << "b";
         fb_->call(input);
+        LOG(INFO) << "c";
         fc_->call(input);
         LOG(INFO) << "Objective";
         out[0] = input[0].dot(fA_->getOutput(0) * input[0]) +
