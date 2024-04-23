@@ -41,6 +41,7 @@ optimisation/bounds.h
 estimation/ekf.h
 common/logging.h
 common/function.h
+common/sparsity.h
 common/profiler.h
 common/math/binomial.h
 common/math/random.h
@@ -74,6 +75,7 @@ utils/pinocchio_model.cc
 optimisation/program.cc
 optimisation/bounds.cc
 common/function.cc
+common/sparsity.cc
 common/math/binomial.cc
 common/trajectory/bezier.cc
 common/trajectory/trajectory.cc

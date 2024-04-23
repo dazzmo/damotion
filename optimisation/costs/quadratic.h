@@ -28,13 +28,13 @@ class QuadraticCost : public CostBase<MatrixType> {
     QuadraticCost(const std::string &name, const casadi::SX &A,
                   const casadi::SX &b, const casadi::SX &c,
                   const casadi::SXVector &p, bool jac = true, bool hes = true)
-        : Cost(name, "quadratic_cost") {
+        : CostBase<MatrixType>(name, "quadratic_cost") {
         ConstructConstraint(A, b, c, p, jac, hes);
     }
 
     QuadraticCost(const std::string &name, const sym::Expression &ex,
                   bool jac = true, bool hes = true)
-        : Cost(name, "quadratic_cost") {
+        : CostBase<MatrixType>(name, "quadratic_cost") {
         int nvar = 0;
         casadi::SXVector in = {};
         // Extract quadratic form
@@ -64,17 +64,11 @@ class QuadraticCost : public CostBase<MatrixType> {
      */
     void ObjectiveCallback(const common::InputRefVector &input,
                            std::vector<double> &out) {
-        LOG(INFO) << "A";
         fA_->call(input);
-        LOG(INFO) << fA_->getOutput(0);
-        LOG(INFO) << "b";
         fb_->call(input);
-        LOG(INFO) << "c";
         fc_->call(input);
-        LOG(INFO) << "Objective";
         out[0] = input[0].dot(fA_->getOutput(0) * input[0]) +
                  fb_->getOutput(0).dot(input[0]) + fc_->getOutput(0);
-        LOG(INFO) << "Objective complete";
     }
 
     /**
@@ -116,8 +110,13 @@ class QuadraticCost : public CostBase<MatrixType> {
         }
 
         // Create coefficient functions
-        fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
-            casadi::Function(this->name() + "_A", in, {densify(A)}));
+        if (std::is_same<MatrixType, Eigen::SparseMatrix<double>>::value) {
+            fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
+                casadi::Function(this->name() + "_A", in, {A}));
+        } else {
+            fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
+                casadi::Function(this->name() + "_A", in, {densify(A)}));
+        }
         fb_ = std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
             casadi::Function(this->name() + "_b", in, {densify(b)}));
         fc_ = std::make_shared<utils::casadi::FunctionWrapper<double>>(
@@ -147,9 +146,9 @@ class QuadraticCost : public CostBase<MatrixType> {
                 });
 
         // Set output sizes for the callbacks
-        obj_cb->InitOutput(0, 0.0);
-        grd_cb->InitOutput(0, Eigen::VectorXd::Zero(b.size1()));
-        // hes_cb->InitOutput(0, Eigen::MatrixXd::Zero(A.size1(), A.size2()));
+        obj_cb->InitialiseOutput(0, common::Sparsity());
+        grd_cb->InitialiseOutput(0, common::Sparsity(b.size1(), b.size2()));
+        hes_cb->InitialiseOutput(0, common::Sparsity(A.sparsity()));
 
         // Create functions through callbacks
         this->SetObjectiveFunction(obj_cb);

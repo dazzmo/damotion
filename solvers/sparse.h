@@ -9,23 +9,22 @@ namespace solvers {
 
 class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
    public:
-    SparseSolver(SparseProgram& prog, bool sparse = false);
+    SparseSolver(SparseProgram& program);
     ~SparseSolver() {}
 
     void EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
                       bool grd, bool hes, bool update_cache = true);
 
-    void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes);
+    void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes) {}
 
     // Evaluates the constraint and updates the cache for the gradients
-    void EvaluateConstraint(Constraint& c, const int& constraint_idx,
-                            const Eigen::VectorXd& x,
-                            const std::vector<sym::VariableVector>& var,
-                            const sym::ParameterVector& par,
-                            const std::vector<bool>& continuous, bool jac,
-                            bool update_cache = true);
+    void EvaluateConstraint(Binding<ConstraintType>& binding,
+                            const int& constraint_idx, const Eigen::VectorXd& x,
+                            bool jac, bool update_cache = true);
 
-    void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
+    void EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {}
+
+    void ConstructSparseConstraintJacobian();
 
    protected:
     Eigen::SparseMatrix<double> constraint_jacobian_cache_;
@@ -44,8 +43,6 @@ class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
     std::unordered_map<Binding<SparseConstraint>::Id,
                        std::vector<std::vector<int>>>
         jacobian_data_map_;
-
-    void ConstructSparseConstraintJacobian();
 };
 }  // namespace solvers
 }  // namespace optimisation

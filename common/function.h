@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include "common/logging.h"
+#include "common/sparsity.h"
 
 namespace damotion {
 namespace common {
@@ -143,13 +144,14 @@ class CallbackFunction : public Function<MatrixType> {
     }
 
     /**
-     * @brief Initialise the output i with the values given by val
+     * @brief Initialise the output i provided its sparsity pattern
      *
-     * @param i
-     * @param val
+     * @param i The index of the output to initialise
+     * @param sparsity Sparsity object detailing the structure of the matrix
      */
-    void InitOutput(const int i, const MatrixType &val) {
-        this->OutputVector()[i] = val;
+    void InitialiseOutput(const int i, const Sparsity &sparsity) {
+        this->OutputVector()[i] =
+            MatrixType::Zero(sparsity.rows(), sparsity.cols());
     }
 
     /**
@@ -175,6 +177,15 @@ class CallbackFunction : public Function<MatrixType> {
    private:
     f_callback_ f_ = nullptr;
 };
+
+// Template specialisations
+
+template <>
+void CallbackFunction<double>::InitialiseOutput(const int i,
+                                                const Sparsity &sparsity);
+template <>
+void CallbackFunction<Eigen::SparseMatrix<double>>::InitialiseOutput(
+    const int i, const Sparsity &sparsity);
 
 }  // namespace common
 }  // namespace damotion

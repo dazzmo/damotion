@@ -222,7 +222,7 @@ class ConstraintBase {
     const bool &IsUpdated() const { return updated_; }
     bool &IsUpdated() { return updated_; }
 
-    // bool IsSparse();
+    void InitialiseOutput(const int i, const casadi::Sparsity &sparsity);
 
    protected:
     /**
@@ -319,6 +319,7 @@ class ConstraintBase {
         return id;
     }
 };
+
 
 typedef ConstraintBase<Eigen::MatrixXd> Constraint;
 typedef ConstraintBase<Eigen::SparseMatrix<double>> SparseConstraint;

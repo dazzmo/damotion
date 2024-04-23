@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "solvers/qpoases.h"
+#include "solvers/sparse.h"
 
 namespace sym = damotion::symbolic;
 namespace opt = damotion::optimisation;
@@ -120,12 +121,11 @@ TEST(Program, AddLinearConstraint) {
     // Create optimisation vector
     program.SetDecisionVariableVector();
 
-
     program.AddBoundingBoxConstraint(-1.0, 1.0, x);
     program.AddBoundingBoxConstraint(-2.0, 2.0, y);
-    
+
     LOG(INFO) << "Added Bounding Box Constraints";
-    
+
     program.ListDecisionVariables();
     program.ListParameters();
     program.ListCosts();
@@ -143,48 +143,59 @@ TEST(Program, AddLinearConstraint) {
 }
 
 TEST(Program, SparseProgram) {
-    // // Create codegen function
-    // sym::VariableVector x = sym::CreateVariableVector("x", 2);
-    // sym::VariableVector y = sym::CreateVariableVector("y", 2);
+    // Create codegen function
+    sym::VariableVector x = sym::CreateVariableVector("x", 10);
 
-    // opt::Program program;
+    opt::SparseProgram program;
 
-    // // Create constraint x0 + 2 y1 + 3 = 0
-    // Eigen::Matrix<double, 1, 2> A;
-    // A << 1.0, 2.0;
-    // Eigen::Vector<double, 1> b(3.0);
+    Eigen::Matrix<double, 1, 10> A1, A2;
+    A1.setZero();
+    A2.setZero();
+    
+    A1[2] = 1.0;
+    A1[9] = -1.0;
+    A2[5] = 1.0;
+    A2[9] = -1.0;
+    Eigen::Vector<double, 1> b1(1.0), b2(-2.0);
 
-    // std::shared_ptr<opt::LinearConstraint> con =
-    //     std::make_shared<opt::LinearConstraint>("", A, b,
-    //                                             opt::BoundsType::kEquality);
+    std::shared_ptr<opt::LinearConstraint<Eigen::SparseMatrix<double>>>
+        con1 = std::make_shared<
+            opt::LinearConstraint<Eigen::SparseMatrix<double>>>(
+            "", A1, b1, opt::BoundsType::kEquality),
+        con2 = std::make_shared<
+            opt::LinearConstraint<Eigen::SparseMatrix<double>>>(
+            "", A2, b2, opt::BoundsType::kEquality);
 
-    // con->JacobianFunction()->setSparseOutput(0);
+    program.AddDecisionVariables(x);
 
-    // program.AddDecisionVariables(x);
-    // program.AddDecisionVariables(y);
+    program.AddLinearConstraint(con1, {x}, {});
+    program.AddLinearConstraint(con2, {x}, {});
 
-    // sym::VariableVector xy(2);
-    // xy << x[0], y[1];
+    casadi::SX xx = casadi::SX::sym("x", 10);
+    sym::Expression J = dot(xx, xx) + xx(0) + xx(0) * xx(2);
+    J.SetInputs({xx}, {});
+    std::shared_ptr<opt::QuadraticCost<Eigen::SparseMatrix<double>>> cost =
+        std::make_shared<opt::QuadraticCost<Eigen::SparseMatrix<double>>>(
+            "sum_squares", J);
 
-    // program.AddLinearConstraint(con, {xy}, {});
+    std::cout << cost->A() << std::endl;
+    std::cout << cost->A().nonZeros() << std::endl;
+    std::cout << cost->b() << std::endl;
+    std::cout << cost->c() << std::endl;
 
-    // // Create optimisation vector
-    // program.SetDecisionVariableVector();
+    program.AddQuadraticCost(cost, {x}, {});
 
-    // program.AddBoundingBoxConstraint(-1.0, 1.0, x);
-    // program.AddBoundingBoxConstraint(-2.0, 2.0, y);
+    // Create optimisation vector
+    program.SetDecisionVariableVector();
 
-    // program.UpdateBindings();
+    program.AddBoundingBoxConstraint(-10.0, 10.0, x);
 
-    // program.ListDecisionVariables();
-    // program.ListParameters();
-    // program.ListCosts();
-    // program.ListConstraints();
+    program.ListDecisionVariables();
+    program.ListParameters();
+    program.ListCosts();
+    program.ListConstraints();
 
-    // LOG(INFO) << "Here\n";
-    // opt::solvers::SolverBase solver(program, true);
+    opt::solvers::SparseSolver solver(program);
 
-    // // Create QPOASES solver and test if constraint jacobian gets created
-
-    // damotion::common::Profiler summary;
+    damotion::common::Profiler summary;
 }

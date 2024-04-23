@@ -7,6 +7,7 @@
 #include <pinocchio/autodiff/casadi.hpp>
 
 #include "common/function.h"
+#include "common/sparsity.h"
 
 namespace damotion {
 namespace utils {
@@ -89,9 +90,7 @@ void toCasadi(const Eigen::Matrix<::casadi::Matrix<T>, rows, cols> &E,
     }
 }
 
-Eigen::SparseMatrix<double> CreateSparseEigenMatrix(
-    const ::casadi::Sparsity &sparsity, std::vector<casadi_int> &rows,
-    std::vector<casadi_int> &cols);
+
 
 /**
  * @brief Function wrapper base class for casadi functions to Eigen

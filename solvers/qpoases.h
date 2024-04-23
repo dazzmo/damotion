@@ -66,7 +66,6 @@ class QPOASESSolverInstance : public Solver {
         H_.setZero();
 
         // Update variable bounds, if any have changed
-        std::cout << "Bounding Box\n";
         for (Binding<BoundingBoxConstraint<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
             if (binding.Get().IsUpdated()) {
@@ -82,7 +81,6 @@ class QPOASESSolverInstance : public Solver {
                 binding.Get().IsUpdated() = false;
             }
         }
-        std::cout << "Linear Costs\n";
         // Linear costs
         for (Binding<LinearCost<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetLinearCostBindings()) {
@@ -96,7 +94,6 @@ class QPOASESSolverInstance : public Solver {
             UpdateVectorAtVariableLocations(
                 g_, binding.Get().c(), binding.GetVariable(0), continuous[0]);
         }
-        std::cout << "Quadratic Costs\n";
         // Quadratic costs
         for (Binding<QuadraticCost<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetQuadraticCostBindings()) {
@@ -104,9 +101,7 @@ class QPOASESSolverInstance : public Solver {
                 CostBindingContinuousInputCheck(binding);
 
             // Evaluate the cost
-            std::cout << "Evaluate Cost\n";
             EvaluateCost(binding, primal_solution_x_, true, true, false);
-            std::cout << "Done\n";
             // Update the gradient
             UpdateVectorAtVariableLocations(
                 g_, binding.Get().b(), binding.GetVariable(0), continuous[0]);
@@ -114,11 +109,7 @@ class QPOASESSolverInstance : public Solver {
             UpdateHessianAtVariableLocations(
                 H_, 2.0 * binding.Get().A(), binding.GetVariable(0),
                 binding.GetVariable(0), continuous[0], continuous[0]);
-
-            LOG(INFO) << binding.Get().A();
-            LOG(INFO) << binding.Get().b();
         }
-        std::cout << "Linear Constraints\n";
         // Evaluate only the linear constraints of the program
         // Reset constraint jacobian
         constraint_jacobian_cache_.setZero();
@@ -136,16 +127,12 @@ class QPOASESSolverInstance : public Solver {
 
             // Increase constraint index
             idx += binding.Get().Dimension();
-
-            LOG(INFO) << binding.Get().A();
-            LOG(INFO) << binding.Get().b();
         }
 
         typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
                               Eigen::RowMajor>
             RowMajorMatrixXd;
 
-        std::cout << "Mapping\n";
         // ! See about effects of copying
         RowMajorMatrixXd H =
             Eigen::Map<RowMajorMatrixXd>(H_.data(), H_.rows(), H_.cols());
@@ -154,16 +141,7 @@ class QPOASESSolverInstance : public Solver {
                                          constraint_jacobian_cache_.rows(),
                                          constraint_jacobian_cache_.cols());
 
-        // std::cout << H << std::endl;
-        // std::cout << g_.transpose() << std::endl;
-        // std::cout << A << std::endl;
-        // std::cout << lbA_.transpose() << std::endl;
-        // std::cout << ubA_.transpose() << std::endl;
-        // std::cout << lbx_.transpose() << std::endl;
-        // std::cout << ubx_.transpose() << std::endl;
-
         // Solve
-        std::cout << "Solving\n";
         int nWSR = 100;
         if (first_solve_) {
             qp_->init(H.data(), g_.data(), A.data(), lbx_.data(), ubx_.data(),
@@ -175,10 +153,27 @@ class QPOASESSolverInstance : public Solver {
         }
 
         // Get primal solution
-        qp_->getPrimalSolution(primal_solution_x_.data());
-
-        // TODO Handle Error
         n_solves_++;
+    }
+
+    /**
+     * @brief Get the current return status of the program
+     *
+     * @return const qpOASES::QProblemStatus&
+     */
+    qpOASES::QProblemStatus GetProblemStatus() const { return qp_->getStatus(); }
+
+    /**
+     * @brief Returns the primal solution of the most recent program, if
+     * successful, otherwise returns the last successful primal solution.
+     *
+     * @return const Eigen::VectorXd&
+     */
+    const Eigen::VectorXd& GetPrimalSolution() {
+        if (GetProblemStatus() == qpOASES::QProblemStatus::QPS_SOLVED) {
+            qp_->getPrimalSolution(primal_solution_x_.data());
+        }
+        return primal_solution_x_;
     }
 
    private:
@@ -186,8 +181,6 @@ class QPOASESSolverInstance : public Solver {
     int n_solves_ = 0;
 
     // Sparse method
-    // std::unique_ptr<qpOASES::SymSparseMat> H_;
-    // std::unique_ptr<qpOASES::SparseMatrix> A_;
     std::unique_ptr<qpOASES::SQProblem> qp_;
 
     Eigen::MatrixXd H_;

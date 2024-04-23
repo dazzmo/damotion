@@ -22,7 +22,6 @@ void Solver::EvaluateCost(const Binding<CostType>& binding,
     const std::vector<bool> continuous =
         CostBindingContinuousInputCheck(binding);
 
-    std::cout << "Mapping Variables\n";
 
     // Mapped vectors from existing data
     std::vector<Eigen::Map<const Eigen::VectorXd>> m_vecs = {};
@@ -66,13 +65,9 @@ void Solver::EvaluateCost(const Binding<CostType>& binding,
         throw std::runtime_error("Cost does not have a hessian!");
     }
 
-    std::cout << "Evaluating\n";
     cost.ObjectiveFunction()->call(inputs);
-    std::cout << "Cost\n";
     if (grd) cost.GradientFunction()->call(inputs);
-    std::cout << "Gradient\n";
     if (hes) cost.HessianFunction()->call(inputs);
-    std::cout << "Hessian\n";
 
     if (update_cache == false) return;
 
@@ -178,11 +173,10 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
         throw std::runtime_error("Constraint does not have a Jacobian!");
     }
 
-    LOG(INFO) << "Constraint";
     c.ConstraintFunction()->call(inputs);
-    LOG(INFO) << "Jacobian";
     if (jac) c.JacobianFunction()->call(inputs);
 
+    // Update the caches if required, otherwise break early
     if (update_cache == false) return;
 
     constraint_cache_.middleRows(constraint_idx, nc) =

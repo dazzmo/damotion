@@ -13,7 +13,7 @@ template <typename MatrixType>
 class LinearCost : public CostBase<MatrixType> {
    public:
     LinearCost(const std::string &name, const Eigen::VectorXd &c,
-                   const double &b, bool jac = true)
+               const double &b, bool jac = true)
         : CostBase<MatrixType>(name, "linear_cost") {
         // Create Costs
         casadi::DM cd, bd = b;
@@ -24,14 +24,13 @@ class LinearCost : public CostBase<MatrixType> {
     }
 
     LinearCost(const std::string &name, const casadi::SX &c,
-                   const casadi::SX &b, const casadi::SXVector &p,
-                   bool jac = true)
+               const casadi::SX &b, const casadi::SXVector &p, bool jac = true)
         : Cost(name, "linear_cost") {
         ConstructConstraint(c, b, p, jac, true);
     }
 
     LinearCost(const std::string &name, const sym::Expression &ex,
-                   bool jac = true, bool hes = true)
+               bool jac = true, bool hes = true)
         : Cost(name, "linear_cost") {
         int nvar = 0;
         casadi::SXVector in = {};
@@ -117,8 +116,8 @@ class LinearCost : public CostBase<MatrixType> {
                 });
 
         // Set output sizes for the callbacks
-        obj_cb->InitOutput(0, 0.0);
-        grd_cb->InitOutput(0, Eigen::VectorXd::Zero(c.size1()));
+        obj_cb->InitialiseOutput(0, common::Sparsity());
+        grd_cb->InitialiseOutput(0, common::Sparsity(c.size1(), c.size2()));
 
         // Create functions through callbacks
         this->SetObjectiveFunction(obj_cb);

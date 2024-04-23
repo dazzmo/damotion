@@ -269,8 +269,8 @@ class CostManager {
         std::cout << "----------------------\n";
         std::cout << "Cost\n";
         std::cout << "----------------------\n";
-        std::vector<Binding<Cost>> costs = GetAllCostBindings();
-        for (Binding<Cost> &b : costs) {
+        std::vector<Binding<CostType>> costs = GetAllCostBindings();
+        for (Binding<CostType> &b : costs) {
             std::cout << b.Get().name() << '\n';
         }
     }
