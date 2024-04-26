@@ -90,8 +90,6 @@ void toCasadi(const Eigen::Matrix<::casadi::Matrix<T>, rows, cols> &E,
     }
 }
 
-
-
 /**
  * @brief Function wrapper base class for casadi functions to Eigen
  * representation

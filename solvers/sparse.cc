@@ -7,9 +7,7 @@ namespace solvers {
 SparseSolver::SparseSolver(SparseProgram& program)
     : SolverBase<Eigen::SparseMatrix<double>>(program) {
     // Initialise sparse constraint Jacobian and Lagrangian Hessian
-    LOG(INFO) << "Sparse Jacobian";
     ConstructSparseConstraintJacobian();
-    LOG(INFO) << "Finished";
 }
 
 void SparseSolver::ConstructSparseConstraintJacobian() {
@@ -17,12 +15,18 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
     // Create default data structure to hold binding id, jacobian idx and data
     // idx
     typedef Eigen::Vector3i binding_index_data_t;
+    int nx = program.NumberOfDecisionVariables();
+    int nc = program.NumberOfConstraints();
     // Create sparse Jacobian
     Eigen::SparseMatrix<std::shared_ptr<binding_index_data_t>> J;
-    J.resize(program.NumberOfConstraints(),
-             program.NumberOfDecisionVariables());
+    constraint_jacobian_cache_.resize(nc, nx);
+    J.resize(nc, nx);
+    // Make sure there's no existing data in the sparse matrix
+    J.setZero();
+    J.data().squeeze();
 
-    LOG(INFO) << "Size of J = " << J.rows() << " x " << J.cols();
+    constraint_jacobian_cache_.setZero();
+    constraint_jacobian_cache_.data().squeeze();
 
     int idx = 0;
     for (Binding<ConstraintType>& b : program.GetAllConstraintBindings()) {
@@ -33,7 +37,6 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
             // Get sparse Jacobian
             const Eigen::SparseMatrix<double>& Ji =
                 b.Get().JacobianFunction()->getOutput(i);
-            LOG(INFO) << Ji;
             int cnt = 0;
             // Loop through non-zero entries
             for (int k = 0; k < Ji.outerSize(); ++k) {
@@ -42,18 +45,13 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
                     // Get location of the non-zero entry
                     int id = b.id();
                     int jac_idx = i;
-                    LOG(INFO) << "Binding: " << id;
-                    LOG(INFO) << "Jacobian: " << i;
                     int c_idx = idx + it.row();
-                    LOG(INFO) << "Row: " << c_idx;
                     int x_idx = program.GetDecisionVariableIndex(
                         b.GetVariable(i)[it.col()]);
-                    LOG(INFO) << "Col: " << x_idx;
-                    LOG(INFO) << "cnt: " << cnt;
                     J.coeffRef(c_idx, x_idx) =
                         std::make_shared<binding_index_data_t>(id, jac_idx,
                                                                cnt);
-                    LOG(INFO) << "Added";
+                    constraint_jacobian_cache_.coeffRef(c_idx, x_idx) = 0.0;
                     // Increase data array counter
                     cnt++;
                 }
@@ -66,8 +64,9 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
         jacobian_data_map_[b.id()] = indices;
     }
 
-    LOG(INFO) << "Jacobian:";
-    LOG(INFO) << J;
+    // Compress Jacobian
+    J.makeCompressed();
+    constraint_jacobian_cache_.makeCompressed();
 
     // With created Jacobian, extract each binding's Jacobian data entries in
     // the data vector in CCS
@@ -159,7 +158,7 @@ void SparseSolver::EvaluateCost(Binding<CostType>& binding,
     }
 }
 
-void SparseSolver::EvaluateConstraint(Binding<ConstraintType>& binding,
+void SparseSolver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                                       const int& constraint_idx,
                                       const Eigen::VectorXd& x, bool jac,
                                       bool update_cache) {
@@ -231,6 +230,8 @@ void SparseSolver::EvaluateConstraint(Binding<ConstraintType>& binding,
 
     if (jac) {
         for (int i = 0; i < nv; ++i) {
+            LOG(INFO) << "Called Jacobian Ji "
+                      << binding.Get().JacobianFunction()->getOutput(i);
             // Update sparse jacobian data
             for (int j = 0; j < var[i]->size(); ++j) {
                 int idx = jacobian_data_map_[binding.id()][i][j];

@@ -103,53 +103,84 @@ class ConstraintBase {
      */
     const int Dimension() const { return dim_; }
 
-    const std::shared_ptr<common::Function<Eigen::VectorXd>> &
-    ConstraintFunction() const {
-        return con_;
-    }
-    const std::shared_ptr<common::Function<MatrixType>> &JacobianFunction()
-        const {
-        return jac_;
-    }
-    const std::shared_ptr<common::Function<MatrixType>> &HessianFunction()
-        const {
-        return hes_;
-    }
-
     /**
-     * @brief Flag to indicate if the constraint has a Jacobian
+     * @brief Evaluate the constraint with the current input variables and
+     * parameters, indicating if jacobian and hessians are required
      *
-     * @return true
-     * @return false
+     * @param x Variables for the constraint
+     * @param p Parameters for the constraint
+     * @param jac Whether to also compute the Jacobian
      */
-    const bool HasJacobian() const { return has_jac_; }
+    virtual void eval(const common::InputRefVector &x,
+                      const common::InputRefVector &p, bool jac = true) const {
+        common::InputRefVector in = {};
+        for (int i = 0; i < x.size(); ++i) in.push_back(x[i]);
+        for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
 
-    /**
-     * @brief Flag to indicate whether the constraint has a Hessian
-     *
-     * @return true
-     * @return false
-     */
-    const bool HasHessian() const { return has_hes_; }
-
-    void SetBoundsType(const BoundsType &type) {
-        bounds_type_ = type;
-        SetBounds(ub_, lb_, bounds_type_);
+        // Call necessary constraint functions
+        this->con_->call(in);
+        if (jac) {
+            this->jac_->call(in);
+        }
     }
 
     /**
-     * @brief The current type of bounds for the constraint
+     * @brief Evaluate the dual-variable-Hessian product via a given strategy
      *
-     * @return const BoundsType&
+     * @param x
+     * @param p
      */
-    const BoundsType &GetBoundsType() const { return bounds_type_; }
+    void eval_hessian(const common::InputRefVector &x,
+                      const common::InputRefVector &l,
+                      const common::InputRefVector &p) {
+        // Create input for the lambda-hessian product
+        common::InputRefVector in = {};
+        for (int i = 0; i < x.size(); ++i) in.push_back(x[i]);
+        for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
+        for (int i = 0; i < l.size(); ++i) in.push_back(l[i]);
+
+        // Call necessary constraint functions
+        this->hes_->call(in);
+    }
 
     /**
-     * @brief Updates the bounds for the constraint according to type
+     * @brief Returns the most recent evaluation of the constraint
+     *
+     * @return const Eigen::VectorXd&
+     */
+    const Eigen::VectorXd &Vector() const { return con_->getOutput(i); }
+    /**
+     * @brief The Jacobian of the constraint with respect to the i-th variable
+     * vector
+     *
+     * @param i
+     * @return const MatrixType&
+     */
+    const MatrixType &Jacobian(const int &i) const {
+        return jac_->getOutput[i];
+    }
+    /**
+     * @brief Returns the Hessian block with respect to the variables xi and xj.
+     * Please note that this formulation produces only the lower-triangular
+     * component of the Hessian, so i >= j.
+     *
+     * @param i
+     * @param j
+     * @return const MatrixType&
+     */
+    const MatrixType &Hessian(const int &i, const int &j) const {
+        // Determine the hessian block index
+        int idx = 0;
+        // TODO
+        return hes_->getOutput[idx];
+    }
+
+    /**
+     * @brief Set the Bounds type for the constraint.
      *
      * @param type
      */
-    void UpdateBounds(const BoundsType &type) {
+    void SetBoundsType(const BoundsType &type) {
         bounds_type_ = type;
         SetBounds(ub_, lb_, bounds_type_);
     }
@@ -160,7 +191,7 @@ class ConstraintBase {
      * @param lb
      * @param ub
      */
-    void UpdateBounds(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub) {
+    void SetBoundsType(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub) {
         bounds_type_ = BoundsType::kCustom;
         lb_ = lb;
         ub_ = ub;
@@ -168,6 +199,13 @@ class ConstraintBase {
         // Indicate constraint was updated
         IsUpdated() = true;
     }
+
+    /**
+     * @brief The current type of bounds for the constraint
+     *
+     * @return const BoundsType&
+     */
+    const BoundsType &GetBoundsType() const { return bounds_type_; }
 
     /**
      * @brief Constraint lower bound (dim x 1)
@@ -185,7 +223,18 @@ class ConstraintBase {
     const Eigen::VectorXd &UpperBound() const { return ub_; }
     Eigen::VectorXd &UpperBound() { return ub_; }
 
+    /**
+     * @brief Number of input variable vectors used to determine the constraint
+     * 
+     * @return const int& 
+     */
     const int &NumberOfInputVariables() const { return nx_; }
+
+    /**
+     * @brief Number of parameters used to determine the constraint
+     * 
+     * @return const int& 
+     */
     const int &NumberOfInputParameters() const { return np_; }
 
     /**
@@ -202,11 +251,11 @@ class ConstraintBase {
         // Determine if constraint within threshold
         double c_norm = 0.0;
         if (p == 1) {
-            c_norm = con_->getOutput(0).lpNorm<1>();
+            c_norm = Vector().lpNorm<1>();
         } else if (p == 2) {
-            c_norm = con_->getOutput(0).lpNorm<2>();
+            c_norm = Vector().lpNorm<2>();
         } else if (p == Eigen::Infinity) {
-            c_norm = con_->getOutput(0).lpNorm<Eigen::Infinity>();
+            c_norm = Vector().lpNorm<Eigen::Infinity>();
         }
 
         return c_norm <= eps;
@@ -221,8 +270,6 @@ class ConstraintBase {
      */
     const bool &IsUpdated() const { return updated_; }
     bool &IsUpdated() { return updated_; }
-
-    void InitialiseOutput(const int i, const casadi::Sparsity &sparsity);
 
    protected:
     /**
@@ -295,11 +342,11 @@ class ConstraintBase {
     // Constraint upper bound
     Eigen::VectorXd ub_;
 
-    // Constraint
+    // Constraint function pointer
     std::shared_ptr<common::Function<Eigen::VectorXd>> con_;
-    // Jacobian
+    // Jacobian function pointer
     std::shared_ptr<common::Function<MatrixType>> jac_;
-    // Hessian of vector-product
+    // Hessian of vector-product function pointer
     std::shared_ptr<common::Function<MatrixType>> hes_;
 
     // Number of variable inputs
@@ -319,7 +366,6 @@ class ConstraintBase {
         return id;
     }
 };
-
 
 typedef ConstraintBase<Eigen::MatrixXd> Constraint;
 typedef ConstraintBase<Eigen::SparseMatrix<double>> SparseConstraint;

@@ -168,8 +168,8 @@ TEST(Program, SparseProgram) {
 
     program.AddDecisionVariables(x);
 
-    program.AddLinearConstraint(con1, {x}, {});
-    program.AddLinearConstraint(con2, {x}, {});
+    auto binding1 = program.AddLinearConstraint(con1, {x}, {});
+    auto binding2 = program.AddLinearConstraint(con2, {x}, {});
 
     casadi::SX xx = casadi::SX::sym("x", 10);
     sym::Expression J = dot(xx, xx) + xx(0) + xx(0) * xx(2);
@@ -196,6 +196,15 @@ TEST(Program, SparseProgram) {
     program.ListConstraints();
 
     opt::solvers::SparseSolver solver(program);
+
+    // Create dummy optimisation variable
+    Eigen::VectorXd xopt(10);
+
+    // Update constraint and assess if it's correct
+    solver.EvaluateConstraint(binding1, 0, xopt, true, true);
+    solver.EvaluateConstraint(binding2, 0, xopt, true, true);
+
+    LOG(INFO) << solver.GetSparseConstraintJacobian();
 
     damotion::common::Profiler summary;
 }

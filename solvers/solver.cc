@@ -8,10 +8,8 @@ void Solver::EvaluateCost(const Binding<CostType>& binding,
                           const Eigen::VectorXd& x, bool grd, bool hes,
                           bool update_cache) {
     // Get binding inputs
-    const Binding<CostType>::VariablePtrVector& var =
-        binding.GetVariables();
-    const Binding<CostType>::ParameterPtrVector& par =
-        binding.GetParameters();
+    const Binding<CostType>::VariablePtrVector& var = binding.GetVariables();
+    const Binding<CostType>::ParameterPtrVector& par = binding.GetParameters();
     int nv = var.size();
     int np = par.size();
     // Optional creation of vectors for inputs to the functions (if vector input
@@ -21,7 +19,6 @@ void Solver::EvaluateCost(const Binding<CostType>& binding,
     // vector
     const std::vector<bool> continuous =
         CostBindingContinuousInputCheck(binding);
-
 
     // Mapped vectors from existing data
     std::vector<Eigen::Map<const Eigen::VectorXd>> m_vecs = {};
@@ -168,25 +165,19 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
         inputs.push_back(GetCurrentProgram().GetParameterValues(*par[i]));
     }
 
-    // Check if gradient exists
-    if (jac && !c.HasJacobian()) {
-        throw std::runtime_error("Constraint does not have a Jacobian!");
-    }
-
-    c.ConstraintFunction()->call(inputs);
-    if (jac) c.JacobianFunction()->call(inputs);
+    // Evaluate the constraint
+    c.eval(inputs, {}, jac);
 
     // Update the caches if required, otherwise break early
     if (update_cache == false) return;
 
-    constraint_cache_.middleRows(constraint_idx, nc) =
-        c.ConstraintFunction()->getOutput(0);
+    constraint_cache_.middleRows(constraint_idx, nc) = c.Vector();
 
     // Update Jacobian blocks
     for (int i = 0; i < nv; ++i) {
-        UpdateJacobianAtVariableLocations(
-            constraint_jacobian_cache_, constraint_idx,
-            c.JacobianFunction()->getOutput(i), *var[i], continuous[i]);
+        UpdateJacobianAtVariableLocations(constraint_jacobian_cache_,
+                                          constraint_idx, c.Jacobian(i),
+                                          *var[i], continuous[i]);
     }
 }
 

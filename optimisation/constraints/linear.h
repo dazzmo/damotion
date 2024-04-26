@@ -75,34 +75,22 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
      */
     const Eigen::Ref<const Eigen::VectorXd> b() { return fb_->getOutput(0); }
 
+    void eval(const common::InputRefVector &in, bool jac = true,
+              bool hes = true) override {
+        // Evaluate the coefficients
+        common::InputRefVector in_Ab = {};
+        for (int i = 1; i < input.size(); ++i) {
+            in_Ab.push_back(input[i]);
+        }
+
+        // Evaluate the constraint
+        Eigen::VectorXd c = fA_->getOutput(0) * in[0] + fb_->getOutput(0);
+        if (jac) MatrixType J = fA_->getOutput(0);
+    }
+
    private:
     std::shared_ptr<common::Function<MatrixType>> fA_;
     std::shared_ptr<common::Function<Eigen::VectorXd>> fb_;
-
-    /**
-     * @brief Compute the constraint with use of A and b
-     *
-     * @param input
-     * @param out
-     */
-    void ConstraintCallback(const common::InputRefVector &input,
-                            std::vector<Eigen::VectorXd> &out) {
-        LOG(INFO) << input[0];
-        LOG(INFO) << fA_->getOutput(0);
-        LOG(INFO) << fb_->getOutput(0);
-        out[0] = fA_->getOutput(0) * input[0] + fb_->getOutput(0);
-    }
-
-    /**
-     * @brief Compute the Jacobian of the constraint with A
-     *
-     * @param input
-     * @param out
-     */
-    void JacobianCallback(const common::InputRefVector &input,
-                          std::vector<MatrixType> &out) {
-        out[0] = fA_->getOutput(0);
-    }
 
     void ConstructConstraint(const casadi::SX &A, const casadi::SX &b,
                              const casadi::SXVector &p,
@@ -131,29 +119,6 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
 
         fb_ = std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
             casadi::Function(this->name() + "_b", in, {densify(b)}));
-
-        std::shared_ptr<common::CallbackFunction<Eigen::VectorXd>> con_cb =
-            std::make_shared<common::CallbackFunction<Eigen::VectorXd>>(
-                in.size(), 1,
-                [this](const common::InputRefVector &in,
-                       std::vector<Eigen::VectorXd> &out) {
-                    this->ConstraintCallback(in, out);
-                });
-        std::shared_ptr<common::CallbackFunction<MatrixType>> jac_cb =
-            std::make_shared<common::CallbackFunction<MatrixType>>(
-                in.size(), 1,
-                [this](const common::InputRefVector &in,
-                       std::vector<MatrixType> &out) {
-                    this->JacobianCallback(in, out);
-                });
-
-        // Set output sizes for the callback
-        con_cb->InitialiseOutput(0, common::Sparsity(b.size1(), b.size2()));
-        jac_cb->InitialiseOutput(0, common::Sparsity(A.sparsity()));
-
-        // Create functions through callbacks
-        this->SetConstraintFunction(con_cb);
-        this->SetJacobianFunction(jac_cb);
     }
 };
 
