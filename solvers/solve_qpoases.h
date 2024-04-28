@@ -84,7 +84,7 @@ class QPOASESSolverInstance : public SolverBase {
         first_solve_ = true;
     }
 
-    void Solve() {
+    qpOASES::returnValue Solve() {
         common::Profiler profiler("QPOASESSolverInstance::Solve");
         // Number of decision variables in the program
         int nx = GetCurrentProgram().NumberOfDecisionVariables();
@@ -186,20 +186,26 @@ class QPOASESSolverInstance : public SolverBase {
 
         // Solve
         int nWSR = 1000;
+        qpOASES::returnValue solver_return_val = qpOASES::returnValue::RET_INIT_FAILED;
         if (first_solve_) {
-            qp_->init(H.data(), g_.data(), A.data(), lbx_.data(), ubx_.data(),
+            solver_return_val = qp_->init(H.data(), g_.data(), A.data(), lbx_.data(), ubx_.data(),
                       lbA_.data(), ubA_.data(), nWSR);
             first_solve_ = false;
         } else {
-            qp_->hotstart(H.data(), g_.data(), A.data(), lbx_.data(),
+            solver_return_val = qp_->hotstart(H.data(), g_.data(), A.data(), lbx_.data(),
                           ubx_.data(), lbA_.data(), ubA_.data(), nWSR);
         }
 
-        // Get primal solution
-        qp_->getPrimalSolution(primal_solution_x_.data());
+        // Get primal solution, if successful
+        if(solver_return_val == qpOASES::returnValue::SUCCESSFUL_RETURN) {
+            qp_->getPrimalSolution(primal_solution_x_.data());
+        } 
 
         // TODO Handle Error
         n_solves_++;
+
+        // Return the status of the solver, for the program using it to handle
+        return solver_return_val;
     }
 
    private:

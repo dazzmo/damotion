@@ -38,7 +38,7 @@
 ## About The Project
 
 <p align="left">
-The Damotion library was designed for personal use in robotics projects. It is built around the CasADi library, utilising the symbolic algebra capabilities to compute and evaluate complicated expressions associated with robotics research areas such as control, optimisation and estimation. To furhter aid these computations, we utilises Pinocchio, a mature rigid-body dynamics library for use in computing these expressions. This library combines these two libraries to offer utilities in optimisation, control and estimation with an emphasis on efficient computations for real-time application.
+The Damotion library was designed for personal use in robotics projects. It is built around the CasADi library, utilising the symbolic algebra capabilities to compute and evaluate complicated expressions associated with robotics research areas such as control, optimisation and estimation. To further aid these computations, we utilises Pinocchio, a mature rigid-body dynamics library for use in computing these expressions. This library combines these two libraries to offer utilities in optimisation, control and estimation with an emphasis on efficient computations for real-time application.
 </p>
 <p align="right">(<a href="#readme-top">back to top</a>)
 </p>
@@ -86,13 +86,12 @@ We also include interfaces to open-source solvers for numerical optimisation, we
 <!-- LICENSE -->
 ## License
 
-Distributed under the GNU LESSER GENERAL PUBLIC LICENSE License. See `LICENSE.txt` for more information.
+Distributed under the GNU GENERAL PUBLIC LICENSE V3.0 License. See `LICENSE.txt` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- CONTACT -->
 ## Contact
-
-Damian Abood - TBA@TBA.COM
+Damian Abood - damian.abood@sydney.edu.au
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
