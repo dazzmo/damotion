@@ -86,7 +86,7 @@ class ConstraintBase {
         }
 
         // Update bounds for the constraint
-        UpdateBounds(bounds);
+        SetBounds(bounds);
     }
 
     /**
@@ -148,7 +148,7 @@ class ConstraintBase {
      *
      * @return const Eigen::VectorXd&
      */
-    const Eigen::VectorXd &Vector() const { return con_->getOutput(i); }
+    const Eigen::VectorXd &Vector() const { return con_->getOutput(0); }
     /**
      * @brief The Jacobian of the constraint with respect to the i-th variable
      * vector
@@ -157,7 +157,7 @@ class ConstraintBase {
      * @return const MatrixType&
      */
     const MatrixType &Jacobian(const int &i) const {
-        return jac_->getOutput[i];
+        return jac_->getOutput(i);
     }
     /**
      * @brief Returns the Hessian block with respect to the variables xi and xj.
@@ -172,7 +172,7 @@ class ConstraintBase {
         // Determine the hessian block index
         int idx = 0;
         // TODO
-        return hes_->getOutput[idx];
+        return hes_->getOutput(idx);
     }
 
     /**
@@ -180,9 +180,9 @@ class ConstraintBase {
      *
      * @param type
      */
-    void SetBoundsType(const BoundsType &type) {
+    void SetBounds(const BoundsType &type) {
         bounds_type_ = type;
-        SetBounds(ub_, lb_, bounds_type_);
+        SetBoundsByType(ub_, lb_, bounds_type_);
     }
 
     /**
@@ -191,7 +191,7 @@ class ConstraintBase {
      * @param lb
      * @param ub
      */
-    void SetBoundsType(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub) {
+    void SetBounds(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub) {
         bounds_type_ = BoundsType::kCustom;
         lb_ = lb;
         ub_ = ub;
@@ -225,15 +225,15 @@ class ConstraintBase {
 
     /**
      * @brief Number of input variable vectors used to determine the constraint
-     * 
-     * @return const int& 
+     *
+     * @return const int&
      */
     const int &NumberOfInputVariables() const { return nx_; }
 
     /**
      * @brief Number of parameters used to determine the constraint
-     * 
-     * @return const int& 
+     *
+     * @return const int&
      */
     const int &NumberOfInputParameters() const { return np_; }
 
@@ -251,11 +251,11 @@ class ConstraintBase {
         // Determine if constraint within threshold
         double c_norm = 0.0;
         if (p == 1) {
-            c_norm = Vector().lpNorm<1>();
+            c_norm = this->Vector().template lpNorm<1>();
         } else if (p == 2) {
-            c_norm = Vector().lpNorm<2>();
+            c_norm = this->Vector().template lpNorm<2>();
         } else if (p == Eigen::Infinity) {
-            c_norm = Vector().lpNorm<Eigen::Infinity>();
+            c_norm = this->Vector().template lpNorm<Eigen::Infinity>();
         }
 
         return c_norm <= eps;

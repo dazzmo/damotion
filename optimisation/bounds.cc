@@ -2,8 +2,8 @@
 namespace damotion {
 namespace optimisation {
 
-void SetBounds(Eigen::Ref<Eigen::VectorXd> ub, Eigen::Ref<Eigen::VectorXd> lb,
-               const BoundsType type) {
+void SetBoundsByType(Eigen::Ref<Eigen::VectorXd> ub,
+                     Eigen::Ref<Eigen::VectorXd> lb, const BoundsType type) {
     const double inf = 1e19;
     const double eps = 1e-8;
 

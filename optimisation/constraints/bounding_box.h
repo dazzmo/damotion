@@ -19,14 +19,14 @@ class BoundingBoxConstraint : public ConstraintBase<MatrixType> {
         // Resize the constraint
         this->Resize(n, n, 0);
         // Update bounds
-        this->UpdateBounds(lb, ub);
+        this->SetBounds(lb, ub);
 
         casadi::SX x = casadi::SX::sym("x", n);
 
         casadi::Function f = casadi::Function(this->name(), {x}, {densify(x)});
         casadi::Function fjac = casadi::Function(this->name() + "_jac", {x},
                                                  {densify(jacobian(x, x))});
-
+        
         this->SetConstraintFunction(
             std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
                 f));

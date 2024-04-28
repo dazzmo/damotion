@@ -127,7 +127,7 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
     int nv = var.size();
     int np = par.size();
 
-    common::InputRefVector inputs;
+    common::InputRefVector x_in = {}, p_in = {};
 
     // Check if the binding input vectors are continuous within the optimisation
     // vector
@@ -147,7 +147,7 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                 x.data() +
                     GetCurrentProgram().GetDecisionVariableIndex((*var[i])[0]),
                 var[i]->size()));
-            inputs.push_back(m_vecs.back());
+            x_in.push_back(m_vecs.back());
         } else {
             // Construct a vector for this input
             Eigen::VectorXd xi(var[i]->size());
@@ -156,17 +156,17 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                     (*var[i])[ii])];
             }
             vecs.push_back(xi);
-            inputs.push_back(vecs.back());
+            x_in.push_back(vecs.back());
         }
     }
 
     // Set parameters
     for (int i = 0; i < np; ++i) {
-        inputs.push_back(GetCurrentProgram().GetParameterValues(*par[i]));
+        p_in.push_back(GetCurrentProgram().GetParameterValues(*par[i]));
     }
 
     // Evaluate the constraint
-    c.eval(inputs, {}, jac);
+    c.eval(x_in, p_in, jac);
 
     // Update the caches if required, otherwise break early
     if (update_cache == false) return;

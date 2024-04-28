@@ -75,16 +75,14 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
      */
     const Eigen::Ref<const Eigen::VectorXd> b() { return fb_->getOutput(0); }
 
-    void eval(const common::InputRefVector &in, bool jac = true,
-              bool hes = true) override {
+    void eval(const common::InputRefVector &x, const common::InputRefVector &p,
+              bool jac = true) const override {
         // Evaluate the coefficients
-        common::InputRefVector in_Ab = {};
-        for (int i = 1; i < input.size(); ++i) {
-            in_Ab.push_back(input[i]);
-        }
+        fA_->call(p);
+        fb_->call(p);
 
         // Evaluate the constraint
-        Eigen::VectorXd c = fA_->getOutput(0) * in[0] + fb_->getOutput(0);
+        Eigen::VectorXd c = fA_->getOutput(0) * x[0] + fb_->getOutput(0);
         if (jac) MatrixType J = fA_->getOutput(0);
     }
 
@@ -102,7 +100,7 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
 
         // Create constraint dimensions and update bounds
         this->Resize(b.rows(), in.size(), p.size());
-        this->UpdateBounds(bounds);
+        this->SetBounds(bounds);
 
         // Add any parameters that define A and b
         for (const casadi::SX &pi : p) {

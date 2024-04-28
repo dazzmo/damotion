@@ -35,8 +35,7 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
         // Add constraint to jacobian
         for (int i = 0; i < b.GetVariables().size(); ++i) {
             // Get sparse Jacobian
-            const Eigen::SparseMatrix<double>& Ji =
-                b.Get().JacobianFunction()->getOutput(i);
+            const Eigen::SparseMatrix<double>& Ji = b.Get().Jacobian(i);
             int cnt = 0;
             // Loop through non-zero entries
             for (int k = 0; k < Ji.outerSize(); ++k) {
@@ -171,7 +170,7 @@ void SparseSolver::EvaluateConstraint(const Binding<ConstraintType>& binding,
     int np = par.size();
     // Optional creation of vectors for inputs to the functions (if vector input
     // is not continuous in optimisation vector)
-    common::InputRefVector inputs = {};
+    common::InputRefVector x_in = {}, p_in = {};
     // Check if the binding input vectors are continuous within the optimisation
     // vector
     const std::vector<bool> continuous =
@@ -190,7 +189,7 @@ void SparseSolver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                 x.data() +
                     GetCurrentProgram().GetDecisionVariableIndex((*var[i])[0]),
                 var[i]->size()));
-            inputs.push_back(m_vecs.back());
+            x_in.push_back(m_vecs.back());
         } else {
             // Construct a vector for this input
             Eigen::VectorXd xi(var[i]->size());
@@ -199,47 +198,33 @@ void SparseSolver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                     (*var[i])[ii])];
             }
             vecs.push_back(xi);
-            inputs.push_back(vecs.back());
+            x_in.push_back(vecs.back());
         }
     }
 
     // Set parameters
     for (int i = 0; i < np; ++i) {
-        inputs.push_back(GetCurrentProgram().GetParameterValues(*par[i]));
+        p_in.push_back(GetCurrentProgram().GetParameterValues(*par[i]));
     }
 
     const ConstraintType& constraint = binding.Get();
-
-    // Check if gradient exists
-    if (jac && !constraint.HasJacobian()) {
-        throw std::runtime_error("Constraint does not have a jacobian!");
-    }
-    // Check if hessian exists
-    // if (hes && !cost.HasHessian()) {
-    // throw std::runtime_error("Cost does not have a hessian!");
-    // }
-
-    constraint.ConstraintFunction()->call(inputs);
-    if (jac) constraint.JacobianFunction()->call(inputs);
-    // if (hes) constraint.HessianFunction()->call(inputs);
+    // Evaluate the constraint
+    constraint.eval(x_in, p_in, jac);
+    // if(hes) constraint.eval_hessian(x_in, p_in, l_in)
 
     if (update_cache == false) return;
 
     constraint_cache_.middleRows(constraint_idx, constraint.Dimension()) =
-        constraint.ConstraintFunction()->getOutput(0);
+        constraint.Vector();
 
     if (jac) {
         for (int i = 0; i < nv; ++i) {
-            LOG(INFO) << "Called Jacobian Ji "
-                      << binding.Get().JacobianFunction()->getOutput(i);
+            LOG(INFO) << "Called Jacobian Ji " << binding.Get().Jacobian(i);
             // Update sparse jacobian data
             for (int j = 0; j < var[i]->size(); ++j) {
                 int idx = jacobian_data_map_[binding.id()][i][j];
                 this->constraint_jacobian_cache_.valuePtr()[i] =
-                    binding.Get()
-                        .JacobianFunction()
-                        ->getOutput(i)
-                        .valuePtr()[j];
+                    binding.Get().Jacobian(i).valuePtr()[j];
             }
         }
     }

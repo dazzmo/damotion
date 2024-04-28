@@ -28,7 +28,8 @@ namespace osc {
 
 typedef model::TargetFrame TargetFrame;
 
-std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>> LinearisedFrictionConstraint();
+std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>>
+LinearisedFrictionConstraint();
 
 // TODO - Place this in a utility
 Eigen::Quaternion<double> RPYToQuaterion(const double roll, const double pitch,
@@ -179,14 +180,14 @@ class OSC {
             // Get parameters related to the contact task
             ContactTaskParameters &p = contact_task_parameters_[task_idx];
             // Set in contact
-            contact_force_bounds_[task_idx].Get().UpdateBounds(task->fmin(),
-                                                               task->fmax());
+            contact_force_bounds_[task_idx].Get().SetBounds(task->fmin(),
+                                                            task->fmax());
 
             program_.SetParameterValues(p.mu,
                                         Eigen::Vector<double, 1>(task->mu()));
             program_.SetParameterValues(p.normal, task->normal());
         } else {
-            contact_force_bounds_[task_idx].Get().UpdateBounds(
+            contact_force_bounds_[task_idx].Get().SetBounds(
                 opt::BoundsType::kEquality);
         }
     }
@@ -347,7 +348,8 @@ class OSC {
         sym::Parameter normal;
     };
     std::vector<ContactTaskParameters> contact_task_parameters_;
-    std::vector<opt::Binding<opt::BoundingBoxConstraint<Eigen::MatrixXd>>> contact_force_bounds_;
+    std::vector<opt::Binding<opt::BoundingBoxConstraint<Eigen::MatrixXd>>>
+        contact_force_bounds_;
 
     // Friction cone constraint
     std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>> friction_cone_con_;
@@ -367,4 +369,4 @@ class OSC {
 }  // namespace control
 }  // namespace damotion
 
-#endif/* OSC_OSC_H */
+#endif /* OSC_OSC_H */

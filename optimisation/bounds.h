@@ -17,8 +17,16 @@ enum class BoundsType {
     kCustom
 };
 
-void SetBounds(Eigen::Ref<Eigen::VectorXd> ub, Eigen::Ref<Eigen::VectorXd> lb,
-               const BoundsType type = BoundsType::kUnbounded);
+/**
+ * @brief Sets the bounds ub and lb based on the BoundsType provided.
+ * 
+ * @param ub 
+ * @param lb 
+ * @param type 
+ */
+void SetBoundsByType(Eigen::Ref<Eigen::VectorXd> ub,
+                     Eigen::Ref<Eigen::VectorXd> lb,
+                     const BoundsType type = BoundsType::kUnbounded);
 
 }  // namespace optimisation
 }  // namespace damotion
