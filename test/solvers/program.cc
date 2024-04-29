@@ -139,6 +139,8 @@ TEST(Program, AddLinearConstraint) {
     solver.Solve();
     solver.Solve();
 
+    LOG(INFO) << solver.GetPrimalSolution();
+
     damotion::common::Profiler summary;
 }
 

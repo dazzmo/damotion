@@ -132,7 +132,7 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
     // Check if the binding input vectors are continuous within the optimisation
     // vector
     const std::vector<bool> continuous =
-        CostBindingContinuousInputCheck(binding);
+        ConstraintBindingContinuousInputCheck(binding);
 
     // Mapped vectors from existing data
     std::vector<Eigen::Map<const Eigen::VectorXd>> m_vecs = {};
@@ -171,7 +171,6 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
     // Update the caches if required, otherwise break early
     if (update_cache == false) return;
 
-    VLOG(10) << "constraint_cache = " << constraint_cache_;
     constraint_cache_.middleRows(constraint_idx, nc) = c.Vector();
     VLOG(10) << "constraint_cache = " << constraint_cache_;
 
@@ -179,6 +178,7 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
     for (int i = 0; i < nv; ++i) {
         VLOG(10) << c.name() << " Jacobian " << i;
         VLOG(10) << c.Jacobian(i);
+        VLOG(10) << "Input is Continuous: " << continuous[i];
         UpdateJacobianAtVariableLocations(constraint_jacobian_cache_,
                                           constraint_idx, c.Jacobian(i),
                                           *var[i], continuous[i]);

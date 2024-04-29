@@ -206,18 +206,24 @@ class SolverBase {
     }
 
     bool IsContinuousInDecisionVariableVector(const sym::VariableVector& var) {
+        VLOG(10) << "IsContinuousInDecisionVariableVector(), checking " << var;
         ProgramType& program = GetCurrentProgram();
         int idx = program.GetDecisionVariableIndex(var[0]);
         // Move through optimisation vector and see if each entry follows one
         // after the other
         for (int i = 1; i < var.size(); ++i) {
             // If not, return false
-            if (program.GetDecisionVariableIndex(var[i]) - idx != 1) {
+            int idx_next = program.GetDecisionVariableIndex(var[i]);
+            VLOG(10) << "idx = " << idx << ", idx next = " << idx_next;
+            
+            if (idx_next - idx != 1) {
+                VLOG(10) << "false";
                 return false;
             }
-            idx = program.GetDecisionVariableIndex(var[i]);
+            idx = idx_next;
         }
         // Return true if all together in the vector
+        VLOG(10) << "true";
         return true;
     }
 
