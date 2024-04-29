@@ -3,6 +3,7 @@
 
 #include <qpOASES.hpp>
 
+#include "common/logging.h"
 #include "common/profiler.h"
 #include "optimisation/program.h"
 #include "solvers/solver.h"
@@ -117,7 +118,7 @@ class QPOASESSolverInstance : public Solver {
         for (Binding<LinearConstraint<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetLinearConstraintBindings()) {
             // Compute the constraints
-            EvaluateConstraint(binding, idx, primal_solution_x_, true, false);
+            EvaluateConstraint(binding, idx, primal_solution_x_, true, true);
 
             // Adapt bounds for the linear constraints
             ubA_.middleRows(idx, binding.Get().Dimension()) =
@@ -140,6 +141,10 @@ class QPOASESSolverInstance : public Solver {
             Eigen::Map<RowMajorMatrixXd>(constraint_jacobian_cache_.data(),
                                          constraint_jacobian_cache_.rows(),
                                          constraint_jacobian_cache_.cols());
+        // Show the problem coeffcients
+        VLOG(10) << "H = " << H;
+        VLOG(10) << "g = " << g_;
+        VLOG(10) << "A = " << A;
 
         // Solve
         int nWSR = 100;

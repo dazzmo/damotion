@@ -62,6 +62,28 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
     }
 
     /**
+     * @brief Returns the most recent evaluation of the constraint
+     *
+     * @return const Eigen::VectorXd&
+     */
+    const Eigen::VectorXd &Vector() const override {
+        VLOG(10) << this->name() << " Vector = " << c_;
+        return c_;
+    }
+    /**
+     * @brief The Jacobian of the constraint with respect to the i-th variable
+     * vector
+     *
+     * @param i
+     * @return const MatrixType&
+     */
+    const MatrixType &Jacobian(const int &i) const override {
+        assert(i == 0 && "Linear constraint only has one Jacobian!");
+        VLOG(10) << this->name() << " Jacobian " << i << " = " << fA_->getOutput(0);
+        return fA_->getOutput(0);
+    }
+
+    /**
      * @brief The coefficient matrix A for the expression A x + b.
      *
      * @return const Eigen::MatrixXd&
@@ -75,28 +97,46 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
      */
     const Eigen::Ref<const Eigen::VectorXd> b() { return fb_->getOutput(0); }
 
+    /**
+     * @brief Evaluate the constraint and Jacobian (optional) given input
+     * variables x and parameters p.
+     *
+     * @param x
+     * @param p
+     * @param jac Flag for computing the Jacobian
+     */
     void eval(const common::InputRefVector &x, const common::InputRefVector &p,
               bool jac = true) const override {
+        VLOG(10) << this->name() << " eval()";
         // Evaluate the coefficients
         fA_->call(p);
         fb_->call(p);
 
+        VLOG(10) << "A = " << fA_->getOutput(0);
+        VLOG(10) << "b = " << fb_->getOutput(0);
+
         // Evaluate the constraint
-        Eigen::VectorXd c = fA_->getOutput(0) * x[0] + fb_->getOutput(0);
-        if (jac) MatrixType J = fA_->getOutput(0);
+        c_ = fA_->getOutput(0) * x[0] + fb_->getOutput(0);
     }
 
    private:
     std::shared_ptr<common::Function<MatrixType>> fA_;
     std::shared_ptr<common::Function<Eigen::VectorXd>> fb_;
 
+    // Contraint vector (c = Ax + b)
+    mutable Eigen::VectorXd c_;
+
     void ConstructConstraint(const casadi::SX &A, const casadi::SX &b,
                              const casadi::SXVector &p,
                              const BoundsType &bounds, bool jac = true,
                              bool sparse = false) {
-        casadi::SXVector in = {};
-        int nvar = 0;
         assert(A.rows() == b.rows() && "A and b must be same dimension!");
+        int nvar = 0;
+        casadi::SXVector in = {};
+
+        VLOG(10) << this->name() << " ConstructConstraint()"; 
+        VLOG(10) << "A = " << A; 
+        VLOG(10) << "b = " << b; 
 
         // Create constraint dimensions and update bounds
         this->Resize(b.rows(), in.size(), p.size());
@@ -123,4 +163,4 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* CONSTRAINTS_LINEAR_H */
+#endif/* CONSTRAINTS_LINEAR_H */

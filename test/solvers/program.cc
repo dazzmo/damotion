@@ -2,12 +2,15 @@
 #include "optimisation/program.h"
 
 #include <gtest/gtest.h>
+#include <gflags/gflags.h>
 
 #include "solvers/qpoases.h"
 #include "solvers/sparse.h"
 
 namespace sym = damotion::symbolic;
 namespace opt = damotion::optimisation;
+
+namespace {
 
 TEST(Program, AddVariables) {
     // Create codegen function
@@ -126,10 +129,7 @@ TEST(Program, AddLinearConstraint) {
 
     LOG(INFO) << "Added Bounding Box Constraints";
 
-    program.ListDecisionVariables();
-    program.ListParameters();
-    program.ListCosts();
-    program.ListConstraints();
+    program.PrintProgramSummary();
 
     // Create QPOASES solver and test if constraint jacobian gets created
     opt::solvers::QPOASESSolverInstance solver(program);
@@ -151,7 +151,7 @@ TEST(Program, SparseProgram) {
     Eigen::Matrix<double, 1, 10> A1, A2;
     A1.setZero();
     A2.setZero();
-    
+
     A1[2] = 1.0;
     A1[9] = -1.0;
     A2[5] = 1.0;
@@ -178,10 +178,10 @@ TEST(Program, SparseProgram) {
         std::make_shared<opt::QuadraticCost<Eigen::SparseMatrix<double>>>(
             "sum_squares", J);
 
-    std::cout << cost->A() << std::endl;
-    std::cout << cost->A().nonZeros() << std::endl;
-    std::cout << cost->b() << std::endl;
-    std::cout << cost->c() << std::endl;
+    VLOG(1) << cost->A();
+    VLOG(1) << cost->A().nonZeros();
+    VLOG(1) << cost->b();
+    VLOG(1) << cost->c();
 
     program.AddQuadraticCost(cost, {x}, {});
 
@@ -207,4 +207,12 @@ TEST(Program, SparseProgram) {
     LOG(INFO) << solver.GetSparseConstraintJacobian();
 
     damotion::common::Profiler summary;
+}
+}
+
+int main(int argc, char **argv) {
+    google::InitGoogleLogging(argv[0]);
+    google::ParseCommandLineFlags(&argc, &argv, true);
+    testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }

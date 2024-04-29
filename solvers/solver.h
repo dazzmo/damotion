@@ -50,7 +50,6 @@ class Solver : public SolverBase<Eigen::MatrixXd> {
                                           bool is_block_x, bool is_block_y);
 
    protected:
-    Eigen::VectorXd constraint_cache_;
     Eigen::MatrixXd constraint_jacobian_cache_;
 
    private:

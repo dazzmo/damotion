@@ -120,7 +120,7 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
     // Get size of constraint
     int nc = c.Dimension();
 
-    const std::vector<std::shared_ptr<sym::VariableVector>>& var =
+    const std::vector<sym::VariableVectorSharedPtr>& var =
         binding.GetVariables();
     const std::vector<std::shared_ptr<sym::Parameter>>& par =
         binding.GetParameters();
@@ -171,10 +171,14 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
     // Update the caches if required, otherwise break early
     if (update_cache == false) return;
 
+    VLOG(10) << "constraint_cache = " << constraint_cache_;
     constraint_cache_.middleRows(constraint_idx, nc) = c.Vector();
+    VLOG(10) << "constraint_cache = " << constraint_cache_;
 
     // Update Jacobian blocks
     for (int i = 0; i < nv; ++i) {
+        VLOG(10) << c.name() << " Jacobian " << i;
+        VLOG(10) << c.Jacobian(i);
         UpdateJacobianAtVariableLocations(constraint_jacobian_cache_,
                                           constraint_idx, c.Jacobian(i),
                                           *var[i], continuous[i]);

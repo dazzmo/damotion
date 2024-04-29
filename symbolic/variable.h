@@ -41,6 +41,7 @@ class Variable {
 
 typedef Eigen::MatrixX<Variable> VariableMatrix;
 typedef Eigen::VectorX<Variable> VariableVector;
+typedef std::shared_ptr<VariableVector> VariableVectorSharedPtr;
 typedef std::vector<Eigen::Ref<const VariableVector>> VariableRefVector;
 
 // Variable matrix

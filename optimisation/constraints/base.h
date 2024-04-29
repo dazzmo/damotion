@@ -113,6 +113,7 @@ class ConstraintBase {
      */
     virtual void eval(const common::InputRefVector &x,
                       const common::InputRefVector &p, bool jac = true) const {
+        VLOG(10) << this->name() << " eval()";
         common::InputRefVector in = {};
         for (int i = 0; i < x.size(); ++i) in.push_back(x[i]);
         for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
@@ -148,7 +149,10 @@ class ConstraintBase {
      *
      * @return const Eigen::VectorXd&
      */
-    const Eigen::VectorXd &Vector() const { return con_->getOutput(0); }
+    virtual const Eigen::VectorXd &Vector() const {
+        VLOG(10) << name_ << " Vector = " << con_->getOutput(0);
+        return con_->getOutput(0);
+    }
     /**
      * @brief The Jacobian of the constraint with respect to the i-th variable
      * vector
@@ -156,7 +160,8 @@ class ConstraintBase {
      * @param i
      * @return const MatrixType&
      */
-    const MatrixType &Jacobian(const int &i) const {
+    virtual const MatrixType &Jacobian(const int &i) const {
+        VLOG(10) << name_ << " Jacobian " << i << " = " << jac_->getOutput(i);
         return jac_->getOutput(i);
     }
     /**

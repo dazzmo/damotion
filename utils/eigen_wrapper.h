@@ -98,6 +98,8 @@ void toCasadi(const Eigen::Matrix<::casadi::Matrix<T>, rows, cols> &E,
 template <typename MatrixType>
 class FunctionWrapper : public common::Function<MatrixType> {
    public:
+    using SharedPtr = std::shared_ptr<common::Function<MatrixType>>;
+
     FunctionWrapper() = default;
     ~FunctionWrapper() {
         // Release memory for casadi function
@@ -145,6 +147,9 @@ class FunctionWrapper : public common::Function<MatrixType> {
             this->OutputVector().push_back(
                 Eigen::MatrixXd::Zero(sparsity.rows(), sparsity.columns()));
             this->out_data_ptr_.push_back(this->OutputVector().back().data());
+
+            VLOG(10) << f.name() << " Dense Output " << i;
+            VLOG(10) << this->OutputVector().back();
         }
 
         return *this;

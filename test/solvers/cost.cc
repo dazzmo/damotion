@@ -90,3 +90,11 @@ TEST(QuadraticCost, WithDecisionVariablesAndParameters) {
     EXPECT_DOUBLE_EQ(c_true, q_cost->c());
 }
 
+int main(int argc, char **argv) {
+    FLAGS_logtostderr = true;
+    FLAGS_minloglevel = 5;
+    FLAGS_v = 10;
+    google::InitGoogleLogging(argv[0]);
+    testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
