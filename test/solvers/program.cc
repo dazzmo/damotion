@@ -1,8 +1,8 @@
 #define DAMOTION_USE_PROFILING
 #include "optimisation/program.h"
 
-#include <gtest/gtest.h>
 #include <gflags/gflags.h>
+#include <gtest/gtest.h>
 
 #include "solvers/qpoases.h"
 #include "solvers/sparse.h"
@@ -112,7 +112,7 @@ TEST(Program, AddLinearConstraint) {
     casadi::SX xx = casadi::SX::sym("x", 4);
     sym::Expression J = dot(xx, xx) + xx(0) + xx(0) * xx(2);
     J.SetInputs({xx}, {});
-    std::shared_ptr<opt::QuadraticCost<Eigen::MatrixXd>> cost =
+    opt::QuadraticCost<Eigen::MatrixXd>::SharedPtr cost =
         std::make_shared<opt::QuadraticCost<Eigen::MatrixXd>>("sum_squares", J);
 
     sym::VariableVector xxyy(4);
@@ -150,40 +150,48 @@ TEST(Program, SparseProgram) {
 
     opt::SparseProgram program;
 
-    Eigen::Matrix<double, 1, 10> A1, A2;
+    Eigen::Matrix<double, 1, 10> A1;
     A1.setZero();
-    A2.setZero();
 
     A1[2] = 1.0;
     A1[9] = -1.0;
-    A2[5] = 1.0;
-    A2[9] = -1.0;
-    Eigen::Vector<double, 1> b1(1.0), b2(-2.0);
+    Eigen::Vector<double, 1> b1(1.0);
 
-    std::shared_ptr<opt::LinearConstraint<Eigen::SparseMatrix<double>>>
-        con1 = std::make_shared<
-            opt::LinearConstraint<Eigen::SparseMatrix<double>>>(
-            "", A1, b1, opt::BoundsType::kEquality),
-        con2 = std::make_shared<
-            opt::LinearConstraint<Eigen::SparseMatrix<double>>>(
-            "", A2, b2, opt::BoundsType::kEquality);
+    opt::LinearConstraint<Eigen::SparseMatrix<double>>::SharedPtr con1 =
+        std::make_shared<opt::LinearConstraint<Eigen::SparseMatrix<double>>>(
+            "", A1, b1, opt::BoundsType::kEquality);
+    // Create sparse constraint by symbolic expression
+    casadi::SX xs = casadi::SX::sym("x", 2);
+    sym::VariableVector xcon2(2);
+    xcon2 << x[5], x[9];
+
+    sym::Expression expr = xs(0) - xs(1) + 2.0;
+    expr.SetInputs({xs}, {});
+
+    opt::LinearConstraint<Eigen::SparseMatrix<double>>::SharedPtr con2 =
+        std::make_shared<opt::LinearConstraint<Eigen::SparseMatrix<double>>>(
+            "", expr, opt::BoundsType::kEquality);
 
     program.AddDecisionVariables(x);
 
     auto binding1 = program.AddLinearConstraint(con1, {x}, {});
-    auto binding2 = program.AddLinearConstraint(con2, {x}, {});
+    auto binding2 = program.AddLinearConstraint(con2, {xcon2}, {});
+
+    // Print constraint data
+    LOG(INFO) << "Constraint 1";
+    LOG(INFO) << "A = " << con1->A();
+    LOG(INFO) << "b = " << con1->b();
+
+    LOG(INFO) << "Constraint 2";
+    LOG(INFO) << "A = " << con2->A();
+    LOG(INFO) << "b = " << con2->b();
 
     casadi::SX xx = casadi::SX::sym("x", 10);
     sym::Expression J = dot(xx, xx) + xx(0) + xx(0) * xx(2);
     J.SetInputs({xx}, {});
-    std::shared_ptr<opt::QuadraticCost<Eigen::SparseMatrix<double>>> cost =
+    opt::QuadraticCost<Eigen::SparseMatrix<double>>::SharedPtr cost =
         std::make_shared<opt::QuadraticCost<Eigen::SparseMatrix<double>>>(
             "sum_squares", J);
-
-    VLOG(1) << cost->A();
-    VLOG(1) << cost->A().nonZeros();
-    VLOG(1) << cost->b();
-    VLOG(1) << cost->c();
 
     program.AddQuadraticCost(cost, {x}, {});
 
@@ -192,15 +200,13 @@ TEST(Program, SparseProgram) {
 
     program.AddBoundingBoxConstraint(-10.0, 10.0, x);
 
-    program.ListDecisionVariables();
-    program.ListParameters();
-    program.ListCosts();
-    program.ListConstraints();
+    program.PrintProgramSummary();
 
     opt::solvers::SparseSolver solver(program);
 
     // Create dummy optimisation variable
     Eigen::VectorXd xopt(10);
+    xopt.setOnes();
 
     // Update constraint and assess if it's correct
     solver.EvaluateConstraint(binding1, 0, xopt, true, true);
@@ -210,7 +216,7 @@ TEST(Program, SparseProgram) {
 
     damotion::common::Profiler summary;
 }
-}
+}  // namespace
 
 int main(int argc, char **argv) {
     google::InitGoogleLogging(argv[0]);

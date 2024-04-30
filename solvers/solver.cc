@@ -4,105 +4,41 @@ namespace damotion {
 namespace optimisation {
 namespace solvers {
 
-void Solver::EvaluateCost(const Binding<CostType>& binding,
-                          const Eigen::VectorXd& x, bool grd, bool hes,
-                          bool update_cache) {
-    // Get binding inputs
-    const Binding<CostType>::VariablePtrVector& var = binding.GetVariables();
-    const Binding<CostType>::ParameterPtrVector& par = binding.GetParameters();
-    int nv = var.size();
-    int np = par.size();
-    // Optional creation of vectors for inputs to the functions (if vector input
-    // is not continuous in optimisation vector)
-    common::InputRefVector inputs = {};
-    // Check if the binding input vectors are continuous within the optimisation
-    // vector
-    const std::vector<bool> continuous =
-        CostBindingContinuousInputCheck(binding);
-
-    // Mapped vectors from existing data
-    std::vector<Eigen::Map<const Eigen::VectorXd>> m_vecs = {};
-    // Vectors created manually
-    std::vector<Eigen::VectorXd> vecs = {};
+void Solver::EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
+                          bool grd, bool hes, bool update_cache) {
+    common::InputRefVector x_in = {}, p_in = {};
+    // Extract the input for the binding
+    BindingInputData& binding_input_data = GetBindingInputData(binding);
+    UpdateBindingInputData(binding, x, binding_input_data);
 
     // Set variables
-    for (int i = 0; i < nv; ++i) {
-        if (continuous[i]) {
-            // Set input to the start of the vector input
-            m_vecs.push_back(Eigen::Map<const Eigen::VectorXd>(
-                x.data() +
-                    GetCurrentProgram().GetDecisionVariableIndex((*var[i])[0]),
-                var[i]->size()));
-            inputs.push_back(m_vecs.back());
-        } else {
-            // Construct a vector for this input
-            Eigen::VectorXd xi(var[i]->size());
-            for (int ii = 0; ii < var[i]->size(); ++ii) {
-                xi[ii] = x[GetCurrentProgram().GetDecisionVariableIndex(
-                    (*var[i])[ii])];
-            }
-            vecs.push_back(xi);
-            inputs.push_back(vecs.back());
-        }
+    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
+        x_in.push_back(binding_input_data.inputs[i]);
     }
-
     // Set parameters
-    for (int i = 0; i < np; ++i) {
-        inputs.push_back(GetCurrentProgram().GetParameterValues(*par[i]));
+    for (int i = 0; i < binding.NumberOfParameters(); ++i) {
+        p_in.push_back(
+            GetCurrentProgram().GetParameterValues(binding.GetParameter(i)));
     }
 
     const CostType& cost = binding.Get();
-
-    // Check if gradient exists
-    if (grd && !cost.HasGradient()) {
-        throw std::runtime_error("Cost does not have a gradient!");
-    }
-    // Check if hessian exists
-    if (hes && !cost.HasHessian()) {
-        throw std::runtime_error("Cost does not have a hessian!");
-    }
-
-    cost.ObjectiveFunction()->call(inputs);
-    if (grd) cost.GradientFunction()->call(inputs);
-    if (hes) cost.HessianFunction()->call(inputs);
+    // Evaluate the constraint
+    cost.eval(x_in, p_in, grd);
+    // if(hes) constraint.eval_hessian(x_in, p_in, l_in)
 
     if (update_cache == false) return;
 
     objective_cache_ += cost.ObjectiveFunction()->getOutput(0);
-
-    if (grd) {
-        for (int i = 0; i < nv; ++i) {
-            UpdateVectorAtVariableLocations(
-                objective_gradient_cache_,
-                cost.GradientFunction()->getOutput(i), *var[i], continuous[i]);
-        }
-    }
-
-    if (hes) {
-        int cnt = 0;
-        for (int i = 0; i < nv; ++i) {
-            for (int j = i; j < nv; ++j) {
-                // Increase the count for the Hessian
-                UpdateHessianAtVariableLocations(
-                    lagrangian_hes_cache_,
-                    cost.HessianFunction()->getOutput(cnt), *var[i], *var[j],
-                    continuous[i], continuous[j]);
-                cnt++;
-            }
-        }
-    }
+    if (grd) UpdateCostGradient(binding, binding_input_data);
+    if (hes) UpdateLagrangianHessian(binding, binding_input_data);
 }
 
 void Solver::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
-    // Reset objective
+    // Reset terms
     objective_cache_ = 0.0;
-    // Reset objective gradient
-    if (grad) {
-        objective_gradient_cache_.setZero();
-    }
-    if (hes) {
-        lagrangian_hes_cache_.setZero();
-    }
+    if (grad) objective_gradient_cache_.setZero();
+    if (hes) lagrangian_hes_cache_.setZero();
+
     // Evaluate all costs in the program
     for (Binding<CostType>& b : GetCosts()) {
         EvaluateCost(b, x, grad, hes);
@@ -110,79 +46,38 @@ void Solver::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
 }
 
 // Evaluates the constraint and updates the cache for the gradients
-void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
+void Solver::EvaluateConstraint(Binding<ConstraintType>& binding,
                                 const int& constraint_idx,
                                 const Eigen::VectorXd& x, bool jac,
                                 bool update_cache) {
-    // Get underlying constraint
-    const ConstraintType& c = binding.Get();
-
-    // Get size of constraint
-    int nc = c.Dimension();
-
-    const std::vector<sym::VariableVectorSharedPtr>& var =
-        binding.GetVariables();
-    const std::vector<std::shared_ptr<sym::Parameter>>& par =
-        binding.GetParameters();
-    int nv = var.size();
-    int np = par.size();
-
     common::InputRefVector x_in = {}, p_in = {};
 
-    // Check if the binding input vectors are continuous within the optimisation
-    // vector
-    const std::vector<bool> continuous =
-        ConstraintBindingContinuousInputCheck(binding);
-
-    // Mapped vectors from existing data
-    std::vector<Eigen::Map<const Eigen::VectorXd>> m_vecs = {};
-    // Vectors created manually
-    std::vector<Eigen::VectorXd> vecs = {};
+    BindingInputData& binding_input_data = GetBindingInputData(binding);
+    UpdateBindingInputData(binding, x, binding_input_data);
 
     // Set variables
-    for (int i = 0; i < nv; ++i) {
-        if (continuous[i]) {
-            // Set input to the start of the vector input
-            m_vecs.push_back(Eigen::Map<const Eigen::VectorXd>(
-                x.data() +
-                    GetCurrentProgram().GetDecisionVariableIndex((*var[i])[0]),
-                var[i]->size()));
-            x_in.push_back(m_vecs.back());
-        } else {
-            // Construct a vector for this input
-            Eigen::VectorXd xi(var[i]->size());
-            for (int ii = 0; ii < var[i]->size(); ++ii) {
-                xi[ii] = x[GetCurrentProgram().GetDecisionVariableIndex(
-                    (*var[i])[ii])];
-            }
-            vecs.push_back(xi);
-            x_in.push_back(vecs.back());
-        }
+    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
+        x_in.push_back(binding_input_data.inputs[i]);
     }
-
     // Set parameters
-    for (int i = 0; i < np; ++i) {
-        p_in.push_back(GetCurrentProgram().GetParameterValues(*par[i]));
+    for (int i = 0; i < binding.NumberOfParameters(); ++i) {
+        p_in.push_back(
+            GetCurrentProgram().GetParameterValues(binding.GetParameter(i)));
     }
 
+    const ConstraintType& constraint = binding.Get();
     // Evaluate the constraint
-    c.eval(x_in, p_in, jac);
+    constraint.eval(x_in, p_in, jac);
+    // if(hes) constraint.eval_hessian(x_in, p_in, l_in)
 
     // Update the caches if required, otherwise break early
     if (update_cache == false) return;
 
-    constraint_cache_.middleRows(constraint_idx, nc) = c.Vector();
+    constraint_cache_.middleRows(constraint_idx, constraint.Dimension()) =
+        constraint.Vector();
     VLOG(10) << "constraint_cache = " << constraint_cache_;
 
-    // Update Jacobian blocks
-    for (int i = 0; i < nv; ++i) {
-        VLOG(10) << c.name() << " Jacobian " << i;
-        VLOG(10) << c.Jacobian(i);
-        VLOG(10) << "Input is Continuous: " << continuous[i];
-        UpdateJacobianAtVariableLocations(constraint_jacobian_cache_,
-                                          constraint_idx, c.Jacobian(i),
-                                          *var[i], continuous[i]);
-    }
+    UpdateConstraintJacobian(binding, binding_input_data, constraint_idx);
 }
 
 void Solver::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
@@ -198,56 +93,67 @@ void Solver::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
     }
 }
 
-void Solver::UpdateJacobianAtVariableLocations(Eigen::MatrixXd& jac,
-                                               int row_idx,
-                                               const Eigen::MatrixXd& block,
-                                               const sym::VariableVector& var,
-                                               bool is_block) {
-    Eigen::Block<Eigen::MatrixXd> J = jac.middleRows(row_idx, block.rows());
-    if (is_block) {
-        J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(var[0]),
-                     var.size()) += block;
-    } else {
-        // For each variable, update the location in the Jacobian
-        for (int j = 0; j < var.size(); ++j) {
-            int idx = GetCurrentProgram().GetDecisionVariableIndex(var[j]);
-            J.col(idx) += block.col(j);
+void Solver::UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
+                                      const BindingInputData& data,
+                                      const int& constraint_idx) {
+    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
+        Eigen::Block<Eigen::MatrixXd> J = constraint_jacobian_cache_.middleRows(
+            constraint_idx, binding.Get().Dimension());
+
+        const sym::VariableVector& vi = binding.GetVariable(i);
+        if (data.continuous[i]) {
+            J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(vi[0]),
+                         vi.size()) += J;
+        } else {
+            // For each variable, update the location in the Jacobian
+            for (int j = 0; j < vi.size(); ++j) {
+                int idx = GetCurrentProgram().GetDecisionVariableIndex(vi[j]);
+                constraint_jacobian_cache_.col(idx) += J.col(j);
+            }
         }
     }
 }
 
-void Solver::UpdateHessianAtVariableLocations(Eigen::MatrixXd& hes,
-                                              const Eigen::MatrixXd& block,
-                                              const sym::VariableVector& var_x,
-                                              const sym::VariableVector& var_y,
-                                              bool is_block_x,
-                                              bool is_block_y) {
-    // For each variable combination
-    if (is_block_x && is_block_y) {
-        int i_idx = GetCurrentProgram().GetDecisionVariableIndex(var_x[0]),
-            j_idx = GetCurrentProgram().GetDecisionVariableIndex(var_y[0]);
-        int i_sz = var_x.size(), j_sz = var_y.size();
-        // Create lower triangular Hessian
-        if (i_idx > j_idx) {
-            // Block fill
-            hes.block(i_idx, j_idx, i_sz, j_sz) += block;
-        } else {
-            hes.block(j_idx, i_idx, j_sz, i_sz) += block.transpose();
-        }
-
-    } else {
-        // For each variable pair, populate the Hessian
-        for (int ii = 0; ii < var_x.size(); ++ii) {
-            for (int jj = 0; jj < var_y.size(); ++jj) {
-                int i_idx =
-                        GetCurrentProgram().GetDecisionVariableIndex(var_x[ii]),
-                    j_idx =
-                        GetCurrentProgram().GetDecisionVariableIndex(var_y[jj]);
-                // Create lower triangular matrix
+void Solver::UpdateLagrangianHessian(const Binding<CostType>& binding,
+                                     const BindingInputData& data) {
+    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
+        const sym::VariableVector& vi = binding.GetVariable(i);
+        int i_sz = vi.size();
+        int i_idx = GetCurrentProgram().GetDecisionVariableIndex(vi[0]);
+        for (int j = i; j < binding.NumberOfVariables(); ++j) {
+            const sym::VariableVector& vj = binding.GetVariable(j);
+            // For each variable combination
+            if (data.continuous[i] && data.continuous[j]) {
+                int j_sz = vj.size();
+                int j_idx = GetCurrentProgram().GetDecisionVariableIndex(vj[0]);
+                // Create lower triangular Hessian
                 if (i_idx > j_idx) {
-                    hes(i_idx, j_idx) += block(ii, jj);
+                    lagrangian_hes_cache_.block(i_idx, j_idx, i_sz, j_sz) +=
+                        binding.Get().Hessian(i, j);
                 } else {
-                    hes(j_idx, i_idx) += block(ii, jj);
+                    lagrangian_hes_cache_.block(j_idx, i_idx, j_sz, i_sz) +=
+                        binding.Get().Hessian(i, j).transpose();
+                }
+
+            } else {
+                // For each variable pair, populate the Hessian
+                for (int ii = 0; ii < vi.size(); ++ii) {
+                    for (int jj = 0; jj < vj.size(); ++jj) {
+                        int i_idx =
+                                GetCurrentProgram().GetDecisionVariableIndex(
+                                    vi[ii]),
+                            j_idx =
+                                GetCurrentProgram().GetDecisionVariableIndex(
+                                    vj[jj]);
+                        // Create lower triangular matrix
+                        if (i_idx > j_idx) {
+                            lagrangian_hes_cache_(i_idx, j_idx) +=
+                                binding.Get().Hessian(i, j)(ii, jj);
+                        } else {
+                            lagrangian_hes_cache_(j_idx, i_idx) +=
+                                binding.Get().Hessian(i, j)(ii, jj);
+                        }
+                    }
                 }
             }
         }

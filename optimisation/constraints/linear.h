@@ -9,6 +9,9 @@ namespace optimisation {
 template <typename MatrixType>
 class LinearConstraint : public ConstraintBase<MatrixType> {
    public:
+    using UniquePtr = std::unique_ptr<LinearConstraint<MatrixType>>;
+    using SharedPtr = std::shared_ptr<LinearConstraint<MatrixType>>;
+
     /**
      * @brief Construct a new Linear Constraint object of the form \f$ A x + b
      * \f$
@@ -67,7 +70,6 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
      * @return const Eigen::VectorXd&
      */
     const Eigen::VectorXd &Vector() const override {
-        VLOG(10) << this->name() << " Vector = " << c_;
         return c_;
     }
     /**
@@ -79,16 +81,15 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
      */
     const MatrixType &Jacobian(const int &i) const override {
         assert(i == 0 && "Linear constraint only has one Jacobian!");
-        VLOG(10) << this->name() << " Jacobian " << i << " = " << fA_->getOutput(0);
         return fA_->getOutput(0);
     }
 
     /**
      * @brief The coefficient matrix A for the expression A x + b.
      *
-     * @return const Eigen::MatrixXd&
+     * @return const MatrixType&
      */
-    const Eigen::Ref<const Eigen::MatrixXd> A() { return fA_->getOutput(0); }
+    const Eigen::Ref<const MatrixType> A() { return fA_->getOutput(0); }
 
     /**
      * @brief The constant vector for the linear constraint A x + b
@@ -112,8 +113,10 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
         fA_->call(p);
         fb_->call(p);
 
-        VLOG(10) << "A = " << fA_->getOutput(0);
-        VLOG(10) << "b = " << fb_->getOutput(0);
+        VLOG(10) << "A = ";
+        VLOG(10) << fA_->getOutput(0);
+        VLOG(10) << "b = ";
+        VLOG(10) << fb_->getOutput(0);
 
         // Evaluate the constraint
         c_ = fA_->getOutput(0) * x[0] + fb_->getOutput(0);

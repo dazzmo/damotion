@@ -18,13 +18,14 @@ class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
     void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes) {}
 
     // Evaluates the constraint and updates the cache for the gradients
-    void EvaluateConstraint(const Binding<ConstraintType>& binding,
+    void EvaluateConstraint(Binding<ConstraintType>& binding,
                             const int& constraint_idx, const Eigen::VectorXd& x,
                             bool jac, bool update_cache = true);
 
     void EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {}
 
     void ConstructSparseConstraintJacobian();
+    void ConstructSparseLagrangianHessian(bool with_constraints = true);
 
     const Eigen::SparseMatrix<double>& GetSparseConstraintJacobian() const {
         return constraint_jacobian_cache_;
@@ -52,4 +53,4 @@ class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
 
 }  // namespace damotion
 
-#endif /* SOLVERS_SPARSE_H */
+#endif/* SOLVERS_SPARSE_H */

@@ -113,43 +113,115 @@ class SolverBase {
      * If the variables are within a block, indicating this with is_block can
      * enable efficient block-insertion.
      *
-     * @param vec
-     * @param vals
-     * @param var
-     * @param is_block
+     * @param binding
+     * @param data
      */
-    void UpdateVectorAtVariableLocations(Eigen::VectorXd& vec,
-                                         const Eigen::VectorXd& val,
-                                         const sym::VariableVector& var,
-                                         bool is_block) {
-        if (is_block) {
-            vec.middleRows(GetCurrentProgram().GetDecisionVariableIndex(var[0]),
-                           var.size()) += val;
-        } else {
-            // For each variable, update the location in the Jacobian
-            for (int j = 0; j < var.size(); ++j) {
-                int idx = GetCurrentProgram().GetDecisionVariableIndex(var[j]);
-                vec[idx] += val[j];
+    void UpdateCostGradient(const Binding<CostType>& binding,
+                            const BindingInputData& data) {
+        for (int i = 0; i < binding.NumberOfVariables(); ++i) {
+            if (data.continuous[i]) {
+                // Block-insert
+                objective_gradient_cache_.middleRows(
+                    GetCurrentProgram().GetDecisionVariableIndex(var[0]),
+                    var.size()) += binding.Get().Gradient(i);
+            } else {
+                // Manually insert into vector
+                for (int j = 0; j < binding.GetVariable(i).size(); ++j) {
+                    int idx =
+                        GetCurrentProgram().GetDecisionVariableIndex(var[j]);
+                    objective_gradient_cache_[idx] +=
+                        binding.Get().Gradient(i)[j];
+                }
+            }
+        }
+    }
+
+    /**
+     * @brief Provides a reference to the input data associated with the binding
+     *
+     * @tparam T
+     * @param binding
+     * @return BindingInputData&
+     */
+    template <typename T>
+    BindingInputData& GetBindingInputData(const Binding<T>& binding) {
+        auto idx = binding_idx_.find(binding.id());
+        if (idx == binding_idx_.end()) {
+            throw std::runtime_error("Binding is not included within program");
+        }
+        // Return the binding data given by the index
+        return binding_input_data_[idx->second];
+    }
+
+    /**
+     * @brief Create input vectors for the given binding from the optimisation
+     * vector x.
+     *
+     * @tparam T
+     * @param binding
+     * @param data Data
+     * @param x
+     * @return std::vector<Eigen::Map<Eigen::VectorXd>>
+     */
+    template <typename T>
+    void UpdateBindingInputData(Binding<T>& binding, const Eigen::VectorXd& x,
+                                BindingInputData& data) {
+        // Get the binding index
+        int cnt = 0;
+        for (int i = 0; i < binding.NumberOfVariables(); ++i) {
+            if (data.continuous[i]) {
+                // Set input to the start of the vector input
+                data.inputs[i] = Eigen::Map<const Eigen::VectorXd>(
+                    x.data() + GetCurrentProgram().GetDecisionVariableIndex(
+                                   binding.GetVariable(i)[0]),
+                    binding.GetVariable(i).size());
+            } else {
+                // Construct a vector for this input
+                for (int ii = 0; ii < var[i]->size(); ++ii) {
+                    data.vecs[cnt][ii] =
+                        x[GetCurrentProgram().GetDecisionVariableIndex(
+                            binding.GetVariable(i)[ii])];
+                }
+                data.inputs = data.vecs[cnt];
+                cnt++;
             }
         }
     }
 
    protected:
-    // Solver caches
+    /**
+     * @brief Input data for each binding, providing vectors extracted from the
+     * optimisation vector of the program to provide input to the binding
+     *
+     */
+    struct BindingInputData {
+        // Inputs vectors for a binding
+        std::vector<Eigen::Map<const Eigen::VectorXd>> inputs;
+        // Manually created vectors for non-continuous data in the optimisation
+        // vector
+        std::vector<Eigen::VectorXd> vecs;
+        // Whether an input for the binding is continuous in the optimisation
+        // vector
+        std::vector<bool> continuous;
+    };
+
+    // Cache for current values of the decision variables
     Eigen::VectorXd decision_variable_cache_;
+    // Cache for current values of the dual variables
     Eigen::VectorXd dual_variable_cache_;
-
+    // Cache for current value of the objective
     double objective_cache_;
+    // Cache for current value of the objective gradient
     Eigen::VectorXd objective_gradient_cache_;
-
+    // Cache for current value of the constraint vector
     Eigen::VectorXd constraint_cache_;
 
-    Eigen::MatrixXd lagrangian_hes_cache_;
-
+    // Primal solution of the program
     Eigen::VectorXd primal_solution_x_;
 
-    // Vector of constraint bindings
+    // Vector of the constraint bindings for the program
     std::vector<Binding<ConstraintType>> constraints_;
+    // Vector of the cost bindings for the program
     std::vector<Binding<CostType>> costs_;
 
     template <typename T>
@@ -157,6 +229,12 @@ class SolverBase {
         const Binding<T>& binding) {
         return constraint_binding_continuous_input_
             [constraint_binding_idx_[binding.id()]];
+    }
+
+    template <typename T>
+    const int& GetBindingIndex(const Binding<T>& binding) {
+        // TODO - Make sure the binding exists
+        return binding_idx_[binding.id()];
     }
 
     template <typename T>
@@ -173,49 +251,67 @@ class SolverBase {
     // Calculate binding inputs for the problem
     void CalculateBindingInputs() {
         ProgramType& program = GetCurrentProgram();
-        // Pre-compute variable look ups for speed
+        // Compute binding input data for all constraints
         for (Binding<ConstraintType>& b : program.GetAllConstraintBindings()) {
-            // For each input, assess if memory is continuous (allow for
-            // optimisation of input)
-            std::vector<bool> continuous(b.NumberOfVariables());
+            // Create binding data
+            BindingInputData data;
+            data.continuous.resize(b.NumberOfVariables());
+            data.inputs.resize(b.NumberOfVariables());
             for (int i = 0; i < b.NumberOfVariables(); ++i) {
-                continuous[i] =
-                    IsContinuousInDecisionVariableVector(b.GetVariable(i));
+                if (IsContinuousInDecisionVariableVector(b.GetVariable(i))) {
+                    data.continuous[i] = true;
+                } else {
+                    data.continuous[i] = false;
+                    data.vecs.push_back(
+                        Eigen::VectorXd::Zero(b.GetVariable(i).size()));
+                }
             }
             // Add index to map
-            constraint_binding_idx_[b.id()] =
-                constraint_binding_continuous_input_.size();
+            binding_idx_[b.id()] = binding_input_data_.size();
             // Include continuous data
-            constraint_binding_continuous_input_.push_back(continuous);
+            binding_input_data_.push_back(data);
         }
-
-        // Perform the same for the costs
+        // Compute binding input data for all costs
         for (Binding<CostType>& b : program.GetAllCostBindings()) {
-            // For each input, assess if memory is continuous (allow for
-            // optimisation of input)
-            std::vector<bool> continuous(b.NumberOfVariables());
+            // Create binding data
+            BindingInputData data;
+            data.continuous.resize(b.NumberOfVariables());
+            data.inputs.resize(b.NumberOfVariables());
             for (int i = 0; i < b.NumberOfVariables(); ++i) {
-                continuous[i] =
-                    IsContinuousInDecisionVariableVector(b.GetVariable(i));
+                if (IsContinuousInDecisionVariableVector(b.GetVariable(i))) {
+                    data.continuous[i] = true;
+                } else {
+                    data.continuous[i] = false;
+                    data.vecs.push_back(
+                        Eigen::VectorXd::Zero(b.GetVariable(i).size()));
+                }
             }
             // Add index to map
-            cost_binding_idx_[b.id()] = cost_binding_continuous_input_.size();
+            binding_idx_[b.id()] = binding_input_data_.size();
             // Include continuous data
-            cost_binding_continuous_input_.push_back(continuous);
+            binding_input_data_.push_back(data);
         }
     }
 
+    /**
+     * @brief Determines whether a vector of variables var is continuous within
+     * the optimisation vector of the program.
+     *
+     * @param var
+     * @return true
+     * @return false
+     */
     bool IsContinuousInDecisionVariableVector(const sym::VariableVector& var) {
         VLOG(10) << "IsContinuousInDecisionVariableVector(), checking " << var;
         ProgramType& program = GetCurrentProgram();
+        // Determine the index of the first element within var
         int idx = program.GetDecisionVariableIndex(var[0]);
         // Move through optimisation vector and see if each entry follows one
         // after the other
         for (int i = 1; i < var.size(); ++i) {
             // If not, return false
             int idx_next = program.GetDecisionVariableIndex(var[i]);
-            VLOG(10) << "idx = " << idx << ", idx next = " << idx_next;
-            
+
             if (idx_next - idx != 1) {
                 VLOG(10) << "false";
                 return false;
@@ -227,19 +323,18 @@ class SolverBase {
         return true;
     }
 
-    std::unordered_map<typename Binding<ConstraintType>::Id, int>
-        constraint_binding_idx_;
-    std::unordered_map<typename Binding<CostType>::Id, int> cost_binding_idx_;
+    // Indices for each binding data
+    std::unordered_map<int, int> binding_idx_;
+
+    // Vector of binding input data structs
+    std::vector<BindingInputData> binding_input_data_;
 
     // Index of the constraints within the constraint vector
     std::vector<int> constraint_idx_;
-
-    std::vector<std::vector<bool>> constraint_binding_continuous_input_;
-    std::vector<std::vector<bool>> cost_binding_continuous_input_;
 };
 
 }  // namespace solvers
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* SOLVERS_BASE_H */
+#endif /* SOLVERS_BASE_H */

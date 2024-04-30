@@ -25,32 +25,28 @@ class Solver : public SolverBase<Eigen::MatrixXd> {
     }
     ~Solver() = default;
 
-    void EvaluateCost(Binding<CostType> const& binding,
-                      const Eigen::VectorXd& x, bool grd, bool hes,
-                      bool update_cache = true);
+    void EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
+                      bool grd, bool hes, bool update_cache = true);
 
     void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes);
 
     // Evaluates the constraint and updates the cache for the gradients
-    void EvaluateConstraint(const Binding<ConstraintType>& binding,
+    void EvaluateConstraint(Binding<ConstraintType>& binding,
                             const int& constraint_idx, const Eigen::VectorXd& x,
                             bool jac, bool update_cache = true);
 
     void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
 
-    void UpdateJacobianAtVariableLocations(Eigen::MatrixXd& jac, int row_idx,
-                                           const Eigen::MatrixXd& block,
-                                           const sym::VariableVector& var,
-                                           bool is_block);
+    void UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
+                                  const BindingInputData& data,
+                                  const int& constraint_idx);
 
-    void UpdateHessianAtVariableLocations(Eigen::MatrixXd& hes,
-                                          const Eigen::MatrixXd& block,
-                                          const sym::VariableVector& var_x,
-                                          const sym::VariableVector& var_y,
-                                          bool is_block_x, bool is_block_y);
+    void UpdateLagrangianHessian(const Binding<CostType>& binding,
+                                 const BindingInputData& data);
 
    protected:
     Eigen::MatrixXd constraint_jacobian_cache_;
+    Eigen::MatrixXd lagrangian_hes_cache_;
 
    private:
 };

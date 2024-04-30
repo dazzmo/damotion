@@ -150,7 +150,6 @@ class ConstraintBase {
      * @return const Eigen::VectorXd&
      */
     virtual const Eigen::VectorXd &Vector() const {
-        VLOG(10) << name_ << " Vector = " << con_->getOutput(0);
         return con_->getOutput(0);
     }
     /**
@@ -161,7 +160,6 @@ class ConstraintBase {
      * @return const MatrixType&
      */
     virtual const MatrixType &Jacobian(const int &i) const {
-        VLOG(10) << name_ << " Jacobian " << i << " = " << jac_->getOutput(i);
         return jac_->getOutput(i);
     }
     /**

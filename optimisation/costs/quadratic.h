@@ -12,6 +12,9 @@ namespace optimisation {
 template <typename MatrixType>
 class QuadraticCost : public CostBase<MatrixType> {
    public:
+    using UniquePtr = std::unique_ptr<QuadraticCost<MatrixType>>;
+    using SharedPtr = std::shared_ptr<QuadraticCost<MatrixType>>;
+
     QuadraticCost(const std::string &name, const Eigen::MatrixXd &A,
                   const Eigen::VectorXd &b, const double &c, bool jac = true,
                   bool hes = true)
