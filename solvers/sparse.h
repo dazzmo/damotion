@@ -31,6 +31,10 @@ class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
         return constraint_jacobian_cache_;
     }
 
+    void UpdateConstraintJacobian(const Binding<ConstraintType>& binding);
+
+    void UpdateLagrangianHessian(const Binding<CostType>& binding);
+
    protected:
     Eigen::SparseMatrix<double> constraint_jacobian_cache_;
     Eigen::SparseMatrix<double> lagrangian_hes_cache_;
@@ -40,17 +44,17 @@ class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
     std::vector<Binding<CostType>> costs_;
 
    private:
-    std::unordered_map<Binding<ConstraintType>::Id, int> constraint_binding_idx;
-    std::unordered_map<Binding<CostType>::Id, int> cost_binding_idx;
-
     // Index of each sparse Jacobian's data entries in the constraint Jacobian
     std::unordered_map<Binding<ConstraintType>::Id,
                        std::vector<std::vector<int>>>
         jacobian_data_map_;
+    std::unordered_map<Binding<ConstraintType>::Id,
+                       std::vector<std::vector<int>>>
+        lagrangian_hes_data_map_;
 };
 }  // namespace solvers
 }  // namespace optimisation
 
 }  // namespace damotion
 
-#endif/* SOLVERS_SPARSE_H */
+#endif /* SOLVERS_SPARSE_H */
