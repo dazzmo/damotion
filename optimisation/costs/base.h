@@ -34,6 +34,9 @@ class CostBase {
         nx_ = ex.Variables().size();
         np_ = ex.Parameters().size();
 
+        // Convert input variables to single vector
+        casadi::SX x = casadi::SX::vertcat(ex.Variables());
+
         // Create functions to compute the constraint and derivatives given the
         // variables and parameters
 
@@ -50,40 +53,20 @@ class CostBase {
                 casadi::Function(name, in, {ex})));
         // Jacobian
         if (grd) {
-            casadi::SXVector gradients;
-            for (const casadi::SX &xi : ex.Variables()) {
-                gradients.push_back(gradient(ex, xi));
-            }
             // Wrap the functions
             SetGradientFunction(
                 std::make_shared<
                     utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
-                    casadi::Function(name + "_grd", in, gradients)));
+                    casadi::Function(name + "_grd", in, gradient(ex, x))));
         }
 
-        // Hessians
+        // Hessian
         if (hes) {
-            casadi::SXVector hessians;
-            // For each combination of input variables, compute the hessians
-            for (int i = 0; i < ex.Variables().size(); ++i) {
-                casadi::SX xi = ex.Variables()[i];
-                for (int j = i; j < ex.Variables().size(); ++j) {
-                    casadi::SX xj = ex.Variables()[j];
-                    if (j == i) {
-                        // Diagonal term, only include lower-triangular
-                        // component
-                        hessians.push_back(casadi::SX::tril(
-                            jacobian(gradient(ex, xi), xj), true));
-                    } else {
-                        hessians.push_back(jacobian(gradient(ex, xi), xj));
-                    }
-                }
-            }
-
             // Wrap the functions
             SetHessianFunction(
                 std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
-                    casadi::Function(name + "_hes", in, hessians)));
+                    casadi::Function(name + "_hes", in,
+                                     casadi::SX::tril(hessian(ex, x)))));
         }
     }
 
@@ -130,18 +113,15 @@ class CostBase {
      * @param p Parameters for the cost
      * @param grd Whether to also compute the gradient
      */
-    virtual void eval(const common::InputRefVector &x,
-                      const common::InputRefVector &p, bool grd = true) const {
+    virtual void eval(const Eigen::VectorXd &x, const common::InputRefVector &p,
+                      bool grd = true) const {
         VLOG(10) << this->name() << " eval()";
-        common::InputRefVector in = {};
-        for (int i = 0; i < x.size(); ++i) in.push_back(x[i]);
+        common::InputRefVector in = {x};
         for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
 
         // Call necessary cost functions
         this->obj_->call(in);
-        if (grd) {
-            this->grd_->call(in);
-        }
+        if (grd) this->grd_->call(in);
     }
 
     /**
@@ -150,13 +130,11 @@ class CostBase {
      * @param x
      * @param p
      */
-    void eval_hessian(const common::InputRefVector &x,
+    void eval_hessian(const Eigen::VectorXd &x, const Eigen::VectorXd &l,
                       const common::InputRefVector &p) {
         // Create input for the lambda-hessian product
-        common::InputRefVector in = {};
-        for (int i = 0; i < x.size(); ++i) in.push_back(x[i]);
+        common::InputRefVector in = {x, l};
         for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
-
         // Call necessary constraint functions
         this->hes_->call(in);
     }
@@ -174,31 +152,18 @@ class CostBase {
      * @param i
      * @return const VectorXd&
      */
-    virtual const Eigen::VectorXd &Gradient(const int &i) const {
-        return grd_->getOutput(i);
+    virtual const Eigen::VectorXd &Gradient() const {
+        return grd_->getOutput(0);
     }
     /**
-     * @brief Returns the Hessian block with respect to the variables xi and xj.
-     * Please note that this formulation produces only the lower-triangular
-     * component of the Hessian, so i >= j.
+     * @brief Returns the Hessian block with respect to the variables.
+     * Please note that this formulation produces only the lower-triangular.
      *
      * @param i
      * @param j
      * @return const MatrixType&
      */
-    const MatrixType &Hessian(const int &i, const int &j) const {
-        // Determine the hessian block index
-        int idx = 0;
-        // TODO
-        return hes_->getOutput(idx);
-    }
-
-    /**
-     * @brief Number of input variable vectors used to determine the constraint
-     *
-     * @return const int&
-     */
-    const int &NumberOfInputVariables() const { return nx_; }
+    const MatrixType &Hessian() const { return hes_->getOutput(0); }
 
     /**
      * @brief Number of parameters used to determine the constraint
@@ -217,11 +182,11 @@ class CostBase {
         const std::shared_ptr<common::Function<double>> &f) {
         obj_ = f;
     }
-    
+
     /**
      * @brief Set the Gradient Function object
-     * 
-     * @param f 
+     *
+     * @param f
      */
     void SetGradientFunction(
         const std::shared_ptr<common::Function<Eigen::VectorXd>> &f) {
@@ -231,8 +196,8 @@ class CostBase {
 
     /**
      * @brief Set the Hessian Function object
-     * 
-     * @param f 
+     *
+     * @param f
      */
     void SetHessianFunction(
         const std::shared_ptr<common::Function<MatrixType>> &f) {
@@ -256,19 +221,19 @@ class CostBase {
      * @brief Objective function
      *
      */
-    common::Function<double>>::SharedPtr obj_;
+    common::Function<double>::SharedPtr obj_;
 
     /**
      * @brief Gradient function
      *
      */
-    common::Function<Eigen::VectorXd>>::SharedPtr grad_;
+    common::Function<Eigen::VectorXd>::SharedPtr grad_;
 
     /**
      * @brief Hessian function
      *
      */
-    common::Function<MatrixType>>::SharedPtr hes_;
+    common::Function<MatrixType>::SharedPtr hes_;
 
     /**
      * @brief Creates a unique id for each cost

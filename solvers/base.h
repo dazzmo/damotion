@@ -200,9 +200,9 @@ class SolverBase {
         // Manually created vectors for non-continuous data in the optimisation
         // vector
         std::vector<Eigen::VectorXd> vecs;
-        // Whether an input for the binding is continuous in the optimisation
-        // vector
-        std::vector<bool> continuous;
+        // Whether the input vector for the binding is continuous in the
+        // optimisation vector
+        bool continuous;
     };
 
     // Cache for current values of the decision variables

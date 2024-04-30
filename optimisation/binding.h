@@ -15,8 +15,6 @@ template <typename T>
 class Binding {
    public:
     typedef int Id;
-    typedef std::shared_ptr<sym::VariableVector> VariablePtr;
-    typedef std::vector<VariablePtr> VariablePtrVector;
     typedef std::shared_ptr<sym::Parameter> ParameterPtr;
     typedef std::vector<ParameterPtr> ParameterPtrVector;
 
@@ -32,33 +30,28 @@ class Binding {
      * @param x
      * @param p
      */
-    Binding(const std::shared_ptr<T> &c, const sym::VariableRefVector &x,
+    Binding(const std::shared_ptr<T> &c, const sym::VariableVectorRef &x,
             const sym::ParameterVector &p = {}) {
         c_ = c;
-        // Create variable and parameter vectors
-        x_.reserve(x.size());
-        for (auto xi : x) {
-            x_.push_back(std::make_shared<sym::VariableVector>(xi));
-        }
-
+        // Set variable vector
+        x_ = std::make_shared<sym::VariableVector>(x);
+        // Create vector of parameters
         p_.reserve(p.size());
         for (auto pi : p) {
             p_.push_back(std::make_shared<sym::Parameter>(pi));
         }
 
-        nx_ = x.size();
         np_ = p.size();
 
         SetId();
     }
 
-    Binding(const std::shared_ptr<T> &c, const VariablePtrVector &variables,
-            const ParameterPtrVector &parameters)
-        : x_(variables), p_(parameters) {
+    Binding(const std::shared_ptr<T> &c, const sym::VariableVector::SharedPtr &x,
+            const ParameterPtrVector &p)
+        : x_(x), p_(p) {
         // Copy binding pointer
         c_ = c;
         // Set sizes for the bound variables and parameters
-        nx_ = variables.size();
         np_ = parameters.size();
         // Set an ID
         SetId();
@@ -79,7 +72,6 @@ class Binding {
         id_ = b.id();
     }
 
-    const int &NumberOfVariables() const { return nx_; }
     const int &NumberOfParameters() const { return np_; }
 
     /**
@@ -92,24 +84,25 @@ class Binding {
 
     const std::shared_ptr<T> &GetPtr() const { return c_; }
 
-    const VariablePtrVector GetVariables() const { return x_; }
-    const ParameterPtrVector &GetParameters() const { return p_; }
+    /**
+     * @brief Get the variable vector associated with the binding
+     *
+     * @return const sym::VariableVector&
+     */
+    const sym::VariableVector &GetVariableVector() const { return *x_; }
 
-    const sym::VariableVector &GetVariable(const int &i) const {
-        return *x_[i];
-    }
+    const ParameterPtrVector &GetParameters() const { return p_; }
     const sym::Parameter &GetParameter(const int &i) const { return *p_[i]; }
 
    private:
     Id id_;
 
-    int nx_ = 0;
     int np_ = 0;
 
     std::shared_ptr<T> c_;
 
     // Vector of variables bound to the constraint
-    VariablePtrVector x_ = {};
+    std::shared_ptr<sym::VariableVector> x_ = nullptr;
     ParameterPtrVector p_ = {};
 
     /**
@@ -127,4 +120,4 @@ class Binding {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* OPTIMISATION_BINDING_H */
+#endif /* OPTIMISATION_BINDING_H */

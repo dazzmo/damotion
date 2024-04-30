@@ -111,11 +111,10 @@ class ConstraintBase {
      * @param p Parameters for the constraint
      * @param jac Whether to also compute the Jacobian
      */
-    virtual void eval(const common::InputRefVector &x,
-                      const common::InputRefVector &p, bool jac = true) const {
+    virtual void eval(const Eigen::VectorXd &x, const common::InputRefVector &p,
+                      bool jac = true) const {
         VLOG(10) << this->name() << " eval()";
-        common::InputRefVector in = {};
-        for (int i = 0; i < x.size(); ++i) in.push_back(x[i]);
+        common::InputRefVector in = {x};
         for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
 
         // Call necessary constraint functions
@@ -128,17 +127,15 @@ class ConstraintBase {
     /**
      * @brief Evaluate the dual-variable-Hessian product via a given strategy
      *
-     * @param x
-     * @param p
+     * @param x Input vector
+     * @param l Dual variable vector
+     * @param p Vector of parameters
      */
-    void eval_hessian(const common::InputRefVector &x,
-                      const common::InputRefVector &l,
+    void eval_hessian(const Eigen::VectorXd &x, const Eigen::VectorXd &l,
                       const common::InputRefVector &p) {
         // Create input for the lambda-hessian product
-        common::InputRefVector in = {};
-        for (int i = 0; i < x.size(); ++i) in.push_back(x[i]);
+        common::InputRefVector in = {x, l};
         for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
-        for (int i = 0; i < l.size(); ++i) in.push_back(l[i]);
 
         // Call necessary constraint functions
         this->hes_->call(in);
@@ -149,34 +146,23 @@ class ConstraintBase {
      *
      * @return const Eigen::VectorXd&
      */
-    virtual const Eigen::VectorXd &Vector() const {
-        return con_->getOutput(0);
-    }
+    virtual const Eigen::VectorXd &Vector() const { return con_->getOutput(0); }
     /**
-     * @brief The Jacobian of the constraint with respect to the i-th variable
+     * @brief The Jacobian of the constraint with respect to the variables
      * vector
      *
      * @param i
      * @return const MatrixType&
      */
-    virtual const MatrixType &Jacobian(const int &i) const {
-        return jac_->getOutput(i);
-    }
+    virtual const MatrixType &Jacobian() const { return jac_->getOutput(0); }
     /**
-     * @brief Returns the Hessian block with respect to the variables xi and xj.
-     * Please note that this formulation produces only the lower-triangular
-     * component of the Hessian, so i >= j.
+     * @brief Returns the Hessian block with respect to the variables
      *
      * @param i
      * @param j
      * @return const MatrixType&
      */
-    const MatrixType &Hessian(const int &i, const int &j) const {
-        // Determine the hessian block index
-        int idx = 0;
-        // TODO
-        return hes_->getOutput(idx);
-    }
+    const MatrixType &Hessian() const { return hes_->getOutput(0); }
 
     /**
      * @brief Set the Bounds type for the constraint.
@@ -225,13 +211,6 @@ class ConstraintBase {
      */
     const Eigen::VectorXd &UpperBound() const { return ub_; }
     Eigen::VectorXd &UpperBound() { return ub_; }
-
-    /**
-     * @brief Number of input variable vectors used to determine the constraint
-     *
-     * @return const int&
-     */
-    const int &NumberOfInputVariables() const { return nx_; }
 
     /**
      * @brief Number of parameters used to determine the constraint

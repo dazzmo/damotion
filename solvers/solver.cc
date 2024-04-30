@@ -56,9 +56,7 @@ void Solver::EvaluateConstraint(Binding<ConstraintType>& binding,
     UpdateBindingInputData(binding, x, binding_input_data);
 
     // Set variables
-    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
         x_in.push_back(binding_input_data.inputs[i]);
-    }
     // Set parameters
     for (int i = 0; i < binding.NumberOfParameters(); ++i) {
         p_in.push_back(
@@ -96,12 +94,11 @@ void Solver::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
 void Solver::UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
                                       const BindingInputData& data,
                                       const int& constraint_idx) {
-    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
         Eigen::Block<Eigen::MatrixXd> J = constraint_jacobian_cache_.middleRows(
             constraint_idx, binding.Get().Dimension());
 
-        const sym::VariableVector& vi = binding.GetVariable(i);
-        if (data.continuous[i]) {
+        const sym::VariableVector& x = binding.GetVariableVector();
+        if (data.continuous) {
             J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(vi[0]),
                          vi.size()) += J;
         } else {
@@ -111,7 +108,6 @@ void Solver::UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
                 constraint_jacobian_cache_.col(idx) += J.col(j);
             }
         }
-    }
 }
 
 void Solver::UpdateLagrangianHessian(const Binding<CostType>& binding,
