@@ -7,8 +7,8 @@
 #include <map>
 #include <string>
 
-#include "common/profiler.h"
-#include "control/osc/tasks/contact.h"
+#include "damotion/common/profiler.h"
+#include "damotion/control/osc/tasks/contact.h"
 #include "control/osc/tasks/motion.h"
 #include "solvers/constraint.h"
 #include "solvers/cost.h"
