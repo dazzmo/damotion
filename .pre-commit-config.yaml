@@ -2,9 +2,9 @@
 # See https://pre-commit.com/hooks.html for more hooks
 
 # Skip these files
-exclude: "^\
-  (third-party/.*)\
-  "
+# exclude: "^\
+#   (third-party/.*)\
+#   "
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
