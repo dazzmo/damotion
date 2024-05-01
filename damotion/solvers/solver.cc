@@ -9,7 +9,7 @@ SolverBase::SolverBase(Program &prog) : prog_(prog) {
   // ! Program is currently dense, look at sparse alternative soon
 
   // Decision variables
-        decision_variable_cache_ =
+    decision_variable_cache_ =
       Eigen::VectorXd::Zero(prog_.NumberOfDecisionVariables());
   // Output solution vector
   primal_solution_x_ = Eigen::VectorXd::Zero(prog_.NumberOfDecisionVariables());
