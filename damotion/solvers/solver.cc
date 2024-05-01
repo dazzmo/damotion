@@ -10,7 +10,9 @@ SolverBase::SolverBase(Program &prog) : prog_(prog) {
 
   // Decision variables
     decision_variable_cache_ =
-      Eigen::VectorXd::Zero(prog_.NumberOfDecisionVariables());
+      
+    Eigen::VectorXd::Zero(
+        prog_.NumberOfDecisionVariables());
   // Output solution vector
   primal_solution_x_ = Eigen::VectorXd::Zero(prog_.NumberOfDecisionVariables());
   // Objective gradient
