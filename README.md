@@ -62,6 +62,8 @@ We also include interfaces to open-source solvers for numerical optimisation, we
 * [Ipopt](https://github.com/coin-or/Ipopt)
 * [QPOASES](https://github.com/coin-or/qpOASES)
 
+> NOTE: qpOASES __must__ be built as a shared library. This may not be enabled by default, so check the options in their CMakeLists.txt!
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Installation
@@ -89,6 +91,10 @@ We also include interfaces to open-source solvers for numerical optimisation, we
 Distributed under the GNU GENERAL PUBLIC LICENSE V3.0 License. See `LICENSE.txt` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Development
+
+We use [pre-commit](https://pre-commit.com/) to standardise code formatting. Please install prior to development.
 
 <!-- CONTACT -->
 ## Contact

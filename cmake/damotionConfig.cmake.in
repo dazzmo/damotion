@@ -1,0 +1,17 @@
+get_filename_component(DAMOTION_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+include(CMakeFindDependencyMacro)
+
+list(APPEND CMAKE_MODULE_PATH ${DAMOTION_CMAKE_DIR})
+
+find_dependency(Boost REQUIRED)
+find_dependency(casadi REQUIRED)
+find_dependency(Eigen3 REQUIRED)
+find_dependency(glog REQUIRED)
+find_dependency(pinocchio REQUIRED)
+find_dependency(qpOASES REQUIRED)
+
+list(REMOVE_AT CMAKE_MODULE_PATH -1)
+
+if(NOT TARGET damotion)
+  include("${DAMOTION_CMAKE_DIR}/damotionTargets.cmake")
+endif()

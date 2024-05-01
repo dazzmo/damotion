@@ -951,8 +951,8 @@ WARN_LOGFILE           =
 
 INPUT                  = ../common \
                          ../solvers \
-                         ../system \ 
-                         ../planning \ 
+                         ../system \
+                         ../planning \
                          ../control
 
 # This tag can be used to specify the character encoding of the source files

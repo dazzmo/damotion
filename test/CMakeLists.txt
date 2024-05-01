@@ -8,7 +8,7 @@ enable_testing()
 # Create list of files
 
 SET(TEST_FILES
-${CMAKE_CURRENT_SOURCE_DIR}/utils/codegen.cc 
+${CMAKE_CURRENT_SOURCE_DIR}/utils/codegen.cc
 ${CMAKE_CURRENT_SOURCE_DIR}/utils/eigen_wrapper.cc
 ${CMAKE_CURRENT_SOURCE_DIR}/utils/pinocchio_model.cc
 ${CMAKE_CURRENT_SOURCE_DIR}/utils/log.cc
