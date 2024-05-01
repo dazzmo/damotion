@@ -21,6 +21,10 @@ repos:
       - id: mixed-line-ending # replaces or checks mixed line ending.
       - id: requirements-txt-fixer # sorts entries in requirements.txt.
       - id: trailing-whitespace # trims trailing whitespace.
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v14.0.6
+    hooks:
+    - id: clang-format
 
 # Below does not run on Ubuntu 18.04
 #   - repo: https://github.com/pre-commit/mirrors-prettier
@@ -62,8 +66,3 @@ repos:
   #   rev: v0.8.0.3
   #   hooks:
   #     - id: shellcheck
-
-  - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v13.0.0
-    hooks:
-      - id: clang-format
