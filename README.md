@@ -94,7 +94,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE V3.0 License. See `LICENSE.txt`
 
 ## Development
 
-We use [pre-commit](https://pre-commit.com/) to standardise code formatting. Please install prior to development.  
+We use [pre-commit](https://pre-commit.com/) to standardise code formatting. Please install prior to development.
 
 <!-- CONTACT -->
 ## Contact

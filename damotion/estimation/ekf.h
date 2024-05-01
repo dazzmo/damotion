@@ -1,5 +1,4 @@
 #ifndef ESTIMATION_EKF_H
 #define ESTIMATION_EKF_H
 
-
-#endif/* ESTIMATION_EKF_H */
+#endif /* ESTIMATION_EKF_H */

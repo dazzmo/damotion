@@ -9,7 +9,7 @@ SolverBase::SolverBase(Program &prog) : prog_(prog) {
   // ! Program is currently dense, look at sparse alternative soon
 
   // Decision variables
-    decision_variable_cache_ =
+  decision_variable_cache_ =
       Eigen::VectorXd::Zero(prog_.NumberOfDecisionVariables());
   // Output solution vector
   primal_solution_x_ = Eigen::VectorXd::Zero(prog_.NumberOfDecisionVariables());
@@ -126,8 +126,7 @@ void SolverBase::EvaluateCost(Cost &cost, const Eigen::VectorXd &x,
     // }
   }
 
-  if (update_cache == false)
-    return;
+  if (update_cache == false) return;
 
   objective_cache_ += cost.ObjectiveFunction().getOutput(0).data()[0];
 
@@ -207,14 +206,12 @@ void SolverBase::EvaluateConstraint(Constraint &c, const int &constraint_idx,
   // Set vector inputs and evaluate necessary functions
   for (int i = 0; i < nv; ++i) {
     c.ConstraintFunction().setInput(i, inputs[i]);
-    if (jac)
-      c.JacobianFunction().setInput(i, inputs[i]);
+    if (jac) c.JacobianFunction().setInput(i, inputs[i]);
   }
   // Set parameter inputs
   for (int i = 0; i < np; ++i) {
     c.ConstraintFunction().setInput(nv + i, par[i]);
-    if (jac)
-      c.JacobianFunction().setInput(nv + i, par[i]);
+    if (jac) c.JacobianFunction().setInput(nv + i, par[i]);
   }
 
   c.ConstraintFunction().call();
@@ -226,8 +223,7 @@ void SolverBase::EvaluateConstraint(Constraint &c, const int &constraint_idx,
     c.JacobianFunction().call();
   }
 
-  if (update_cache == false)
-    return;
+  if (update_cache == false) return;
 
   constraint_cache_.middleRows(constraint_idx, nc) =
       c.ConstraintFunction().getOutput(0);
@@ -373,6 +369,6 @@ void SolverBase::UpdateHessianAtVariableLocations(
   }
 }
 
-} // namespace solvers
-} // namespace optimisation
-} // namespace damotion
+}  // namespace solvers
+}  // namespace optimisation
+}  // namespace damotion

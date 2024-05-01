@@ -31,10 +31,10 @@ utils/pinocchio_model.cc
 )
 
 SET(${PROJECT_NAME}_LIBRARIES
-Eigen3::Eigen 
-pinocchio::pinocchio 
+Eigen3::Eigen
+pinocchio::pinocchio
 casadi
-glog 
+glog
 )
 
 
@@ -63,7 +63,7 @@ message("CMAKE_CURRENT_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}")
 
 # Jesse: not actually sure what it does, since we dont have a include folder do we need the INSTALL_INTERFACE
 # dont know about the build interface
-target_include_directories(${PROJECT_NAME} 
+target_include_directories(${PROJECT_NAME}
   PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"
     "$<INSTALL_INTERFACE:include>"
@@ -90,5 +90,3 @@ include(GNUInstallDirs)
 install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
   DESTINATION include
   FILES_MATCHING PATTERN "*.h")
-
-

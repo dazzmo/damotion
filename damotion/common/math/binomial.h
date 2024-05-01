@@ -6,14 +6,14 @@ namespace math {
 
 /**
  * @brief Computes the binomial coefficient nCk
- * 
- * @param n 
- * @param k 
- * @return double 
+ *
+ * @param n
+ * @param k
+ * @return double
  */
 double BinomialCoefficient(int n, int k);
 
-}
+}  // namespace math
 }  // namespace damotion
 
-#endif/* COMMON_BINOMIAL_H */
+#endif /* COMMON_BINOMIAL_H */

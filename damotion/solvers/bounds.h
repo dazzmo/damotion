@@ -8,13 +8,13 @@ namespace damotion {
 namespace optimisation {
 
 enum class BoundsType {
-    kEquality,
-    kPositive,
-    kNegative,
-    kStrictlyPositive,
-    kStrictlyNegative,
-    kUnbounded,
-    kCustom
+  kEquality,
+  kPositive,
+  kNegative,
+  kStrictlyPositive,
+  kStrictlyNegative,
+  kUnbounded,
+  kCustom
 };
 
 void SetBounds(Eigen::Ref<Eigen::VectorXd> ub, Eigen::Ref<Eigen::VectorXd> lb,
