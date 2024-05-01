@@ -12,6 +12,6 @@ find_dependency(qpOASES REQUIRED)
 
 list(REMOVE_AT CMAKE_MODULE_PATH -1)
 
-if(NOT TARGET kimera_vio)
+if(NOT TARGET damotion)
   include("${DAMOTION_CMAKE_DIR}/damotionTargets.cmake")
 endif()
