@@ -1,4 +1,4 @@
-#include "system/controlled.h"
+#include "damotion/system/controlled.h"
 
 #include <gtest/gtest.h>
 

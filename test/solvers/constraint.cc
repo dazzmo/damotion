@@ -1,7 +1,7 @@
 #define DAMOTION_USE_PROFILING
 #include <gtest/gtest.h>
 
-#include "solvers/constraint.h"
+#include "damotion/solvers/constraint.h"
 
 namespace sym = damotion::symbolic;
 namespace opt = damotion::optimisation;

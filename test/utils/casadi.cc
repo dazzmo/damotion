@@ -1,4 +1,4 @@
-#include "utils/casadi.h"
+#include "damotion/utils/casadi.h"
 
 #include <gtest/gtest.h>
 

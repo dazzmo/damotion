@@ -1,10 +1,10 @@
 #define DAMOTION_USE_PROFILING
 
-#include "common/function.h"
+#include "damotion/common/function.h"
 
 #include <gtest/gtest.h>
 
-#include "common/logging.h"
+#include "damotion/common/logging.h"
 
 namespace common = damotion::common;
 

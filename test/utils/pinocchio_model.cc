@@ -1,10 +1,10 @@
-#include "utils/pinocchio_model.h"
+#include "damotion/utils/pinocchio_model.h"
 
 #include <gtest/gtest.h>
 
 #include "pinocchio/parsers/urdf.hpp"
-#include "symbolic/expression.h"
-#include "utils/codegen.h"
+#include "damotion/symbolic/expression.h"
+#include "damotion/utils/codegen.h"
 
 // TEST(PinocchioModelWrapper, LoadModel) {
 //     pinocchio::Model model;

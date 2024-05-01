@@ -1,6 +1,6 @@
 #define DAMOTION_USE_PROFILING
 
-#include "common/profiler.h"
+#include "damotion/common/profiler.h"
 
 #include <gtest/gtest.h>
 

@@ -1,11 +1,11 @@
 #define DAMOTION_USE_PROFILING
-#include "optimisation/program.h"
+#include "damotion/optimisation/program.h"
 
 #include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
-#include "solvers/qpoases.h"
-#include "solvers/sparse.h"
+#include "damotion/solvers/qpoases.h"
+#include "damotion/solvers/sparse.h"
 
 namespace sym = damotion::symbolic;
 namespace opt = damotion::optimisation;
