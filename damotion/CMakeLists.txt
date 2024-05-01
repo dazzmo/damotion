@@ -37,8 +37,6 @@ casadi
 glog
 )
 
-
-
 if(USE_QPOASES)
   message(STATUS "Using qpOASES as numeric optimization solver")
 
