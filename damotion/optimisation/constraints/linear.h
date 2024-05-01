@@ -112,12 +112,6 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
         // Evaluate the coefficients
         fA_->call(p);
         fb_->call(p);
-
-        VLOG(10) << "A = ";
-        VLOG(10) << fA_->getOutput(0);
-        VLOG(10) << "b = ";
-        VLOG(10) << fb_->getOutput(0);
-
         // Evaluate the constraint
         c_ = fA_->getOutput(0) * x[0] + fb_->getOutput(0);
     }

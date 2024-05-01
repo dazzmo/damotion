@@ -9,9 +9,8 @@ namespace optimisation {
 template <typename MatrixType>
 class BoundingBoxConstraint : public ConstraintBase<MatrixType> {
    public:
-    BoundingBoxConstraint(const std::string &name,
-                              const Eigen::VectorXd &lb,
-                              const Eigen::VectorXd &ub)
+    BoundingBoxConstraint(const std::string &name, const Eigen::VectorXd &lb,
+                          const Eigen::VectorXd &ub)
         : ConstraintBase<MatrixType>(name, "bounding_box_constraint") {
         assert(lb.rows() == ub.rows() && "lb and ub must be same dimension!");
 
@@ -19,7 +18,7 @@ class BoundingBoxConstraint : public ConstraintBase<MatrixType> {
         // Resize the constraint
         this->Resize(n, n, 0);
         // Update bounds
-        this->SetBounds(lb, ub);       
+        this->SetBounds(lb, ub);
     }
 
     /**
@@ -41,10 +40,7 @@ class BoundingBoxConstraint : public ConstraintBase<MatrixType> {
      *
      * @return const Eigen::VectorXd&
      */
-    const Eigen::VectorXd &Vector() const override {
-        VLOG(10) << this->name() << " Vector = " << c_;
-        return c_;
-    }
+    const Eigen::VectorXd &Vector() const override { return c_; }
     /**
      * @brief The Jacobian of the constraint with respect to the i-th variable
      * vector
@@ -52,18 +48,13 @@ class BoundingBoxConstraint : public ConstraintBase<MatrixType> {
      * @param i
      * @return const MatrixType&
      */
-    const MatrixType &Jacobian(const int &i) const override {
-        assert(i != 0 && "Bounding box constraint only has one Jacobian!");
-        VLOG(10) << this->name() << " Jacobian " << i << " = " << J_;
-        return J_;
-    }
+    const MatrixType &Jacobian() const override { return J_; }
 
    private:
     // Constraint Vector
     mutable Eigen::VectorXd c_;
     // Jacobian
     mutable MatrixType J_;
-    
 };
 
 }  // namespace optimisation

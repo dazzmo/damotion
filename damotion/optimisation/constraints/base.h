@@ -64,6 +64,9 @@ class ConstraintBase {
             in.push_back(pi);
         }
 
+        // Create concatenated vector
+        casadi::SX x = casadi::SX::vertcat(c.Variables());
+
         // Constraint
         SetConstraintFunction(
             std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
@@ -71,18 +74,31 @@ class ConstraintBase {
 
         // Jacobian
         if (jac) {
-            casadi::SXVector jacobians;
-            for (const casadi::SX &xi : c.Variables()) {
-                jacobians.push_back(jacobian(c, xi));
-            }
-            // Wrap the functions
             SetJacobianFunction(
                 std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
-                    casadi::Function(this->name() + "_jac", in, jacobians)));
+                    casadi::Function(this->name() + "_jac", in,
+                                     jacobian(c, x))));
         }
 
+        // Hessian
         if (hes) {
-            // TODO - Hessians
+            // Create dual-variables
+            casadi::SX l = casadi::SX::sym("l", c.size1());
+            // Create dual-variable-constraint dot product
+            casadi::SX lTc = mtimes(l.T(), c);
+
+            // Adjust input
+            in = c.Variables();
+            in.push_back(l);
+            for (const casadi::SX &pi : c.Parameters()) {
+                in.push_back(pi);
+            }
+
+            // Compute the Hessian of the product
+            SetHessianFunction(
+                std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
+                    casadi::Function(this->name() + "_hes", in,
+                                     hessian(lTc, x))));
         }
 
         // Update bounds for the constraint
@@ -111,10 +127,10 @@ class ConstraintBase {
      * @param p Parameters for the constraint
      * @param jac Whether to also compute the Jacobian
      */
-    virtual void eval(const Eigen::VectorXd &x, const common::InputRefVector &p,
+    virtual void eval(const common::InputRefVector &x, const common::InputRefVector &p,
                       bool jac = true) const {
         VLOG(10) << this->name() << " eval()";
-        common::InputRefVector in = {x};
+        common::InputRefVector in = x;
         for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
 
         // Call necessary constraint functions
@@ -131,10 +147,11 @@ class ConstraintBase {
      * @param l Dual variable vector
      * @param p Vector of parameters
      */
-    void eval_hessian(const Eigen::VectorXd &x, const Eigen::VectorXd &l,
+    void eval_hessian(const common::InputRefVector &x, const Eigen::VectorXd &l,
                       const common::InputRefVector &p) {
         // Create input for the lambda-hessian product
-        common::InputRefVector in = {x, l};
+        common::InputRefVector in = x;
+        in.push_back(l);
         for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
 
         // Call necessary constraint functions
@@ -325,11 +342,11 @@ class ConstraintBase {
     Eigen::VectorXd ub_;
 
     // Constraint function pointer
-    std::shared_ptr<common::Function<Eigen::VectorXd>> con_;
+    common::Function<Eigen::VectorXd>::SharedPtr con_;
     // Jacobian function pointer
-    std::shared_ptr<common::Function<MatrixType>> jac_;
+    typename common::Function<MatrixType>::SharedPtr jac_;
     // Hessian of vector-product function pointer
-    std::shared_ptr<common::Function<MatrixType>> hes_;
+    typename common::Function<MatrixType>::SharedPtr hes_;
 
     // Number of variable inputs
     int nx_ = 0;
