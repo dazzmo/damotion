@@ -222,7 +222,8 @@ class SolverBase {
       throw std::runtime_error("Binding is not included within program");
     }
     // Return the binding data given by the index
-    VLOG(10) << "Found Binding Data for " << binding.Get().name() << " at Index " << idx->second;
+    VLOG(10) << "Found Binding Data for " << binding.Get().name()
+             << " at Index " << idx->second;
     return data_[idx->second];
   }
 

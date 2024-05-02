@@ -6,22 +6,18 @@ namespace planning {
 namespace optimisation {
 
 class CollocationConstraintBase {
-    public:
-    private:
-        int nx_ = 0;
-        int nu_ = 0;
+ public:
+ private:
+  int nx_ = 0;
+  int nu_ = 0;
 };
 
-class TrapezoidalCollocationConstraint {
+class TrapezoidalCollocationConstraint {};
 
-};
+class HermiteSimpsonCollocationConstraint {};
 
-class HermiteSimpsonCollocationConstraint {
+}  // namespace optimisation
+}  // namespace planning
+}  // namespace damotion
 
-};
-
-}
-}
-}
-
-#endif/* COLLOCATION_BASE_H */
+#endif /* COLLOCATION_BASE_H */

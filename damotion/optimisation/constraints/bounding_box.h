@@ -8,53 +8,53 @@ namespace optimisation {
 
 template <typename MatrixType>
 class BoundingBoxConstraint : public ConstraintBase<MatrixType> {
-   public:
-    BoundingBoxConstraint(const std::string &name, const Eigen::VectorXd &lb,
-                          const Eigen::VectorXd &ub)
-        : ConstraintBase<MatrixType>(name, "bounding_box_constraint") {
-        assert(lb.rows() == ub.rows() && "lb and ub must be same dimension!");
+ public:
+  BoundingBoxConstraint(const std::string &name, const Eigen::VectorXd &lb,
+                        const Eigen::VectorXd &ub)
+      : ConstraintBase<MatrixType>(name, "bounding_box_constraint") {
+    assert(lb.rows() == ub.rows() && "lb and ub must be same dimension!");
 
-        int n = lb.rows();
-        // Resize the constraint
-        this->Resize(n, n, 0);
-        // Update bounds
-        this->SetBounds(lb, ub);
-    }
+    int n = lb.rows();
+    // Resize the constraint
+    this->Resize(n, n, 0);
+    // Update bounds
+    this->SetBounds(lb, ub);
+  }
 
-    /**
-     * @brief Evaluate the constraint and Jacobian (optional) given input
-     * variables x and parameters p.
-     *
-     * @param x
-     * @param p
-     * @param jac Flag for computing the Jacobian
-     */
-    void eval(const common::InputRefVector &x, const common::InputRefVector &p,
-              bool jac = true) const override {
-        // Evaluate the constraint
-        c_ << x[0] - this->LowerBound(), x[0] + this->UpperBound();
-    }
+  /**
+   * @brief Evaluate the constraint and Jacobian (optional) given input
+   * variables x and parameters p.
+   *
+   * @param x
+   * @param p
+   * @param jac Flag for computing the Jacobian
+   */
+  void eval(const common::InputRefVector &x, const common::InputRefVector &p,
+            bool jac = true) const override {
+    // Evaluate the constraint
+    c_ << x[0] - this->LowerBound(), x[0] + this->UpperBound();
+  }
 
-    /**
-     * @brief Returns the most recent evaluation of the constraint
-     *
-     * @return const Eigen::VectorXd&
-     */
-    const Eigen::VectorXd &Vector() const override { return c_; }
-    /**
-     * @brief The Jacobian of the constraint with respect to the i-th variable
-     * vector
-     *
-     * @param i
-     * @return const MatrixType&
-     */
-    const MatrixType &Jacobian() const override { return J_; }
+  /**
+   * @brief Returns the most recent evaluation of the constraint
+   *
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &Vector() const override { return c_; }
+  /**
+   * @brief The Jacobian of the constraint with respect to the i-th variable
+   * vector
+   *
+   * @param i
+   * @return const MatrixType&
+   */
+  const MatrixType &Jacobian() const override { return J_; }
 
-   private:
-    // Constraint Vector
-    mutable Eigen::VectorXd c_;
-    // Jacobian
-    mutable MatrixType J_;
+ private:
+  // Constraint Vector
+  mutable Eigen::VectorXd c_;
+  // Jacobian
+  mutable MatrixType J_;
 };
 
 }  // namespace optimisation

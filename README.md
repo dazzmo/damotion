@@ -38,7 +38,7 @@ For testing purposes we have (this is later be a toggle-able option):
 * [glog](https://github.com/google/glog)
 
 We also include interfaces to open-source solvers for numerical optimisation, we currently include:
-* [Ipopt](https://github.com/coin-or/Ipopt) 
+* [Ipopt](https://github.com/coin-or/Ipopt)
 * [qpOASES](https://github.com/coin-or/qpOASES) (-DWITH_QPOASES=ON in <a href="#installation">Installation</a>). Be sure to install qpOASES as a shared library, as this is what is expected by damotion.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

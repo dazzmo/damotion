@@ -4,4 +4,4 @@
 #include "damotion/optimisation/costs/linear.h"
 #include "damotion/optimisation/costs/quadratic.h"
 
-#endif/* COSTS_COSTS_H */
+#endif /* COSTS_COSTS_H */

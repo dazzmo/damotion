@@ -3,4 +3,4 @@
 
 #include <glog/logging.h>
 
-#endif/* COMMON_LOGGING_H */
+#endif /* COMMON_LOGGING_H */

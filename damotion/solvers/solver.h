@@ -14,39 +14,39 @@ namespace solvers {
  *
  */
 class Solver : public SolverBase<Eigen::MatrixXd> {
-   public:
-    Solver(Program& program) : SolverBase<Eigen::MatrixXd>(program) {
-        // Initialise dense constraint Jacobian and Lagrangian Hessian
-        constraint_jacobian_cache_ = Eigen::MatrixXd::Zero(
-            program.NumberOfConstraints(), program.NumberOfDecisionVariables());
-        lagrangian_hes_cache_ =
-            Eigen::MatrixXd::Zero(program.NumberOfDecisionVariables(),
-                                  program.NumberOfDecisionVariables());
-    }
-    ~Solver() = default;
+ public:
+  Solver(Program& program) : SolverBase<Eigen::MatrixXd>(program) {
+    // Initialise dense constraint Jacobian and Lagrangian Hessian
+    constraint_jacobian_cache_ = Eigen::MatrixXd::Zero(
+        program.NumberOfConstraints(), program.NumberOfDecisionVariables());
+    lagrangian_hes_cache_ =
+        Eigen::MatrixXd::Zero(program.NumberOfDecisionVariables(),
+                              program.NumberOfDecisionVariables());
+  }
+  ~Solver() = default;
 
-    void EvaluateCost(const Binding<CostType>& binding, const Eigen::VectorXd& x,
-                      bool grd, bool hes, bool update_cache = true);
+  void EvaluateCost(const Binding<CostType>& binding, const Eigen::VectorXd& x,
+                    bool grd, bool hes, bool update_cache = true);
 
-    void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes);
+  void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes);
 
-    // Evaluates the constraint and updates the cache for the gradients
-    void EvaluateConstraint(const Binding<ConstraintType>& binding,
-                            const int& constraint_idx, const Eigen::VectorXd& x,
-                            bool jac, bool update_cache = true);
+  // Evaluates the constraint and updates the cache for the gradients
+  void EvaluateConstraint(const Binding<ConstraintType>& binding,
+                          const int& constraint_idx, const Eigen::VectorXd& x,
+                          bool jac, bool update_cache = true);
 
-    void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
+  void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
 
-    void UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
-                                  const int& constraint_idx);
+  void UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
+                                const int& constraint_idx);
 
-    void UpdateLagrangianHessian(const Binding<CostType>& binding);
+  void UpdateLagrangianHessian(const Binding<CostType>& binding);
 
-   protected:
-    Eigen::MatrixXd constraint_jacobian_cache_;
-    Eigen::MatrixXd lagrangian_hes_cache_;
+ protected:
+  Eigen::MatrixXd constraint_jacobian_cache_;
+  Eigen::MatrixXd lagrangian_hes_cache_;
 
-   private:
+ private:
 };
 
 }  // namespace solvers

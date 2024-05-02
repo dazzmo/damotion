@@ -2,9 +2,9 @@
 
 #include <gtest/gtest.h>
 
-#include "pinocchio/parsers/urdf.hpp"
 #include "damotion/symbolic/expression.h"
 #include "damotion/utils/codegen.h"
+#include "pinocchio/parsers/urdf.hpp"
 
 // TEST(PinocchioModelWrapper, LoadModel) {
 //     pinocchio::Model model;
@@ -142,39 +142,40 @@
 // }
 
 TEST(PinocchioModelWrapper, EndEffector) {
-    pinocchio::Model model;
-    pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
-    pinocchio::Data data(model);
+  pinocchio::Model model;
+  pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
+  pinocchio::Data data(model);
 
-    damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
+  damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
-    auto tool0 = wrapper.AddEndEffector("tool0");
+  auto tool0 = wrapper.AddEndEffector("tool0");
 
-    Eigen::VectorXd q = pinocchio::randomConfiguration(model);
-    Eigen::VectorXd v = Eigen::VectorXd::Random(model.nv);
-    Eigen::VectorXd a = Eigen::VectorXd::Random(model.nv);
+  Eigen::VectorXd q = pinocchio::randomConfiguration(model);
+  Eigen::VectorXd v = Eigen::VectorXd::Random(model.nv);
+  Eigen::VectorXd a = Eigen::VectorXd::Random(model.nv);
 
-    // Create function wrapper for end-effector function
-    tool0->UpdateState(q, v, a);
+  // Create function wrapper for end-effector function
+  tool0->UpdateState(q, v, a);
 
-    Eigen::MatrixXd J(6, model.nv), dJ(6, model.nv);
-    J.setZero();
-    dJ.setZero();
-    pinocchio::computeFrameJacobian(model, data, q, model.getFrameId("tool0"),
-                                    pinocchio::LOCAL_WORLD_ALIGNED, J);
-    // Get classical frame acceleration drift
-    pinocchio::forwardKinematics(model, data, q, v, Eigen::VectorXd::Zero(model.nv));
-    Eigen::VectorXd dJdt_v = pinocchio::getFrameClassicalAcceleration(
-                                 model, data, model.getFrameId("tool0"),
-                                 pinocchio::LOCAL_WORLD_ALIGNED)
-                                 .toVector();
+  Eigen::MatrixXd J(6, model.nv), dJ(6, model.nv);
+  J.setZero();
+  dJ.setZero();
+  pinocchio::computeFrameJacobian(model, data, q, model.getFrameId("tool0"),
+                                  pinocchio::LOCAL_WORLD_ALIGNED, J);
+  // Get classical frame acceleration drift
+  pinocchio::forwardKinematics(model, data, q, v,
+                               Eigen::VectorXd::Zero(model.nv));
+  Eigen::VectorXd dJdt_v = pinocchio::getFrameClassicalAcceleration(
+                               model, data, model.getFrameId("tool0"),
+                               pinocchio::LOCAL_WORLD_ALIGNED)
+                               .toVector();
 
-    Eigen::VectorXd xvel = J * v;
-    Eigen::VectorXd xacc = J * a + dJdt_v;
+  Eigen::VectorXd xvel = J * v;
+  Eigen::VectorXd xacc = J * a + dJdt_v;
 
-    // Test joint position, velocity and acceleration
-    EXPECT_TRUE(xvel.isApprox(tool0->vel()));
-    EXPECT_TRUE(xacc.isApprox(tool0->acc()));
+  // Test joint position, velocity and acceleration
+  EXPECT_TRUE(xvel.isApprox(tool0->vel()));
+  EXPECT_TRUE(xacc.isApprox(tool0->acc()));
 }
 
 // // TEST(PinocchioModelWrapper, RNEAWithEndEffector) {

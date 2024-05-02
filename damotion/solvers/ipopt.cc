@@ -46,7 +46,8 @@
 //     return true;
 // }
 
-// bool IpoptSolverInstance::eval_g(Index n, const Number* x, bool new_x, Index m,
+// bool IpoptSolverInstance::eval_g(Index n, const Number* x, bool new_x, Index
+// m,
 //                                  Number* g) {
 //     if (new_x) {
 //         decision_variable_cache_ =
@@ -134,7 +135,8 @@
 // }
 
 // bool IpoptSolverInstance::get_bounds_info(Index n, Number* x_l, Number* x_u,
-//                                           Index m, Number* g_l, Number* g_u) {
+//                                           Index m, Number* g_l, Number* g_u)
+//                                           {
 //     // Decision variable bounds
 //     std::copy_n(prog_.DecisionVariablesUpperBound().data(), n, x_u);
 //     std::copy_n(prog_.DecisionVariablesLowerBound().data(), n, x_l);
@@ -148,7 +150,8 @@
 // bool IpoptSolverInstance::get_starting_point(Index n, bool init_x, Number* x,
 //                                              bool init_z, Number* z_L,
 //                                              Number* z_U, Index m,
-//                                              bool init_lambda, Number* lambda) {
+//                                              bool init_lambda, Number*
+//                                              lambda) {
 //     if (init_x) {
 //         std::copy_n(prog_.DecisionVariablesInitialPoint().data(), n, x);
 //     }

@@ -9,36 +9,35 @@ namespace damotion {
 namespace symbolic {
 
 class Variable {
-   public:
-    // ID type for the variables
-    typedef int Id;
+ public:
+  // ID type for the variables
+  typedef int Id;
 
-    Variable() = default;
+  Variable() = default;
 
-    Variable(const std::string &name) {
-        static int next_id_ = 0;
-        next_id_++;
-        // Set ID for variable
-        id_ = next_id_;
+  Variable(const std::string &name) {
+    static int next_id_ = 0;
+    next_id_++;
+    // Set ID for variable
+    id_ = next_id_;
 
-        name_ = name;
-    }
+    name_ = name;
+  }
 
-    ~Variable() = default;
+  ~Variable() = default;
 
-    // enum class Type : uint8_t { kContinuous };
+  // enum class Type : uint8_t { kContinuous };
 
-    const Id &id() const { return id_; }
-    const std::string &name() const { return name_; }
+  const Id &id() const { return id_; }
+  const std::string &name() const { return name_; }
 
-    bool operator<(const Variable &v) const { return id() < v.id(); }
-    bool operator==(const Variable &v) const { return id() == v.id(); }
+  bool operator<(const Variable &v) const { return id() < v.id(); }
+  bool operator==(const Variable &v) const { return id() == v.id(); }
 
-   private:
-    Id id_;
-    std::string name_;
+ private:
+  Id id_;
+  std::string name_;
 };
-
 
 typedef Eigen::VectorX<Variable> VariableVector;
 typedef Eigen::MatrixX<Variable> VariableMatrix;

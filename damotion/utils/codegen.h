@@ -2,11 +2,9 @@
 #define UTILS_CODEGEN_H
 
 #include <dlfcn.h>
-#include <filesystem>
 
 #include <casadi/casadi.hpp>
-
-
+#include <filesystem>
 
 namespace damotion {
 namespace utils {
@@ -22,10 +20,10 @@ namespace casadi {
  * library
  */
 ::casadi::Function codegen(const ::casadi::Function &f,
-                         const std::string &dir = "./");
+                           const std::string &dir = "./");
 
-}  // namespace casadi_utils
-}
-}
+}  // namespace casadi
+}  // namespace utils
+}  // namespace damotion
 
 #endif /* UTILS_CODEGEN_H */

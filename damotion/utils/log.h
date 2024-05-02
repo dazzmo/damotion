@@ -9,13 +9,13 @@ namespace damotion {
 
 template <typename T>
 Eigen::Matrix<T, 3, -1> log3(const Eigen::Matrix<T, 3, 3> &R) {
-    T theta;
-    return pinocchio::log3(R, theta);
+  T theta;
+  return pinocchio::log3(R, theta);
 }
 
 template <typename T>
 Eigen::Matrix<T, 3, -1> log3(const Eigen::Matrix<T, 3, 3> &R, T &theta) {
-    return pinocchio::log3(R, theta);
+  return pinocchio::log3(R, theta);
 }
 
 /**
@@ -36,7 +36,7 @@ Eigen::Matrix<casadi::SX, 3, -1> log3(const Eigen::Matrix<casadi::SX, 3, 3> &R);
 template <typename T>
 void Jlog3(T &theta, const Eigen::Matrix<T, 3, 1> &log,
            Eigen::Matrix<T, 3, 3> &J) {
-    return pinocchio::Jlog3(theta, log, J);
+  return pinocchio::Jlog3(theta, log, J);
 }
 
 template <>
@@ -46,7 +46,7 @@ void Jlog3(casadi::SX &theta, const Eigen::Matrix<casadi::SX, 3, 1> &log,
 template <typename T>
 Eigen::Matrix<T, 6, -1> log6(const Eigen::Matrix<T, 3, 3> &R,
                              const Eigen::Matrix<T, 3, 1> &p) {
-    return pinocchio::log6(pinocchio::SE3Tpl<T>(R, p));
+  return pinocchio::log6(pinocchio::SE3Tpl<T>(R, p));
 }
 
 /**
@@ -64,7 +64,7 @@ Eigen::Matrix<casadi::SX, 6, -1> log6(const Eigen::Matrix<casadi::SX, 3, 3> &R,
 template <typename T>
 void Jlog6(const Eigen::Matrix<T, 3, 3> &R, const Eigen::Matrix<T, 3, 1> &p,
            Eigen::Matrix<T, 6, 6> &J) {
-    return pinocchio::Jlog6(pinocchio::SE3Tpl<T>(R, p), J);
+  return pinocchio::Jlog6(pinocchio::SE3Tpl<T>(R, p), J);
 }
 
 template <>

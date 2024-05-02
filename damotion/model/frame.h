@@ -11,87 +11,87 @@ namespace model {
  *
  */
 class TargetFrame {
-   public:
-    TargetFrame() { x_.resize(3); }
-    ~TargetFrame() = default;
+ public:
+  TargetFrame() { x_.resize(3); }
+  ~TargetFrame() = default;
 
-    /**
-     * @brief Position of the frame in the given reference frame
-     *
-     * @return const ::casadi::SX&
-     */
-    const ::casadi::SX &pos_sym() { return x_[0]; }
-    /**
-     * @brief Velocity of the frame in the given reference frame
-     *
-     * @return const ::casadi::SX&
-     */
-    const ::casadi::SX &vel_sym() { return x_[1]; }
-    /**
-     * @brief Acceleration of the frame in the given reference frame
-     *
-     * @return const ::casadi::SX&
-     */
-    const ::casadi::SX &acc_sym() { return x_[2]; }
+  /**
+   * @brief Position of the frame in the given reference frame
+   *
+   * @return const ::casadi::SX&
+   */
+  const ::casadi::SX &pos_sym() { return x_[0]; }
+  /**
+   * @brief Velocity of the frame in the given reference frame
+   *
+   * @return const ::casadi::SX&
+   */
+  const ::casadi::SX &vel_sym() { return x_[1]; }
+  /**
+   * @brief Acceleration of the frame in the given reference frame
+   *
+   * @return const ::casadi::SX&
+   */
+  const ::casadi::SX &acc_sym() { return x_[2]; }
 
-    /**
-     * @brief \copydoc pos_sym()
-     *
-     * @return const ::casadi::SX&
-     */
-    const Eigen::Ref<const Eigen::VectorXd> pos() {
-        pos_ = f_wrapper_.getOutput(0);
-        return pos_;
-    }
-    /**
-     * @brief \copydoc vel_sym()
-     *
-     * @return const ::casadi::SX&
-     */
-    const Eigen::Ref<const Eigen::VectorXd> vel() {
-        vel_ = f_wrapper_.getOutput(1);
-        return vel_;
-    }
-    /**
-     * @brief \copydoc acc_sym()
-     *
-     * @return const ::casadi::SX&
-     */
-    const Eigen::Ref<const Eigen::VectorXd> acc() {
-        acc_ = f_wrapper_.getOutput(2);
-        return acc_;
-    }
+  /**
+   * @brief \copydoc pos_sym()
+   *
+   * @return const ::casadi::SX&
+   */
+  const Eigen::Ref<const Eigen::VectorXd> pos() {
+    pos_ = f_wrapper_.getOutput(0);
+    return pos_;
+  }
+  /**
+   * @brief \copydoc vel_sym()
+   *
+   * @return const ::casadi::SX&
+   */
+  const Eigen::Ref<const Eigen::VectorXd> vel() {
+    vel_ = f_wrapper_.getOutput(1);
+    return vel_;
+  }
+  /**
+   * @brief \copydoc acc_sym()
+   *
+   * @return const ::casadi::SX&
+   */
+  const Eigen::Ref<const Eigen::VectorXd> acc() {
+    acc_ = f_wrapper_.getOutput(2);
+    return acc_;
+  }
 
-    void UpdateState(const ::casadi::SX &qpos, const ::casadi::SX &qvel,
-                     const ::casadi::SX &qacc) {
-        x_ = f_(::casadi::SXVector({qpos, qvel, qacc}));
-    }
+  void UpdateState(const ::casadi::SX &qpos, const ::casadi::SX &qvel,
+                   const ::casadi::SX &qacc) {
+    x_ = f_(::casadi::SXVector({qpos, qvel, qacc}));
+  }
 
-    void UpdateState(const Eigen::VectorXd &qpos, const Eigen::VectorXd &qvel,
-                     const Eigen::VectorXd &qacc) {
-        f_wrapper_.call({qpos, qvel, qacc});
-    }
+  void UpdateState(const Eigen::VectorXd &qpos, const Eigen::VectorXd &qvel,
+                   const Eigen::VectorXd &qacc) {
+    f_wrapper_.call({qpos, qvel, qacc});
+  }
 
-   protected:
-    void SetFunction(const ::casadi::Function &f) {
-        f_ = f;
-        f_wrapper_ = f_;
-    }
+ protected:
+  void SetFunction(const ::casadi::Function &f) {
+    f_ = f;
+    f_wrapper_ = f_;
+  }
 
-   private:
-    // Current frame state for the symbolic function
-    ::casadi::SXVector x_;
+ private:
+  // Current frame state for the symbolic function
+  ::casadi::SXVector x_;
 
-    Eigen::VectorXd pos_;
-    Eigen::VectorXd vel_;
-    Eigen::VectorXd acc_;
+  Eigen::VectorXd pos_;
+  Eigen::VectorXd vel_;
+  Eigen::VectorXd acc_;
 
-    // Function to compute the state of the frame
-    ::casadi::Function f_;
-    // Wrapper for the function of the symbolic function
-    utils::casadi::FunctionWrapper<Eigen::VectorXd> f_wrapper_;
+  // Function to compute the state of the frame
+  ::casadi::Function f_;
+  // Wrapper for the function of the symbolic function
+  utils::casadi::FunctionWrapper<Eigen::VectorXd> f_wrapper_;
 };
 }  // namespace model
 }  // namespace damotion
 
-#endif/* MODEL_FRAME_H */
+#endif /* MODEL_FRAME_H */
