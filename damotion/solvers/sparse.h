@@ -12,7 +12,7 @@ class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
     SparseSolver(SparseProgram& program);
     ~SparseSolver() {}
 
-    void EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
+    void EvaluateCost(const Binding<CostType>& binding, const Eigen::VectorXd& x,
                       bool grd, bool hes, bool update_cache = true);
 
     void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes) {}

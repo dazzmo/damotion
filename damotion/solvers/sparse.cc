@@ -146,7 +146,7 @@ void SparseSolver::ConstructSparseLagrangianHessian(bool with_constraints) {
     }
 }
 
-void SparseSolver::EvaluateCost(Binding<CostType>& binding,
+void SparseSolver::EvaluateCost(const Binding<CostType>& binding,
                                 const Eigen::VectorXd& x, bool grd, bool hes,
                                 bool update_cache) {
     common::InputRefVector x_in = {}, p_in = {};

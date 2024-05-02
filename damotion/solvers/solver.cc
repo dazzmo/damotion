@@ -91,7 +91,7 @@ void Solver::UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
     int idx = 0;
     for (int i = 0; i < binding.nx(); ++i) {
         const sym::VariableVector& xi = binding.x(i);
-        Eigen::Ref<const Eigen::VectorXd> Ji =
+        Eigen::Ref<const Eigen::MatrixXd> Ji =
             binding.Get().Jacobian().middleCols(idx, xi.size());
         InsertJacobianAtVariableLocations(constraint_jacobian_cache_, Ji, xi,
                                           data.continuous[i]);

@@ -13,32 +13,11 @@
   </p>
 </div>
 
-<!-- TABLE OF CONTENTS -->
-<navigation>
-  <summary><b>Table of Contents</b></summary>
-  <ul>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-    </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#license">License</a></li>
-    <li><a href="#contact">Contact</a></li>
-  </ul>
-</navigation>
-
-
-
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
 <p align="left">
-The Damotion library was designed for personal use in robotics projects. It is built around the CasADi library, utilising the symbolic algebra capabilities to compute and evaluate complicated expressions associated with robotics research areas such as control, optimisation and estimation. To furhter aid these computations, we utilises Pinocchio, a mature rigid-body dynamics library for use in computing these expressions. This library combines these two libraries to offer utilities in optimisation, control and estimation with an emphasis on efficient computations for real-time application.
+The Damotion library is designed to provide functions and utilities for personal use in robotics-related projects. It is built around the CasADi library, utilising its symbolic algebra capabilities to compute and evaluate complicated expressions associated with robotics research areas such as control, optimisation and estimation. To furhter aid these computations, we utilise Pinocchio, a mature rigid-body dynamics library for use in computing these expressions. This library incorporates these two libraries to offer utilities in optimisation, control and estimation with an emphasis on efficient computations for real-time application.
 </p>
 <p align="right">(<a href="#readme-top">back to top</a>)
 </p>
@@ -59,12 +38,13 @@ For testing purposes we have (this is later be a toggle-able option):
 * [glog](https://github.com/google/glog)
 
 We also include interfaces to open-source solvers for numerical optimisation, we currently include:
-* [Ipopt](https://github.com/coin-or/Ipopt)
-* [QPOASES](https://github.com/coin-or/qpOASES)
+* [Ipopt](https://github.com/coin-or/Ipopt) 
+* [qpOASES](https://github.com/coin-or/qpOASES) (-DWITH_QPOASES=ON in <a href="#installation">Installation</a>). Be sure to install qpOASES as a shared library, as this is what is expected by damotion.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Installation
+<a name="installation"></a>
 
 1. Clone the repo
    ```sh
@@ -93,6 +73,11 @@ Distributed under the GNU LESSER GENERAL PUBLIC LICENSE License. See `LICENSE.tx
 <!-- CONTACT -->
 ## Contact
 
-Damian Abood - TBA@TBA.COM
+Damian Abood - damian.abood@sydney.edu.au
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Acknowledgements
+Thank you to Jesse Morris for his assistance with build-related concerns and improving the layout of the library.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
