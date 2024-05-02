@@ -4,8 +4,9 @@ namespace damotion {
 namespace optimisation {
 namespace solvers {
 
-void Solver::EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
-                          bool grd, bool hes, bool update_cache) {
+void Solver::EvaluateCost(const Binding<CostType>& binding,
+                          const Eigen::VectorXd& x, bool grd, bool hes,
+                          bool update_cache) {
     common::InputRefVector x_in = {}, p_in = {};
     GetBindingInputs(binding, x_in);
 
@@ -39,7 +40,7 @@ void Solver::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
 }
 
 // Evaluates the constraint and updates the cache for the gradients
-void Solver::EvaluateConstraint(Binding<ConstraintType>& binding,
+void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                                 const int& constraint_idx,
                                 const Eigen::VectorXd& x, bool jac,
                                 bool update_cache) {
@@ -87,23 +88,14 @@ void Solver::UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
     Eigen::Block<Eigen::MatrixXd> J = constraint_jacobian_cache_.middleRows(
         constraint_idx, binding.Get().Dimension());
 
-    int jac_idx = 0;
+    int idx = 0;
     for (int i = 0; i < binding.nx(); ++i) {
         const sym::VariableVector& xi = binding.x(i);
         Eigen::Ref<const Eigen::VectorXd> Ji =
-            binding.Get().Jacobian().middleCols(jac_idx, xi.size());
-        if (data.continuous[i]) {
-            J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(xi[0]),
-                         xi.size()) += Ji;
-        } else {
-            // For each variable, update the location in the Jacobian
-            for (int j = 0; j < xi.size(); ++j) {
-                int idx = GetCurrentProgram().GetDecisionVariableIndex(xi[j]);
-                constraint_jacobian_cache_.col(idx) += Ji.col(j);
-            }
-        }
-
-        jac_idx += xi.size();
+            binding.Get().Jacobian().middleCols(idx, xi.size());
+        InsertJacobianAtVariableLocations(constraint_jacobian_cache_, Ji, xi,
+                                          data.continuous[i]);
+        idx += xi.size();
     }
 }
 
@@ -112,7 +104,7 @@ void Solver::UpdateLagrangianHessian(const Binding<CostType>& binding) {
     ProgramType& program = GetCurrentProgram();
     BindingInputData& data = GetBindingInputData(binding);
 
-    int hes_x_idx = 0, hes_y_idx = 0;
+    int idx_x = 0, idx_y = 0;
 
     for (int i = 0; i < binding.nx(); ++i) {
         const sym::VariableVector& xi = binding.x(i);
@@ -125,38 +117,15 @@ void Solver::UpdateLagrangianHessian(const Binding<CostType>& binding) {
 
             // Get Hessian block
             Eigen::Ref<const Eigen::MatrixXd> Hij =
-                binding.Get().Hessian().block(hes_x_idx, hes_y_idx, i_sz, j_sz);
+                binding.Get().Hessian().block(idx_x, idx_y, i_sz, j_sz);
 
-            // For each variable combination
-            if (data.continuous[i] && data.continuous[j]) {
-                // Create lower triangular Hessian
-                if (i_idx > j_idx) {
-                    lagrangian_hes_cache_.block(i_idx, j_idx, i_sz, j_sz) +=
-                        Hij;
-                } else {
-                    lagrangian_hes_cache_.block(j_idx, i_idx, j_sz, i_sz) +=
-                        Hij.transpose();
-                }
+            InsertHessianAtVariableLocations(lagrangian_hes_cache_, Hij, xi, xj,
+                                             data.continuous[j],
+                                             data.continuous[j]);
 
-            } else {
-                // For each variable pair, populate the Hessian
-                for (int ii = 0; ii < xi.size(); ++ii) {
-                    int i_idx =
-                        GetCurrentProgram().GetDecisionVariableIndex(xi[ii]);
-                    for (int jj = 0; jj < xj.size(); ++jj) {
-                        int j_idx =
-                            GetCurrentProgram().GetDecisionVariableIndex(
-                                xj[jj]);
-                        // Create lower triangular matrix
-                        if (i_idx > j_idx) {
-                            lagrangian_hes_cache_(i_idx, j_idx) += Hij(ii, jj);
-                        } else {
-                            lagrangian_hes_cache_(j_idx, i_idx) += Hij(ii, jj);
-                        }
-                    }
-                }
-            }
+            idx_y += xj.size();
         }
+        idx_x += xi.size();
     }
 }
 

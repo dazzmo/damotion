@@ -18,7 +18,7 @@ class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
     void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes) {}
 
     // Evaluates the constraint and updates the cache for the gradients
-    void EvaluateConstraint(Binding<ConstraintType>& binding,
+    void EvaluateConstraint(const Binding<ConstraintType>& binding,
                             const int& constraint_idx, const Eigen::VectorXd& x,
                             bool jac, bool update_cache = true);
 

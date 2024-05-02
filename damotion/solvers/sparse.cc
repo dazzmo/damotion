@@ -169,7 +169,7 @@ void SparseSolver::EvaluateCost(Binding<CostType>& binding,
     if (hes) UpdateLagrangianHessian(binding);
 }
 
-void SparseSolver::EvaluateConstraint(Binding<ConstraintType>& binding,
+void SparseSolver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                                       const int& constraint_idx,
                                       const Eigen::VectorXd& x, bool jac,
                                       bool update_cache) {

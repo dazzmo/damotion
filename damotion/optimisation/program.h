@@ -1,5 +1,5 @@
-#ifndef SOLVERS_PROGRAM_H
-#define SOLVERS_PROGRAM_H
+#ifndef OPTIMISATION_PROGRAM_H
+#define OPTIMISATION_PROGRAM_H
 
 #include <casadi/casadi.hpp>
 
@@ -216,7 +216,7 @@ class CostManager {
      * @return Binding<Cost<MatrixType>>
      */
     Binding<CostType> AddCost(const std::shared_ptr<CostType> &cost,
-                              const sym::VariableVectorRef &x,
+                              const sym::VariableRefVector &x,
                               const sym::ParameterVector &p) {
         Binding<CostType> binding(cost, x, p);
         costs_.push_back(binding);
@@ -225,14 +225,14 @@ class CostManager {
 
     Binding<LinearCost<MatrixType>> AddLinearCost(
         const std::shared_ptr<LinearCost<MatrixType>> &cost,
-        const sym::VariableVectorRef &x, const sym::ParameterVector &p) {
+        const sym::VariableRefVector &x, const sym::ParameterVector &p) {
         linear_costs_.push_back(Binding<LinearCost<MatrixType>>(cost, x, p));
         return linear_costs_.back();
     }
 
     Binding<QuadraticCost<MatrixType>> AddQuadraticCost(
         const std::shared_ptr<QuadraticCost<MatrixType>> &cost,
-        const sym::VariableVectorRef &x, const sym::ParameterVector &p) {
+        const sym::VariableRefVector &x, const sym::ParameterVector &p) {
         quadratic_costs_.push_back(
             Binding<QuadraticCost<MatrixType>>(cost, x, p));
         return quadratic_costs_.back();
@@ -317,7 +317,7 @@ class ConstraintManager {
      */
     Binding<ConstraintBase<MatrixType>> AddConstraint(
         const std::shared_ptr<ConstraintBase<MatrixType>> &con,
-        const sym::VariableVectorRef &x, const sym::ParameterVector &p) {
+        const sym::VariableRefVector &x, const sym::ParameterVector &p) {
         // Create a binding for the constraint
         constraints_.push_back(Binding<ConstraintBase<MatrixType>>(con, x, p));
         n_constraints_ += con->Dimension();
@@ -326,7 +326,7 @@ class ConstraintManager {
 
     Binding<LinearConstraint<MatrixType>> AddLinearConstraint(
         const std::shared_ptr<LinearConstraint<MatrixType>> &con,
-        const sym::VariableVectorRef &x, const sym::ParameterVector &p) {
+        const sym::VariableRefVector &x, const sym::ParameterVector &p) {
         linear_constraints_.push_back(
             Binding<LinearConstraint<MatrixType>>(con, x, p));
         n_constraints_ += con->Dimension();
@@ -511,4 +511,4 @@ typedef ProgramBase<Eigen::SparseMatrix<double>> SparseProgram;
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* SOLVERS_PROGRAM_H */
+#endif/* OPTIMISATION_PROGRAM_H */

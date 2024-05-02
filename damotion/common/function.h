@@ -47,16 +47,16 @@ class Function {
     /**
      * @brief Number of inputs for the function
      *
-     * @return const int
+     * @return const int&
      */
-    const int n_in() const { return n_in_; }
+    const int& n_in() const { return n_in_; }
 
     /**
      * @brief Number of outputs for the function
      *
-     * @return const int
+     * @return const int&
      */
-    const int n_out() const { return n_out_; }
+    const int& n_out() const { return n_out_; }
 
     /**
      * @brief Update the function based on its inputs

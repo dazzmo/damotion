@@ -88,14 +88,14 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
      *
      * @return const MatrixType&
      */
-    const Eigen::Ref<const MatrixType> A() { return fA_->getOutput(0); }
+    const Eigen::Ref<const MatrixType> A() const { return fA_->getOutput(0); }
 
     /**
      * @brief The constant vector for the linear constraint A x + b
      *
      * @return const Eigen::VectorXd&
      */
-    const Eigen::Ref<const Eigen::VectorXd> b() { return fb_->getOutput(0); }
+    const Eigen::Ref<const Eigen::VectorXd> b() const { return fb_->getOutput(0); }
 
     /**
      * @brief Evaluate the constraint and Jacobian (optional) given input

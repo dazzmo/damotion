@@ -85,38 +85,39 @@ class QPOASESSolverInstance : public Solver {
         // Linear costs
         for (Binding<LinearCost<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetLinearCostBindings()) {
+            BindingInputData& data =
+                GetBindingInputData(binding);
+
             // Evaluate the cost
             EvaluateCost(binding, primal_solution_x_, true, true, false);
 
-            const std::vector<bool>& continuous =
-                CostBindingContinuousInputCheck(binding);
-
             // Update the gradient
-            UpdateVectorAtVariableLocations(
-                g_, binding.Get().c(), binding.x(0), continuous[0]);
+            InsertVectorAtVariableLocations(g_, binding.Get().c(), binding.x(0),
+                                            data.continuous[0]);
         }
         // Quadratic costs
         for (Binding<QuadraticCost<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetQuadraticCostBindings()) {
-            const std::vector<bool>& continuous =
-                CostBindingContinuousInputCheck(binding);
+            BindingInputData& data =
+                GetBindingInputData(binding);
 
             // Evaluate the cost
             EvaluateCost(binding, primal_solution_x_, true, true, false);
             // Update the gradient
-            UpdateVectorAtVariableLocations(
-                g_, binding.Get().b(), binding.x(0), continuous[0]);
+            InsertVectorAtVariableLocations(g_, binding.Get().b(), binding.x(0),
+                                            data.continuous[0]);
             // Update the hessian
-            UpdateHessianAtVariableLocations(
-                H_, 2.0 * binding.Get().A(), binding.x(0),
-                binding.x(0), continuous[0], continuous[0]);
+            InsertHessianAtVariableLocations(
+                H_, 2.0 * binding.Get().A(), binding.x(0), binding.x(0),
+                data.continuous[0], data.continuous[0]);
         }
         // Evaluate only the linear constraints of the program
         // Reset constraint jacobian
         constraint_jacobian_cache_.setZero();
         int idx = 0;
-        for (Binding<LinearConstraint<Eigen::MatrixXd>>& binding :
+        for (const Binding<LinearConstraint<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetLinearConstraintBindings()) {
+
             // Compute the constraints
             EvaluateConstraint(binding, idx, primal_solution_x_, true, true);
 
@@ -166,7 +167,9 @@ class QPOASESSolverInstance : public Solver {
      *
      * @return const qpOASES::QProblemStatus&
      */
-    qpOASES::QProblemStatus GetProblemStatus() const { return qp_->getStatus(); }
+    qpOASES::QProblemStatus GetProblemStatus() const {
+        return qp_->getStatus();
+    }
 
     /**
      * @brief Returns the primal solution of the most recent program, if

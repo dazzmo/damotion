@@ -1,57 +1,10 @@
-include_directories(/usr/local/include)
-link_directories(/usr/local/lib)
-
 find_package(Boost REQUIRED)
-find_package(glog REQUIRED)
 find_package(casadi REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
+find_package(glog REQUIRED)
 find_package(pinocchio REQUIRED)
 
-SET(${PROJECT_NAME}_HEADERS
-solvers/ipopt.h
-solvers/base.h
-solvers/sparse.h
-solvers/solver.h
-solvers/qpoases.h
-utils/pinocchio_model.h
-utils/codegen.h
-utils/eigen_wrapper.h
-utils/log.h
-utils/casadi.h
-optimisation/costs/costs.h
-optimisation/costs/base.h
-optimisation/costs/quadratic.h
-optimisation/costs/linear.h
-optimisation/program.h
-optimisation/binding.h
-optimisation/constraints/bounding_box.h
-optimisation/constraints/base.h
-optimisation/constraints/linear.h
-optimisation/constraints/constraints.h
-optimisation/bounds.h
-estimation/ekf.h
-common/logging.h
-common/function.h
-common/sparsity.h
-common/profiler.h
-common/math/binomial.h
-common/math/random.h
-common/trajectory/bezier.h
-common/trajectory/piecewise_bezier.h
-common/trajectory/trajectory.h
-model/frame.h
-symbolic/parameter.h
-symbolic/expression.h
-symbolic/variable.h
-planning/optimisation/collocation/base.h
-system/controlled.h
-system/system.h
-control/osc/osc.h
-control/osc/tasks/contact.h
-control/osc/tasks/task.h
-control/osc/tasks/motion.h
-control/lqr.h
-)
+option(USE_QPOASES "Build using qpOASES" ON)
 
 # Collect source files
 SET(${PROJECT_NAME}_SOURCES
@@ -66,10 +19,10 @@ utils/pinocchio_model.cc
 optimisation/program.cc
 optimisation/bounds.cc
 common/function.cc
-common/sparsity.cc
 common/math/binomial.cc
 common/trajectory/bezier.cc
 common/trajectory/trajectory.cc
+common/sparsity.cc
 symbolic/parameter.cc
 symbolic/variable.cc
 system/controlled.cc
@@ -80,81 +33,59 @@ control/osc/osc.cc
 )
 
 SET(${PROJECT_NAME}_LIBRARIES
-Eigen3::Eigen 
-pinocchio::pinocchio 
+Eigen3::Eigen
+pinocchio::pinocchio
 casadi
-glog 
+glog
 )
 
-# Optional solvers
-# qpOASES
-if(WITH_QPOASES)
-find_package(qpOASES REQUIRED)
-list(APPEND ${PROJECT_NAME}_LIBRARIES qpOASES)
-list(APPEND ${PROJECT_NAME}_HEADERS solvers/solve_qpoases.h)
-endif(WITH_QPOASES)
-# IPOPT
-if(WITH_IPOPT)
-list(APPEND ${PROJECT_NAME}_LIBRARIES ipopt)
-list(APPEND ${PROJECT_NAME}_SOURCES solvers/solve_ipopt.cc)
-list(APPEND ${PROJECT_NAME}_HEADERS solvers/solve_ipopt.h)
-endif(WITH_IPOPT)
+if(USE_QPOASES)
+  message(STATUS "Using qpOASES as numeric optimization solver")
+
+  find_package(qpOASES REQUIRED)
+  list(APPEND ${PROJECT_NAME}_LIBRARIES qpOASES)
+endif(USE_QPOASES)
+
+
+# if(WITH_IPOPT)
+# list(APPEND ${PROJECT_NAME}_LIBRARIES ipopt)
+# list(APPEND ${PROJECT_NAME}_SOURCES solvers/solve_ipopt.cc)
+# # list(APPEND ${PROJECT_NAME}_HEADERS solvers/solve_ipopt.h)
+# endif(WITH_IPOPT)
 
 add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_SOURCES})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${${PROJECT_NAME}_LIBRARIES})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
-target_include_directories(${PROJECT_NAME} 
+message("CMAKE_CURRENT_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}")
+
+# Jesse: not actually sure what it does, since we dont have a include folder do we need the INSTALL_INTERFACE
+# dont know about the build interface
+target_include_directories(${PROJECT_NAME}
   PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
-    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}>"
+    "$<INSTALL_INTERFACE:include>"
 )
 
-# Install
-include(GNUInstallDirs) # for correct libraries locations across platforms
-set(config_package_location "usr/local/lib/cmake/${PROJECT_NAME}") # for .cmake find-scripts installs
-install(
-  TARGETS ${PROJECT_NAME}
-  EXPORT ${PROJECT_NAME}-targets
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME}
-)
-# Copy header files
-install(DIRECTORY 
-        "common"
-        "control"
-        "planning"
-        "model"
-        "solvers"
-        "symbolic"
-        "system"
-        "utils"
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME} # target directory
-        FILES_MATCHING # install only matched files
-        PATTERN "*.h" # select header files
-)
+target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-unused-parameter -pipe)
 
-# Auto generate and install the find scripts helpers
-install(
-  EXPORT ${PROJECT_NAME}-targets
-  FILE ${PROJECT_NAME}-targets.cmake
-  NAMESPACE ${PROJECT_NAME}::
-  DESTINATION ${config_package_location}
-)
-# generate the file damotionConfigVersion.cmake
-set(version_file "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake")
-include(CMakePackageConfigHelpers)
-write_basic_package_version_file(
-  ${version_file}
-  VERSION ${damotion_VERSION}
-  COMPATIBILITY SameMajorVersion
-)
-# install the two files in a place where cmake looks for them
-install(
-  FILES 
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${PROJECT_NAME}-config.cmake" # self-written
-    ${version_file}                                                  # generated
-  DESTINATION ${config_package_location}
-)
+add_library(damotion::damotion ALIAS ${PROJECT_NAME})
+
+
+include(GNUInstallDirs)
+  ## First of all, we need to install the library itself.
+  install(TARGETS ${PROJECT_NAME}
+      EXPORT damotion-export
+      LIBRARY DESTINATION lib
+      ARCHIVE DESTINATION lib
+      # Perhaps use this, instead of installing include dir
+      #PUBLIC_HEADER DESTINATION include
+      INCLUDES DESTINATION include # We need this right?
+      RUNTIME DESTINATION bin
+  )
+
+   # Install header files
+install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+  DESTINATION include
+  FILES_MATCHING PATTERN "*.h")

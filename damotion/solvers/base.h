@@ -217,6 +217,83 @@ class SolverBase {
         return data_[idx->second];
     }
 
+    /**
+     * @brief Places the vector vec within res specified at the variable
+     * locations of var
+     *
+     * @param res
+     * @param vec
+     * @param var
+     * @param is_continuous
+     */
+    void InsertVectorAtVariableLocations(Eigen::VectorXd& res,
+                                         const Eigen::VectorXd& vec,
+                                         const sym::VariableVector& var,
+                                         bool is_continuous = false) {
+        if (is_continuous) {
+            // Block-insert
+            res.middleRows(program_.GetDecisionVariableIndex(var[0]),
+                           var.size()) += vec;
+        } else {
+            // Manually insert into vector
+            for (int j = 0; j < var.size(); ++j) {
+                int idx = program_.GetDecisionVariableIndex(var[j]);
+                res[idx] += vec[j];
+            }
+        }
+    }
+
+    void InsertJacobianAtVariableLocations(Eigen::MatrixXd& res,
+                                           const Eigen::MatrixXd& jac,
+                                           const sym::VariableVector& var,
+                                           bool is_continuous = false) {
+        if (is_continuous) {
+            res.middleCols(GetCurrentProgram().GetDecisionVariableIndex(var[0]),
+                           var.size()) += jac;
+        } else {
+            // For each variable, update the location in the Jacobian
+            for (int i = 0; i < var.size(); ++i) {
+                int idx = GetCurrentProgram().GetDecisionVariableIndex(var[i]);
+                res.col(idx) += jac.col(i);
+            }
+        }
+    }
+
+    void InsertHessianAtVariableLocations(Eigen::MatrixXd& res,
+                                          const Eigen::MatrixXd& mat,
+                                          const sym::VariableVector& var_x,
+                                          const sym::VariableVector& var_y,
+                                          bool is_continuous_x = false,
+                                          bool is_continuous_y = false) {
+        // For each variable combination
+        if (is_continuous_x && is_continuous_y) {
+            int x_idx = program_.GetDecisionVariableIndex(var_x[0]);
+            int y_idx = program_.GetDecisionVariableIndex(var_y[0]);
+            // Create lower triangular Hessian
+            if (x_idx > y_idx) {
+                res.block(x_idx, y_idx, var_x.size(), var_y.size()) += mat;
+            } else {
+                res.block(y_idx, x_idx, var_y.size(), var_x.size()) +=
+                    mat.transpose();
+            }
+
+        } else {
+            // For each variable pair, populate the Hessian
+            for (int i = 0; i < var_x.size(); ++i) {
+                int x_idx = program_.GetDecisionVariableIndex(var_x[i]);
+                for (int j = 0; j < var_y.size(); ++j) {
+                    int y_idx = program_.GetDecisionVariableIndex(var_y[j]);
+                    // Create lower triangular matrix
+                    if (x_idx > y_idx) {
+                        res(x_idx, y_idx) += mat(i, j);
+                    } else {
+                        res(y_idx, x_idx) += mat(i, j);
+                    }
+                }
+            }
+        }
+    }
+
    private:
     bool is_solved_ = false;
     // Reference to current program in solver
@@ -260,8 +337,6 @@ class SolverBase {
         binding_idx_[binding.id()] = data_.size();
         data_.push_back(data);
     }
-
-    
 };
 
 }  // namespace solvers
