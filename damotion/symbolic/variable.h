@@ -39,11 +39,8 @@ class Variable {
     std::string name_;
 };
 
-class VariableVector : public Eigen::VectorX<Variable> {
-    using UniquePtr = std::shared_ptr<VariableVector>;
-    using SharedPtr = std::shared_ptr<VariableVector>;
-};
 
+typedef Eigen::VectorX<Variable> VariableVector;
 typedef Eigen::MatrixX<Variable> VariableMatrix;
 typedef Eigen::Ref<VariableVector> VariableVectorRef;
 typedef std::vector<Eigen::Ref<const VariableVector>> VariableRefVector;

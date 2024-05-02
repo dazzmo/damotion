@@ -3,6 +3,7 @@
 
 #include <casadi/casadi.hpp>
 
+#include "damotion/common/logging.h"
 #include "damotion/common/profiler.h"
 #include "damotion/optimisation/binding.h"
 #include "damotion/optimisation/constraints/constraints.h"
@@ -96,6 +97,16 @@ class DecisionVariableManager {
      * @param var
      */
     bool SetDecisionVariableVector(const Eigen::Ref<sym::VariableVector> &var);
+
+    /**
+     * @brief Determines whether a vector of variables var is continuous within
+     * the optimisation vector of the program.
+     *
+     * @param var
+     * @return true
+     * @return false
+     */
+    bool IsContinuousInDecisionVariableVector(const sym::VariableVector &var);
 
     /**
      * @brief Prints the current set of parameters for the program to the

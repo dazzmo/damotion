@@ -30,7 +30,7 @@ class QPOASESSolverInstance : public Solver {
         for (Binding<BoundingBoxConstraint<Eigen::MatrixXd>>& binding :
              GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
             // For each variable of the constraint
-            const sym::VariableVector& v = binding.GetVariable(0);
+            const sym::VariableVector& v = binding.x(0);
             for (int i = 0; i < v.size(); ++i) {
                 lbx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
                     binding.Get().LowerBound()[i];
@@ -71,7 +71,7 @@ class QPOASESSolverInstance : public Solver {
              GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
             if (binding.Get().IsUpdated()) {
                 // For each variable of the constraint
-                const sym::VariableVector& v = binding.GetVariable(0);
+                const sym::VariableVector& v = binding.x(0);
                 for (int i = 0; i < v.size(); ++i) {
                     lbx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
                         binding.Get().LowerBound()[i];
@@ -93,7 +93,7 @@ class QPOASESSolverInstance : public Solver {
 
             // Update the gradient
             UpdateVectorAtVariableLocations(
-                g_, binding.Get().c(), binding.GetVariable(0), continuous[0]);
+                g_, binding.Get().c(), binding.x(0), continuous[0]);
         }
         // Quadratic costs
         for (Binding<QuadraticCost<Eigen::MatrixXd>>& binding :
@@ -105,11 +105,11 @@ class QPOASESSolverInstance : public Solver {
             EvaluateCost(binding, primal_solution_x_, true, true, false);
             // Update the gradient
             UpdateVectorAtVariableLocations(
-                g_, binding.Get().b(), binding.GetVariable(0), continuous[0]);
+                g_, binding.Get().b(), binding.x(0), continuous[0]);
             // Update the hessian
             UpdateHessianAtVariableLocations(
-                H_, 2.0 * binding.Get().A(), binding.GetVariable(0),
-                binding.GetVariable(0), continuous[0], continuous[0]);
+                H_, 2.0 * binding.Get().A(), binding.x(0),
+                binding.x(0), continuous[0], continuous[0]);
         }
         // Evaluate only the linear constraints of the program
         // Reset constraint jacobian
@@ -216,7 +216,7 @@ class QPOASESSolverInstance : public Solver {
 //         for (Binding<BoundingBoxConstraint>& binding :
 //              GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
 //             // For each variable of the constraint
-//             const sym::VariableVector& v = binding.GetVariable(0);
+//             const sym::VariableVector& v = binding.x(0);
 //             for (int i = 0; i < v.size(); ++i) {
 //                 lbx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
 //                     binding.Get().LowerBound()[i];
@@ -281,7 +281,7 @@ class QPOASESSolverInstance : public Solver {
 //              GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
 //             if (binding.Get().IsUpdated()) {
 //                 // For each variable of the constraint
-//                 const sym::VariableVector& v = binding.GetVariable(0);
+//                 const sym::VariableVector& v = binding.x(0);
 //                 for (int i = 0; i < v.size(); ++i) {
 //                     lbx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])]
 //                     =
@@ -306,7 +306,7 @@ class QPOASESSolverInstance : public Solver {
 
 //             // Update the gradient
 //             UpdateVectorAtVariableLocations(
-//                 g_, binding.Get().c(), binding.GetVariable(0),
+//                 g_, binding.Get().c(), binding.x(0),
 //                 continuous[0]);
 //         }
 //         // Quadratic costs
@@ -317,17 +317,17 @@ class QPOASESSolverInstance : public Solver {
 
 //             // Evaluate the cost
 //             EvaluateCost(binding.Get(), primal_solution_x_,
-//                          binding.GetVariables(), binding.GetParameters(),
+//                          binding.xs(), binding.ps(),
 //                          continuous, true, true, false);
 
 //             // Update the gradient
 //             UpdateVectorAtVariableLocations(
-//                 g_, binding.Get().b(), binding.GetVariable(0),
+//                 g_, binding.Get().b(), binding.x(0),
 //                 continuous[0]);
 //             // Update the hessian
 //             UpdateHessianAtVariableLocations(
-//                 H_, 2.0 * binding.Get().A(), binding.GetVariable(0),
-//                 binding.GetVariable(0), continuous[0], continuous[0]);
+//                 H_, 2.0 * binding.Get().A(), binding.x(0),
+//                 binding.x(0), continuous[0], continuous[0]);
 
 //             LOG(INFO) << binding.Get().A();
 //             LOG(INFO) << binding.Get().b();
@@ -341,8 +341,8 @@ class QPOASESSolverInstance : public Solver {
 //              GetCurrentProgram().GetLinearConstraintBindings()) {
 //             // Compute the constraints
 //             EvaluateConstraint(binding.Get(), idx, primal_solution_x_,
-//                                binding.GetVariables(),
-//                                binding.GetParameters(),
+//                                binding.xs(),
+//                                binding.ps(),
 //                                ConstraintBindingContinuousInputCheck(binding),
 //                                true);
 

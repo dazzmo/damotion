@@ -7,18 +7,11 @@ namespace solvers {
 void Solver::EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
                           bool grd, bool hes, bool update_cache) {
     common::InputRefVector x_in = {}, p_in = {};
-    // Extract the input for the binding
-    BindingInputData& binding_input_data = GetBindingInputData(binding);
-    UpdateBindingInputData(binding, x, binding_input_data);
+    GetBindingInputs(binding, x_in);
 
-    // Set variables
-    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
-        x_in.push_back(binding_input_data.inputs[i]);
-    }
     // Set parameters
-    for (int i = 0; i < binding.NumberOfParameters(); ++i) {
-        p_in.push_back(
-            GetCurrentProgram().GetParameterValues(binding.GetParameter(i)));
+    for (int i = 0; i < binding.np(); ++i) {
+        p_in.push_back(GetCurrentProgram().GetParameterValues(binding.p(i)));
     }
 
     const CostType& cost = binding.Get();
@@ -29,8 +22,8 @@ void Solver::EvaluateCost(Binding<CostType>& binding, const Eigen::VectorXd& x,
     if (update_cache == false) return;
 
     objective_cache_ += cost.ObjectiveFunction()->getOutput(0);
-    if (grd) UpdateCostGradient(binding, binding_input_data);
-    if (hes) UpdateLagrangianHessian(binding, binding_input_data);
+    if (grd) UpdateCostGradient(binding);
+    if (hes) UpdateLagrangianHessian(binding);
 }
 
 void Solver::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
@@ -51,16 +44,11 @@ void Solver::EvaluateConstraint(Binding<ConstraintType>& binding,
                                 const Eigen::VectorXd& x, bool jac,
                                 bool update_cache) {
     common::InputRefVector x_in = {}, p_in = {};
+    GetBindingInputs(binding, x_in);
 
-    BindingInputData& binding_input_data = GetBindingInputData(binding);
-    UpdateBindingInputData(binding, x, binding_input_data);
-
-    // Set variables
-        x_in.push_back(binding_input_data.inputs[i]);
     // Set parameters
-    for (int i = 0; i < binding.NumberOfParameters(); ++i) {
-        p_in.push_back(
-            GetCurrentProgram().GetParameterValues(binding.GetParameter(i)));
+    for (int i = 0; i < binding.np(); ++i) {
+        p_in.push_back(GetCurrentProgram().GetParameterValues(binding.p(i)));
     }
 
     const ConstraintType& constraint = binding.Get();
@@ -75,7 +63,7 @@ void Solver::EvaluateConstraint(Binding<ConstraintType>& binding,
         constraint.Vector();
     VLOG(10) << "constraint_cache = " << constraint_cache_;
 
-    UpdateConstraintJacobian(binding, binding_input_data, constraint_idx);
+    UpdateConstraintJacobian(binding, constraint_idx);
 }
 
 void Solver::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
@@ -92,62 +80,78 @@ void Solver::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
 }
 
 void Solver::UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
-                                      const BindingInputData& data,
                                       const int& constraint_idx) {
-        Eigen::Block<Eigen::MatrixXd> J = constraint_jacobian_cache_.middleRows(
-            constraint_idx, binding.Get().Dimension());
+    // Get data related to the binding
+    ProgramType& program = GetCurrentProgram();
+    BindingInputData& data = GetBindingInputData(binding);
+    Eigen::Block<Eigen::MatrixXd> J = constraint_jacobian_cache_.middleRows(
+        constraint_idx, binding.Get().Dimension());
 
-        const sym::VariableVector& x = binding.GetVariableVector();
-        if (data.continuous) {
-            J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(vi[0]),
-                         vi.size()) += J;
+    int jac_idx = 0;
+    for (int i = 0; i < binding.nx(); ++i) {
+        const sym::VariableVector& xi = binding.x(i);
+        Eigen::Ref<const Eigen::VectorXd> Ji =
+            binding.Get().Jacobian().middleCols(jac_idx, xi.size());
+        if (data.continuous[i]) {
+            J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(xi[0]),
+                         xi.size()) += Ji;
         } else {
             // For each variable, update the location in the Jacobian
-            for (int j = 0; j < vi.size(); ++j) {
-                int idx = GetCurrentProgram().GetDecisionVariableIndex(vi[j]);
-                constraint_jacobian_cache_.col(idx) += J.col(j);
+            for (int j = 0; j < xi.size(); ++j) {
+                int idx = GetCurrentProgram().GetDecisionVariableIndex(xi[j]);
+                constraint_jacobian_cache_.col(idx) += Ji.col(j);
             }
         }
+
+        jac_idx += xi.size();
+    }
 }
 
-void Solver::UpdateLagrangianHessian(const Binding<CostType>& binding,
-                                     const BindingInputData& data) {
-    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
-        const sym::VariableVector& vi = binding.GetVariable(i);
-        int i_sz = vi.size();
-        int i_idx = GetCurrentProgram().GetDecisionVariableIndex(vi[0]);
-        for (int j = i; j < binding.NumberOfVariables(); ++j) {
-            const sym::VariableVector& vj = binding.GetVariable(j);
+void Solver::UpdateLagrangianHessian(const Binding<CostType>& binding) {
+    // Get data related to the binding
+    ProgramType& program = GetCurrentProgram();
+    BindingInputData& data = GetBindingInputData(binding);
+
+    int hes_x_idx = 0, hes_y_idx = 0;
+
+    for (int i = 0; i < binding.nx(); ++i) {
+        const sym::VariableVector& xi = binding.x(i);
+        int i_sz = xi.size();
+        int i_idx = GetCurrentProgram().GetDecisionVariableIndex(xi[0]);
+        for (int j = i; j < binding.nx(); ++j) {
+            const sym::VariableVector& xj = binding.x(j);
+            int j_sz = xj.size();
+            int j_idx = GetCurrentProgram().GetDecisionVariableIndex(xj[0]);
+
+            // Get Hessian block
+            Eigen::Ref<const Eigen::MatrixXd> Hij =
+                binding.Get().Hessian().block(hes_x_idx, hes_y_idx, i_sz, j_sz);
+
             // For each variable combination
             if (data.continuous[i] && data.continuous[j]) {
-                int j_sz = vj.size();
-                int j_idx = GetCurrentProgram().GetDecisionVariableIndex(vj[0]);
                 // Create lower triangular Hessian
                 if (i_idx > j_idx) {
                     lagrangian_hes_cache_.block(i_idx, j_idx, i_sz, j_sz) +=
-                        binding.Get().Hessian(i, j);
+                        Hij;
                 } else {
                     lagrangian_hes_cache_.block(j_idx, i_idx, j_sz, i_sz) +=
-                        binding.Get().Hessian(i, j).transpose();
+                        Hij.transpose();
                 }
 
             } else {
                 // For each variable pair, populate the Hessian
-                for (int ii = 0; ii < vi.size(); ++ii) {
-                    for (int jj = 0; jj < vj.size(); ++jj) {
-                        int i_idx =
-                                GetCurrentProgram().GetDecisionVariableIndex(
-                                    vi[ii]),
-                            j_idx =
-                                GetCurrentProgram().GetDecisionVariableIndex(
-                                    vj[jj]);
+                for (int ii = 0; ii < xi.size(); ++ii) {
+                    int i_idx =
+                        GetCurrentProgram().GetDecisionVariableIndex(xi[ii]);
+                    for (int jj = 0; jj < xj.size(); ++jj) {
+                        int j_idx =
+                            GetCurrentProgram().GetDecisionVariableIndex(
+                                xj[jj]);
                         // Create lower triangular matrix
                         if (i_idx > j_idx) {
-                            lagrangian_hes_cache_(i_idx, j_idx) +=
-                                binding.Get().Hessian(i, j)(ii, jj);
+                            lagrangian_hes_cache_(i_idx, j_idx) += Hij(ii, jj);
                         } else {
-                            lagrangian_hes_cache_(j_idx, i_idx) +=
-                                binding.Get().Hessian(i, j)(ii, jj);
+                            lagrangian_hes_cache_(j_idx, i_idx) += Hij(ii, jj);
                         }
                     }
                 }

@@ -16,7 +16,6 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
     // idx
     struct JacobianIndexData {
         int binding_id;
-        int jacobian_idx;
         int variable_idx;
     };
 
@@ -36,42 +35,35 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
     int idx = 0;
     for (Binding<ConstraintType>& b : program.GetAllConstraintBindings()) {
         // Create data within the map
-        std::vector<std::vector<int>> indices(b.NumberOfVariables());
         // Add constraint to jacobian
-        for (int i = 0; i < b.GetVariables().size(); ++i) {
-            // Get sparse Jacobian
-            const Eigen::SparseMatrix<double>& Ji = b.Get().Jacobian(i);
-            int cnt = 0;
-            // Loop through non-zero entries
-            for (int k = 0; k < Ji.outerSize(); ++k) {
-                for (Eigen::SparseMatrix<double>::InnerIterator it(Ji, k); it;
-                     ++it) {
-                    std::shared_ptr<JacobianIndexData> data;
-                    data->binding_id = b.id();
-                    data->jacobian_idx = i;
-                    data->variable_idx = cnt;
-                    // Constraint index
-                    int c_idx = idx + it.row();
-                    // Index for variable
-                    int x_idx = program.GetDecisionVariableIndex(
-                        b.GetVariable(i)[it.col()]);
-                    // Set element in the full Jacobian to the information for
-                    // the Jacobian block provided
-                    J.coeffRef(c_idx, x_idx) = data;
-                    // Set structure for Jacobian cache
-                    constraint_jacobian_cache_.coeffRef(c_idx, x_idx) = 0.0;
-                    // Increase data array counter
-                    cnt++;
-                }
+        // Get sparse Jacobian
+        const Eigen::SparseMatrix<double>& Ji = b.Get().Jacobian();
+        const sym::VariableVector& v = b.GetConcatenatedVariableVector();
+        std::vector<int> indices(Ji.nonZeros());
+        int cnt = 0;
+        // Loop through non-zero entries
+        for (int k = 0; k < Ji.outerSize(); ++k) {
+            for (Eigen::SparseMatrix<double>::InnerIterator it(Ji, k); it;
+                 ++it) {
+                std::shared_ptr<JacobianIndexData> data;
+                data->binding_id = b.id();
+                data->variable_idx = cnt;
+                // Constraint index
+                int c_idx = idx + it.row();
+                // Index for variable
+                int x_idx = program.GetDecisionVariableIndex(v[it.col()]);
+                // Set element in the full Jacobian to the information for
+                // the Jacobian block provided
+                J.coeffRef(c_idx, x_idx) = data;
+                // Set structure for Jacobian cache
+                constraint_jacobian_cache_.coeffRef(c_idx, x_idx) = 0.0;
+                // Increase data array counter
+                cnt++;
             }
-
-            indices[i].resize(Ji.nonZeros());
         }
 
         // Increase constraint index
         idx += b.Get().Dimension();
-
-        // Add to map
         jacobian_data_map_[b.id()] = indices;
     }
 
@@ -83,9 +75,7 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
     // the data vector in CCS
     for (int i = 0; i < J.nonZeros(); ++i) {
         std::shared_ptr<JacobianIndexData> data = J.valuePtr()[i];
-        // Add to the map
-        jacobian_data_map_[data->binding_id][data->jacobian_idx]
-                          [data->variable_idx] = i;
+        jacobian_data_map_[data->binding_id][data->variable_idx] = i;
     }
 }
 
@@ -95,7 +85,6 @@ void SparseSolver::ConstructSparseLagrangianHessian(bool with_constraints) {
     // idx
     struct HessianIndexData {
         int binding_id;
-        int hessian_idx;
         int variable_idx;
     };
     int nx = program.NumberOfDecisionVariables();
@@ -110,47 +99,39 @@ void SparseSolver::ConstructSparseLagrangianHessian(bool with_constraints) {
     lagrangian_hes_cache_.setZero();
     lagrangian_hes_cache_.data().squeeze();
 
-    int idx = 0;
     for (Binding<CostType>& b : program.GetAllCostBindings()) {
         // Create data within the map
-        std::vector<std::vector<int>> indices(b.NumberOfVariables());
-        // Add constraint to jacobian
-        for (int i = 0; i < b.GetVariables().size(); ++i) {
-            for (int j = 0; j < b.GetVariables().size(); ++j) {
-                // Get sparse Jacobian
-                const Eigen::SparseMatrix<double>& Hij = b.Get().Hessian(i, j);
-                int cnt = 0;
-                // Loop through non-zero entries
-                for (int k = 0; k < Hij.outerSize(); ++k) {
-                    for (Eigen::SparseMatrix<double>::InnerIterator it(Hij, k);
-                         it; ++it) {
-                        int id = b.id();
-                        // Get location of the non-zero entry
-                        int jac_idx = i;
-                        // Constraint index
-                        int c_idx = idx + it.row();
-                        // Index for variable
-                        int x_idx = program.GetDecisionVariableIndex(
-                            b.GetVariable(i)[it.col()]);
-                        // Set element in the full Jacobian to the information
-                        // for the Jacobian block provided
-                        H.coeffRef(c_idx, x_idx) =
-                            std::make_shared<binding_index_data_t>(id, jac_idx,
-                                                                   cnt);
-                        // Set structure for Jacobian cache
-                        constraint_jacobian_cache_.coeffRef(c_idx, x_idx) = 0.0;
-                        // Increase data array counter
-                        cnt++;
-                    }
-                }
+        const Eigen::SparseMatrix<double>& Hi = b.Get().Hessian();
+        std::vector<int> indices(Hi.nonZeros());
+        const sym::VariableVector& v = b.GetConcatenatedVariableVector();
 
-                indices[i].resize(Ji.nonZeros());
+        // Get sparse Jacobian
+        int cnt = 0;
+        // Loop through non-zero entries
+        for (int k = 0; k < Hi.outerSize(); ++k) {
+            for (Eigen::SparseMatrix<double>::InnerIterator it(Hi, k); it;
+                 ++it) {
+                std::shared_ptr<HessianIndexData> data;
+                data->binding_id = b.id();
+                data->variable_idx = cnt;
+                // Index for variable
+                int x_idx = program.GetDecisionVariableIndex(v[it.row()]);
+                int y_idx = program.GetDecisionVariableIndex(v[it.col()]);
+                // Set element in the full Jacobian to the information
+                // for the Jacobian block provided
+                H.coeffRef(x_idx, y_idx) = data;
+                // Set structure for Jacobian cache
+                lagrangian_hes_cache_.coeffRef(x_idx, y_idx) = 0.0;
+                // Increase data array counter
+                cnt++;
             }
         }
 
         // Add to map
-        jacobian_data_map_[b.id()] = indices;
+        lagrangian_hes_data_map_[b.id()] = indices;
     }
+
+    // TODO - Perform the same for the constraints
 
     // Compress Jacobian
     H.makeCompressed();
@@ -159,9 +140,9 @@ void SparseSolver::ConstructSparseLagrangianHessian(bool with_constraints) {
     // With created Jacobian, extract each binding's Jacobian data entries in
     // the data vector in CCS
     for (int i = 0; i < H.nonZeros(); ++i) {
-        binding_index_data_t data = *J.valuePtr()[i];
+        std::shared_ptr<HessianIndexData> data = H.valuePtr()[i];
         // Add to the map
-        jacobian_data_map_[data[0]][data[1]][data[2]] = i;
+        lagrangian_hes_data_map_[data->binding_id][data->variable_idx] = i;
     }
 }
 
@@ -169,18 +150,11 @@ void SparseSolver::EvaluateCost(Binding<CostType>& binding,
                                 const Eigen::VectorXd& x, bool grd, bool hes,
                                 bool update_cache) {
     common::InputRefVector x_in = {}, p_in = {};
-    // Extract the input for the binding
-    BindingInputData& binding_input_data = GetBindingInputData(binding);
-    UpdateBindingInputData(binding, x, binding_input_data);
+    GetBindingInputs(binding, x_in);
 
-    // Set variables
-    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
-        x_in.push_back(binding_input_data.inputs[i]);
-    }
     // Set parameters
-    for (int i = 0; i < binding.NumberOfParameters(); ++i) {
-        p_in.push_back(
-            GetCurrentProgram().GetParameterValues(binding.GetParameter(i)));
+    for (int i = 0; i < binding.np(); ++i) {
+        p_in.push_back(GetCurrentProgram().GetParameterValues(binding.p(i)));
     }
 
     const CostType& cost = binding.Get();
@@ -190,9 +164,9 @@ void SparseSolver::EvaluateCost(Binding<CostType>& binding,
 
     if (update_cache == false) return;
 
-    objective_cache_ += cost.ObjectiveFunction()->getOutput(0);
-    if (grd) UpdateCostGradient(binding, binding_input_data);
-    if (hes) UpdateLagrangianHessian(binding, binding_input_data);
+    objective_cache_ += cost.Objective();
+    if (grd) UpdateCostGradient(binding);
+    if (hes) UpdateLagrangianHessian(binding);
 }
 
 void SparseSolver::EvaluateConstraint(Binding<ConstraintType>& binding,
@@ -200,18 +174,11 @@ void SparseSolver::EvaluateConstraint(Binding<ConstraintType>& binding,
                                       const Eigen::VectorXd& x, bool jac,
                                       bool update_cache) {
     common::InputRefVector x_in = {}, p_in = {};
+    GetBindingInputs(binding, x_in);
 
-    BindingInputData& binding_input_data = GetBindingInputData(binding);
-    UpdateBindingInputData(binding, x, binding_input_data);
-
-    // Set variables
-    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
-        x_in.push_back(binding_input_data.inputs[i]);
-    }
     // Set parameters
-    for (int i = 0; i < binding.NumberOfParameters(); ++i) {
-        p_in.push_back(
-            GetCurrentProgram().GetParameterValues(binding.GetParameter(i)));
+    for (int i = 0; i < binding.np(); ++i) {
+        p_in.push_back(GetCurrentProgram().GetParameterValues(binding.p(i)));
     }
 
     const ConstraintType& constraint = binding.Get();
@@ -232,26 +199,21 @@ void SparseSolver::EvaluateConstraint(Binding<ConstraintType>& binding,
 void SparseSolver::UpdateConstraintJacobian(
     const Binding<ConstraintType>& binding) {
     // For each Jacobian, update the data within the constraint Jacobian
-    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
-        for (int j = 0; j < binding.Get().Jacobian(i).nonZeros(); ++j) {
-            int idx = jacobian_data_map_[binding.id()][i][j];
-            constraint_jacobian_cache_.valuePtr()[idx] =
-                binding.Get().Jacobian(i).valuePtr()[j];
-        }
+    for (int k = 0; k < binding.Get().Jacobian().nonZeros(); ++k) {
+        int idx = jacobian_data_map_[binding.id()][k];
+        constraint_jacobian_cache_.valuePtr()[idx] =
+            binding.Get().Jacobian().valuePtr()[k];
     }
 }
 
 void SparseSolver::UpdateLagrangianHessian(const Binding<CostType>& binding) {
     // For each Jacobian, update the data within the constraint Jacobian
-    for (int i = 0; i < binding.NumberOfVariables(); ++i) {
-        for (int j = 0; j < binding.NumberOfVariables(); ++j) {
-            for (int k = 0; k < binding.Get().Hessian(i, j).nonZeros(); ++k) {
-                int idx = lagrangian_hes_data_map_[binding.id()][i][j];
-                lagrangian_hes_cache_.valuePtr()[idx] +=
-                    binding.Get().Hessian(i, j).valuePtr()[k];
-            }
-        }
+    for (int k = 0; k < binding.Get().Hessian().nonZeros(); ++k) {
+        int idx = lagrangian_hes_data_map_[binding.id()][k];
+        lagrangian_hes_cache_.valuePtr()[idx] +=
+            binding.Get().Hessian().valuePtr()[k];
     }
+}
 
 }  // namespace solvers
 }  // namespace optimisation

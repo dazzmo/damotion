@@ -22,8 +22,8 @@ template <typename MatrixType>
 class Function {
    public:
 
-    typedef UniquePtr = std::unique_ptr<Function<MatrixType>>;
-    typedef SharedPtr = std::shared_ptr<Function<MatrixType>>;
+    using UniquePtr = std::unique_ptr<Function<MatrixType>>;
+    using SharedPtr = std::shared_ptr<Function<MatrixType>>;
 
     /**
      * @brief Empty constructor for the Function class

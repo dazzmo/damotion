@@ -79,8 +79,7 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
      * @param i
      * @return const MatrixType&
      */
-    const MatrixType &Jacobian(const int &i) const override {
-        assert(i == 0 && "Linear constraint only has one Jacobian!");
+    const MatrixType &Jacobian() const override {
         return fA_->getOutput(0);
     }
 

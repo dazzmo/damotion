@@ -38,11 +38,9 @@ class Solver : public SolverBase<Eigen::MatrixXd> {
     void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
 
     void UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
-                                  const BindingInputData& data,
                                   const int& constraint_idx);
 
-    void UpdateLagrangianHessian(const Binding<CostType>& binding,
-                                 const BindingInputData& data);
+    void UpdateLagrangianHessian(const Binding<CostType>& binding);
 
    protected:
     Eigen::MatrixXd constraint_jacobian_cache_;

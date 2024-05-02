@@ -8,7 +8,7 @@
 #include <string>
 
 #include "damotion/common/profiler.h"
-#include "model/frame.h"
+#include "damotion/model/frame.h"
 #include "damotion/optimisation/constraints/constraints.h"
 #include "damotion/optimisation/costs/costs.h"
 #include "damotion/optimisation/program.h"

@@ -13,7 +13,7 @@
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/multibody/model.hpp>
 
-#include "model/frame.h"
+#include "damotion/model/frame.h"
 #include "damotion/utils/eigen_wrapper.h"
 #include "damotion/utils/log.h"
 

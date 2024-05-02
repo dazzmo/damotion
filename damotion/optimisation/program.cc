@@ -86,6 +86,27 @@ int DecisionVariableManager::GetDecisionVariableIndex(const sym::Variable &v) {
     }
 }
 
+bool DecisionVariableManager::IsContinuousInDecisionVariableVector(const sym::VariableVector& var) {
+        VLOG(10) << "IsContinuousInDecisionVariableVector(), checking " << var;
+        // Determine the index of the first element within var
+        int idx = GetDecisionVariableIndex(var[0]);
+        // Move through optimisation vector and see if each entry follows one
+        // after the other
+        for (int i = 1; i < var.size(); ++i) {
+            // If not, return false
+            int idx_next = GetDecisionVariableIndex(var[i]);
+
+            if (idx_next - idx != 1) {
+                VLOG(10) << "false";
+                return false;
+            }
+            idx = idx_next;
+        }
+        // Return true if all together in the vector
+        VLOG(10) << "true";
+        return true;
+    }
+
 void DecisionVariableManager::ListDecisionVariables() {
     std::cout << "----------------------\n";
     std::cout << "Variable\n";

@@ -45,11 +45,9 @@ class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
 
    private:
     // Index of each sparse Jacobian's data entries in the constraint Jacobian
-    std::unordered_map<Binding<ConstraintType>::Id,
-                       std::vector<std::vector<int>>>
+    std::unordered_map<Binding<ConstraintType>::Id, std::vector<int>>
         jacobian_data_map_;
-    std::unordered_map<Binding<ConstraintType>::Id,
-                       std::vector<std::vector<int>>>
+    std::unordered_map<Binding<ConstraintType>::Id, std::vector<int>>
         lagrangian_hes_data_map_;
 };
 }  // namespace solvers

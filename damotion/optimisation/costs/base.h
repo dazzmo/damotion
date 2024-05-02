@@ -75,7 +75,7 @@ class CostBase {
     }
     const std::shared_ptr<common::Function<Eigen::VectorXd>> &GradientFunction()
         const {
-        return grad_;
+        return grd_;
     }
     const std::shared_ptr<common::Function<MatrixType>> &HessianFunction()
         const {
@@ -113,10 +113,10 @@ class CostBase {
      * @param p Parameters for the cost
      * @param grd Whether to also compute the gradient
      */
-    virtual void eval(const Eigen::VectorXd &x, const common::InputRefVector &p,
-                      bool grd = true) const {
+    virtual void eval(const common::InputRefVector &x,
+                      const common::InputRefVector &p, bool grd = true) const {
         VLOG(10) << this->name() << " eval()";
-        common::InputRefVector in = {x};
+        common::InputRefVector in = x;
         for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
 
         // Call necessary cost functions
@@ -130,10 +130,11 @@ class CostBase {
      * @param x
      * @param p
      */
-    void eval_hessian(const Eigen::VectorXd &x, const Eigen::VectorXd &l,
+    void eval_hessian(const common::InputRefVector &x, const Eigen::VectorXd &l,
                       const common::InputRefVector &p) {
         // Create input for the lambda-hessian product
-        common::InputRefVector in = {x, l};
+        common::InputRefVector in = x;
+        in.push_back(l);
         for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
         // Call necessary constraint functions
         this->hes_->call(in);
@@ -178,8 +179,7 @@ class CostBase {
      *
      * @param f
      */
-    void SetObjectiveFunction(
-        const std::shared_ptr<common::Function<double>> &f) {
+    void SetObjectiveFunction(const common::Function<double>::SharedPtr &f) {
         obj_ = f;
     }
 
@@ -189,8 +189,8 @@ class CostBase {
      * @param f
      */
     void SetGradientFunction(
-        const std::shared_ptr<common::Function<Eigen::VectorXd>> &f) {
-        grad_ = f;
+        const common::Function<Eigen::VectorXd>::SharedPtr &f) {
+        grd_ = f;
         has_grd_ = true;
     }
 
@@ -200,7 +200,7 @@ class CostBase {
      * @param f
      */
     void SetHessianFunction(
-        const std::shared_ptr<common::Function<MatrixType>> &f) {
+        const typename common::Function<MatrixType>::SharedPtr &f) {
         hes_ = f;
         has_hes_ = true;
     }
@@ -227,13 +227,13 @@ class CostBase {
      * @brief Gradient function
      *
      */
-    common::Function<Eigen::VectorXd>::SharedPtr grad_;
+    common::Function<Eigen::VectorXd>::SharedPtr grd_;
 
     /**
      * @brief Hessian function
      *
      */
-    common::Function<MatrixType>::SharedPtr hes_;
+    typename common::Function<MatrixType>::SharedPtr hes_;
 
     /**
      * @brief Creates a unique id for each cost
@@ -254,4 +254,4 @@ typedef CostBase<Eigen::SparseMatrix<double>> SparseCost;
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* COSTS_BASE_H */
+#endif /* COSTS_BASE_H */
