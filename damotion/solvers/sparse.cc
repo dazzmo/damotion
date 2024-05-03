@@ -11,6 +11,7 @@ SparseSolver::SparseSolver(SparseProgram& program)
 }
 
 void SparseSolver::ConstructSparseConstraintJacobian() {
+  VLOG(8) << "ConstructSparseConstraintJacobian()";
   SparseProgram& program = GetCurrentProgram();
   // Create default data structure to hold binding id, jacobian idx and data
   // idx
@@ -34,17 +35,20 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
 
   int idx = 0;
   for (Binding<ConstraintType>& b : program.GetAllConstraintBindings()) {
-    // Create data within the map
-    // Add constraint to jacobian
     // Get sparse Jacobian
     const Eigen::SparseMatrix<double>& Ji = b.Get().Jacobian();
+    VLOG(10) << "Adding ";
+    VLOG(10) << Ji;
     const sym::VariableVector& v = b.GetConcatenatedVariableVector();
+    VLOG(10) << "Variables ";
+    VLOG(10) << v;
     std::vector<int> indices(Ji.nonZeros());
     int cnt = 0;
     // Loop through non-zero entries
     for (int k = 0; k < Ji.outerSize(); ++k) {
       for (Eigen::SparseMatrix<double>::InnerIterator it(Ji, k); it; ++it) {
-        std::shared_ptr<JacobianIndexData> data;
+        std::shared_ptr<JacobianIndexData> data =
+            std::make_shared<JacobianIndexData>();
         data->binding_id = b.id();
         data->variable_idx = cnt;
         // Constraint index
@@ -53,6 +57,7 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
         int x_idx = program.GetDecisionVariableIndex(v[it.col()]);
         // Set element in the full Jacobian to the information for
         // the Jacobian block provided
+        VLOG(10) << "Adding element (" << c_idx << ", " << x_idx << ")";
         J.coeffRef(c_idx, x_idx) = data;
         // Set structure for Jacobian cache
         constraint_jacobian_cache_.coeffRef(c_idx, x_idx) = 0.0;
@@ -65,6 +70,8 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
     idx += b.Get().Dimension();
     jacobian_data_map_[b.id()] = indices;
   }
+
+  VLOG(10) << "Created constraint Jacobian";
 
   // Compress Jacobian
   J.makeCompressed();
@@ -79,6 +86,7 @@ void SparseSolver::ConstructSparseConstraintJacobian() {
 }
 
 void SparseSolver::ConstructSparseLagrangianHessian(bool with_constraints) {
+  VLOG(8) << "ConstructSparseLagrangianHessian()";
   SparseProgram& program = GetCurrentProgram();
   // Create default data structure to hold binding id, jacobian idx and data
   // idx
