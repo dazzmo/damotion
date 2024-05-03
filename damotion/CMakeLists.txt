@@ -22,6 +22,7 @@ common/math/binomial.cc
 common/trajectory/bezier.cc
 common/trajectory/trajectory.cc
 common/sparsity.cc
+model/frame.cc
 symbolic/parameter.cc
 symbolic/variable.cc
 system/controlled.cc

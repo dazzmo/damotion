@@ -5,13 +5,13 @@
 
 namespace damotion {
 namespace model {
-/**
- * @brief Target frame of interest on the model, such as an end-effector
- * position or reference frame such as the centre of mass.
- *
- */
+
+namespace symbolic {
+
 class TargetFrame {
  public:
+  friend class model::TargetFrame;
+
   TargetFrame() { x_.resize(3); }
   ~TargetFrame() = default;
 
@@ -20,51 +20,81 @@ class TargetFrame {
    *
    * @return const ::casadi::SX&
    */
-  const ::casadi::SX &pos_sx() { return x_[0]; }
+  const casadi::SX &pos() { return x_[0]; }
   /**
    * @brief Velocity of the frame in the given reference frame
    *
    * @return const ::casadi::SX&
    */
-  const ::casadi::SX &vel_sym() { return x_[1]; }
+  const casadi::SX &vel() { return x_[1]; }
   /**
    * @brief Acceleration of the frame in the given reference frame
    *
    * @return const ::casadi::SX&
    */
-  const ::casadi::SX &acc_sym() { return x_[2]; }
-
-  /**
-   * @brief \copydoc pos_sx()
-   *
-   * @return const ::casadi::SX&
-   */
-  const Eigen::Ref<const Eigen::VectorXd> pos() {
-    pos_ = f_wrapper_.getOutput(0);
-    return pos_;
-  }
-  /**
-   * @brief \copydoc vel_sym()
-   *
-   * @return const ::casadi::SX&
-   */
-  const Eigen::Ref<const Eigen::VectorXd> vel() {
-    vel_ = f_wrapper_.getOutput(1);
-    return vel_;
-  }
-  /**
-   * @brief \copydoc acc_sym()
-   *
-   * @return const ::casadi::SX&
-   */
-  const Eigen::Ref<const Eigen::VectorXd> acc() {
-    acc_ = f_wrapper_.getOutput(2);
-    return acc_;
-  }
+  const casadi::SX &acc() { return x_[2]; }
 
   void UpdateState(const ::casadi::SX &qpos, const ::casadi::SX &qvel,
                    const ::casadi::SX &qacc) {
     x_ = f_(::casadi::SXVector({qpos, qvel, qacc}));
+  }
+
+ protected:
+  void SetFunction(const ::casadi::Function &f) { f_ = f; }
+
+ private:
+  // Current frame state for the symbolic function
+  ::casadi::SXVector x_;
+
+  // Function to compute the state of the frame
+  ::casadi::Function f_;
+};
+
+}  // namespace symbolic
+
+/**
+ * @brief Target frame of interest on the model, such as an end-effector
+ * position or reference frame such as the centre of mass.
+ *
+ */
+class TargetFrame {
+ public:
+  TargetFrame() = default;
+  ~TargetFrame() = default;
+
+  /**
+   * @brief Construct a new Target Frame object from its symbolic equivalent
+   *
+   * @param sym
+   */
+  TargetFrame(const symbolic::TargetFrame &sym) {
+    // Wrap function
+    SetFunction(sym.f_);
+  }
+
+  /**
+   * @brief Position of the frame in the given reference frame
+   *
+   * @return const Eigen::Ref<const Eigen::VectorXd>&
+   */
+  const Eigen::Ref<const Eigen::VectorXd> &pos() {
+    return f_wrapper_.getOutput(0);
+  }
+  /**
+   * @brief Velocity of the frame in the given reference frame
+   *
+   * @return const Eigen::Ref<const Eigen::VectorXd>&
+   */
+  const Eigen::Ref<const Eigen::VectorXd> &vel() {
+    return f_wrapper_.getOutput(1);
+  }
+  /**
+   * @brief Acceleration of the frame in the given reference frame
+   *
+   * @return const Eigen::Ref<const Eigen::VectorXd>&
+   */
+  const Eigen::Ref<const Eigen::VectorXd> &acc() {
+    return f_wrapper_.getOutput(2);
   }
 
   void UpdateState(const Eigen::VectorXd &qpos, const Eigen::VectorXd &qvel,
@@ -73,24 +103,13 @@ class TargetFrame {
   }
 
  protected:
-  void SetFunction(const ::casadi::Function &f) {
-    f_ = f;
-    f_wrapper_ = f_;
-  }
+  void SetFunction(const ::casadi::Function &f) { f_wrapper_ = f; }
 
  private:
-  // Current frame state for the symbolic function
-  ::casadi::SXVector x_;
-
-  Eigen::VectorXd pos_;
-  Eigen::VectorXd vel_;
-  Eigen::VectorXd acc_;
-
-  // Function to compute the state of the frame
-  ::casadi::Function f_;
   // Wrapper for the function of the symbolic function
   utils::casadi::FunctionWrapper<Eigen::VectorXd> f_wrapper_;
 };
+
 }  // namespace model
 }  // namespace damotion
 
