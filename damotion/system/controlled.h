@@ -40,9 +40,9 @@ class ControlledSystem : public System {
   /**
    * @brief Dimension of the input
    *
-   * @return const int
+   * @return const int&
    */
-  const int nu() const { return nu_; }
+  const int &nu() const { return nu_; }
 
   /**
    * @brief Forward dynamics of the system, should be of the form $\f \dot{x}
@@ -130,16 +130,16 @@ class SecondOrderControlledSystem : public ControlledSystem {
   /**
    * @brief Dimension of the configuration of the system
    *
-   * @return const int
+   * @return const int&
    */
-  const int nq() const { return nq_; }
+  const int &nq() const { return nq_; }
 
   /**
    * @brief Dimension of the tangent space of the system
    *
-   * @return const int
+   * @return const int&
    */
-  const int nv() const { return nv_; }
+  const int &nv() const { return nv_; }
 
   /**
    * @brief Forward dynamics of the system, should be of the form $\f \dot{x}

@@ -51,7 +51,7 @@ class Task {
    *
    * @return const int
    */
-  const int dim() const { return dim_; }
+  const int &dim() const { return dim_; }
 
   const std::string &name() const { return name_; }
 

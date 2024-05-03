@@ -36,16 +36,16 @@ class System {
   /**
    * @brief Dimension of the state
    *
-   * @return const int
+   * @return const int&
    */
-  const int nx() const { return nx_; }
+  const int &nx() const { return nx_; }
 
   /**
    * @brief Dimension of the state derivative
    *
-   * @return const int
+   * @return const int&
    */
-  const int ndx() const { return ndx_; }
+  const int &ndx() const { return ndx_; }
 
   /**
    * @brief Forward dynamics of the system, should be of the form $\f \dot{x}

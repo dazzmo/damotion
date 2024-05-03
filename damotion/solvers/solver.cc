@@ -83,42 +83,32 @@ void Solver::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
 void Solver::UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
                                       const int& constraint_idx) {
   // Get data related to the binding
-  ProgramType& program = GetCurrentProgram();
   BindingInputData& data = GetBindingInputData(binding);
-  Eigen::Block<Eigen::MatrixXd> J = constraint_jacobian_cache_.middleRows(
-      constraint_idx, binding.Get().Dimension());
-
+  // Get block rows related to the binding constraint
   int idx = 0;
   for (int i = 0; i < binding.nx(); ++i) {
     const sym::VariableVector& xi = binding.x(i);
     Eigen::Ref<const Eigen::MatrixXd> Ji =
         binding.Get().Jacobian().middleCols(idx, xi.size());
     InsertJacobianAtVariableLocations(constraint_jacobian_cache_, Ji, xi,
-                                      data.continuous[i]);
+                                      constraint_idx, data.continuous[i]);
     idx += xi.size();
   }
 }
 
 void Solver::UpdateLagrangianHessian(const Binding<CostType>& binding) {
   // Get data related to the binding
-  ProgramType& program = GetCurrentProgram();
   BindingInputData& data = GetBindingInputData(binding);
 
   int idx_x = 0, idx_y = 0;
 
   for (int i = 0; i < binding.nx(); ++i) {
     const sym::VariableVector& xi = binding.x(i);
-    int i_sz = xi.size();
-    int i_idx = GetCurrentProgram().GetDecisionVariableIndex(xi[0]);
     for (int j = i; j < binding.nx(); ++j) {
       const sym::VariableVector& xj = binding.x(j);
-      int j_sz = xj.size();
-      int j_idx = GetCurrentProgram().GetDecisionVariableIndex(xj[0]);
-
       // Get Hessian block
       Eigen::Ref<const Eigen::MatrixXd> Hij =
-          binding.Get().Hessian().block(idx_x, idx_y, i_sz, j_sz);
-
+          binding.Get().Hessian().block(idx_x, idx_y, xi.size(), xj.size());
       InsertHessianAtVariableLocations(lagrangian_hes_cache_, Hij, xi, xj,
                                        data.continuous[j], data.continuous[j]);
 

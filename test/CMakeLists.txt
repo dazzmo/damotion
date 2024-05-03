@@ -9,18 +9,17 @@ enable_testing()
 # Create list of files
 
 SET(TEST_FILES
-${CMAKE_CURRENT_SOURCE_DIR}/common/function.cc
-${CMAKE_CURRENT_SOURCE_DIR}/utils/codegen.cc
-${CMAKE_CURRENT_SOURCE_DIR}/utils/eigen_wrapper.cc
-${CMAKE_CURRENT_SOURCE_DIR}/utils/pinocchio_model.cc
-${CMAKE_CURRENT_SOURCE_DIR}/utils/log.cc
-${CMAKE_CURRENT_SOURCE_DIR}/utils/casadi.cc
-${CMAKE_CURRENT_SOURCE_DIR}/utils/expression.cc
-${CMAKE_CURRENT_SOURCE_DIR}/system/controlled.cc
-${CMAKE_CURRENT_SOURCE_DIR}/common/profiler.cc
-${CMAKE_CURRENT_SOURCE_DIR}/control/osc.cc
-${CMAKE_CURRENT_SOURCE_DIR}/solvers/cost.cc
-${CMAKE_CURRENT_SOURCE_DIR}/solvers/program.cc
+common/function.cc
+utils/codegen.cc
+utils/eigen_wrapper.cc
+utils/pinocchio_model.cc
+utils/log.cc
+utils/expression.cc
+system/controlled.cc
+common/profiler.cc
+control/osc.cc
+solvers/cost.cc
+solvers/program.cc
 )
 
 include(GoogleTest)

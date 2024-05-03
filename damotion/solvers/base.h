@@ -257,19 +257,21 @@ class SolverBase {
   void InsertJacobianAtVariableLocations(Eigen::MatrixXd& res,
                                          const Eigen::MatrixXd& jac,
                                          const sym::VariableVector& var,
+                                         const int& constraint_idx,
                                          bool is_continuous = false) {
     VLOG(8) << "InsertJacobianAtVariableLocations()";
     VLOG(10) << "res\n" << res;
     VLOG(10) << "var\n" << var;
     VLOG(10) << "jac\n" << jac;
+    Eigen::Ref<Eigen::MatrixXd> J = res.middleCols(constraint_idx, jac.rows());
     if (is_continuous) {
-      res.middleCols(GetCurrentProgram().GetDecisionVariableIndex(var[0]),
-                     var.size()) += jac;
+      J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(var[0]),
+                   var.size()) += jac;
     } else {
       // For each variable, update the location in the Jacobian
       for (int i = 0; i < var.size(); ++i) {
         int idx = GetCurrentProgram().GetDecisionVariableIndex(var[i]);
-        res.col(idx) += jac.col(i);
+        J.col(idx) += jac.col(i);
       }
     }
   }

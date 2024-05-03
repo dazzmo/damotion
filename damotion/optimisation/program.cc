@@ -35,11 +35,9 @@ bool DecisionVariableManager::IsDecisionVariable(const sym::Variable &var) {
 void DecisionVariableManager::SetDecisionVariableVector() {
   // Set indices by order in the decision variable vector
   int idx = 0;
-  for (int i = 0; i < decision_variables_.size(); ++i) {
-    // Set start index of variables
-    sym::Variable::Id id = decision_variables_[i].id();
-    decision_variable_idx_[id] = idx;
-    // Increment the start index
+  for (const sym::Variable &xi : decision_variables_) {
+    // Set index of each variable to idx
+    decision_variable_idx_[xi.id()] = idx;
     idx++;
   }
 }

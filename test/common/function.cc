@@ -2,6 +2,7 @@
 
 #include "damotion/common/function.h"
 
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
 #include "damotion/common/logging.h"
@@ -10,8 +11,8 @@ namespace common = damotion::common;
 
 class TestCallback {
  public:
-  void foo(const common::Function::InputRefVector &in,
-           std::vector<Eigen::MatrixXd> &out) {
+  void foo(const common::InputRefVector &in,
+           std::vector<Eigen::VectorXd> &out) {
     out[0] = in[0] + in[1];
   }
 
@@ -19,15 +20,15 @@ class TestCallback {
 };
 
 TEST(Function, CallbackFunction) {
-  std::unique_ptr<common::Function> f;
+  common::Function<Eigen::VectorXd>::UniquePtr f;
 
   // Create class
   TestCallback b;
 
-  f = std::make_unique<common::CallbackFunction>(
+  f = std::make_unique<common::CallbackFunction<Eigen::VectorXd>>(
       2, 1,
-      [&b](const common::Function::InputRefVector &in,
-           std::vector<Eigen::MatrixXd> &out) { b.foo(in, out); });
+      [&b](const common::InputRefVector &in,
+           std::vector<Eigen::VectorXd> &out) { b.foo(in, out); });
 
   // Create dummy input
   Eigen::VectorXd xa(5), xb(5), xc(5);
@@ -46,7 +47,7 @@ TEST(Function, CallbackFunction) {
 }
 
 TEST(Function, NoCallbackFunction) {
-  std::unique_ptr<common::Function> f;
+  common::Function<Eigen::VectorXd>::UniquePtr f;
 
   // Create dummy input
   Eigen::VectorXd xa(5), xb(5), xc(5);
@@ -62,4 +63,11 @@ TEST(Function, NoCallbackFunction) {
     EXPECT_TRUE(error.what() ==
                 "Function callback not provided to CallbackFunction!");
   }
+}
+
+int main(int argc, char **argv) {
+  google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

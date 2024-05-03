@@ -1,8 +1,11 @@
 #define DAMOTION_USE_PROFILING
 #include "damotion/control/osc/osc.h"
 
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include "damotion/common/function.h"
 #include "damotion/solvers/solver.h"
 #include "damotion/utils/pinocchio_model.h"
 #include "pinocchio/parsers/urdf.hpp"
@@ -29,7 +32,8 @@ TEST(TrackingCost, QuadraticForm) {
   obj.SetInputs({qacc}, {qpos, qvel, xaccd});
 
   // Create quadratic cost
-  opt::QuadraticCost cost("task_cost", obj);
+  opt::QuadraticCost<Eigen::MatrixXd>::SharedPtr cost =
+      std::make_shared<opt::QuadraticCost<Eigen::MatrixXd>>("task_cost", obj);
 
   // Create random configuration and velocity and desired task acceleration
   Eigen::VectorXd q = pinocchio::randomConfiguration(model);
@@ -37,10 +41,10 @@ TEST(TrackingCost, QuadraticForm) {
   Eigen::VectorXd a = Eigen::VectorXd::Random(model.nv);
   Eigen::VectorXd e = Eigen::VectorXd::Random(6);
 
-  std::cout << "q: " << q.transpose() << std::endl;
-  std::cout << "v: " << v.transpose() << std::endl;
-  std::cout << "a: " << a.transpose() << std::endl;
-  std::cout << "e: " << e.transpose() << std::endl;
+  LOG(INFO) << "q: " << q.transpose() << std::endl;
+  LOG(INFO) << "v: " << v.transpose() << std::endl;
+  LOG(INFO) << "a: " << a.transpose() << std::endl;
+  LOG(INFO) << "e: " << e.transpose() << std::endl;
 
   // Evaluate the true system
   Eigen::MatrixXd J(6, model.nv);
@@ -55,23 +59,10 @@ TEST(TrackingCost, QuadraticForm) {
                                pinocchio::LOCAL_WORLD_ALIGNED)
                                .toVector();
 
-  cost.HessianFunction().setInput(0, a.data());
-  cost.HessianFunction().setInput(1, q.data());
-  cost.HessianFunction().setInput(2, v.data());
-  cost.HessianFunction().setInput(3, e.data());
-  cost.HessianFunction().call();
-
-  cost.GradientFunction().setInput(0, a.data());
-  cost.GradientFunction().setInput(1, q.data());
-  cost.GradientFunction().setInput(2, v.data());
-  cost.GradientFunction().setInput(3, e.data());
-  cost.GradientFunction().call();
-
-  cost.ObjectiveFunction().setInput(0, a.data());
-  cost.ObjectiveFunction().setInput(1, q.data());
-  cost.ObjectiveFunction().setInput(2, v.data());
-  cost.ObjectiveFunction().setInput(3, e.data());
-  cost.ObjectiveFunction().call();
+  // Create input
+  damotion::common::InputRefVector x = {a, q, v, e};
+  cost->eval(x, {}, true);
+  cost->eval_hessian(x, {});
 
   Eigen::MatrixXd A = J;
   Eigen::VectorXd b = dJdt_v;
@@ -81,18 +72,25 @@ TEST(TrackingCost, QuadraticForm) {
   double c_true = b.dot(b);
   double cost_true = (A * a + b).squaredNorm();
 
-  std::cout << "A:\n" << A << std::endl;
-  std::cout << "b:\n" << b.transpose() << std::endl;
+  LOG(INFO) << "A:\n" << A << std::endl;
+  LOG(INFO) << "b:\n" << b.transpose() << std::endl;
 
-  std::cout << Q_true << std::endl;
-  std::cout << cost.Q() << std::endl;
-  std::cout << g_true.transpose() << std::endl;
-  std::cout << cost.g().transpose() << std::endl;
-  std::cout << c_true << std::endl;
-  std::cout << cost.c() << std::endl;
+  LOG(INFO) << Q_true << std::endl;
+  LOG(INFO) << cost->A() << std::endl;
+  LOG(INFO) << g_true.transpose() << std::endl;
+  LOG(INFO) << cost->b().transpose() << std::endl;
+  LOG(INFO) << c_true << std::endl;
+  LOG(INFO) << cost->c() << std::endl;
 
-  EXPECT_TRUE(cost.Q().isApprox(Q_true));
-  EXPECT_TRUE(cost.g().isApprox(g_true));
-  EXPECT_DOUBLE_EQ(cost.c(), c_true);
-  EXPECT_DOUBLE_EQ(cost_true, cost.ObjectiveFunction().getOutput(0).data()[0]);
+  EXPECT_TRUE(cost->A().isApprox(Q_true));
+  EXPECT_TRUE(cost->b().isApprox(g_true));
+  EXPECT_DOUBLE_EQ(cost->c(), c_true);
+  EXPECT_DOUBLE_EQ(cost_true, cost->Objective());
+}
+
+int main(int argc, char **argv) {
+  google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

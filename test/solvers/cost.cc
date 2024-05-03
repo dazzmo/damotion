@@ -1,8 +1,9 @@
 #define DAMOTION_USE_PROFILING
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
-#include "damotion/solvers/program.h"
-#include "damotion/solvers/solve_qpoases.h"
+#include "damotion/optimisation/program.h"
+#include "damotion/solvers/qpoases.h"
 
 namespace sym = damotion::symbolic;
 namespace opt = damotion::optimisation;
@@ -13,18 +14,15 @@ TEST(QuadraticCost, WithDecisionVariables) {
   sym::Expression J = 3.0 * dot(x, x) + 2 * (x(0) - x(1)) + 5.0;
   J.SetInputs({x}, {});
 
-  std::shared_ptr<opt::QuadraticCost> q_cost =
-      std::make_shared<opt::QuadraticCost>("test_cost", J, true, true);
+  opt::QuadraticCost<Eigen::MatrixXd>::SharedPtr q_cost =
+      std::make_shared<opt::QuadraticCost<Eigen::MatrixXd>>("test_cost", J,
+                                                            true, true);
 
   Eigen::VectorXd x_test(2);
   x_test << 1.0, 1.0;
 
-  q_cost->ObjectiveFunction().setInput(0, x_test.data());
-  q_cost->GradientFunction().setInput(0, x_test.data());
-  q_cost->HessianFunction().setInput(0, x_test.data());
-  q_cost->ObjectiveFunction().call();
-  q_cost->GradientFunction().call();
-  q_cost->HessianFunction().call();
+  q_cost->eval({x_test}, {});
+  q_cost->eval_hessian({x_test}, {});
 
   // Evaluate the cost objectives
   Eigen::MatrixXd Q_true(2, 2);
@@ -35,8 +33,8 @@ TEST(QuadraticCost, WithDecisionVariables) {
   g_true << 2.0, -2.0;
   c_true = 5.0;
 
-  EXPECT_TRUE(Q_true.isApprox(q_cost->Q()));
-  EXPECT_TRUE(g_true.isApprox(q_cost->g()));
+  EXPECT_TRUE(Q_true.isApprox(q_cost->A()));
+  EXPECT_TRUE(g_true.isApprox(q_cost->b()));
   EXPECT_DOUBLE_EQ(c_true, q_cost->c());
 }
 
@@ -47,23 +45,16 @@ TEST(QuadraticCost, WithDecisionVariablesAndParameters) {
   sym::Expression J = 3.0 * dot(x, x) + 2 * (p(0) * x(0) - x(1)) + 5.0;
   J.SetInputs({x}, {p});
 
-  std::shared_ptr<opt::QuadraticCost> q_cost =
-      std::make_shared<opt::QuadraticCost>("test_cost", J, true, true);
+  opt::QuadraticCost<Eigen::MatrixXd>::SharedPtr q_cost =
+      std::make_shared<opt::QuadraticCost<Eigen::MatrixXd>>("test_cost", J,
+                                                            true, true);
 
   Eigen::VectorXd x_test(2), p_test(1);
   x_test << 1.0, 1.0;
   p_test << 1.0;
 
-  q_cost->ObjectiveFunction().setInput(0, x_test.data());
-  q_cost->GradientFunction().setInput(0, x_test.data());
-  q_cost->HessianFunction().setInput(0, x_test.data());
-  q_cost->ObjectiveFunction().setInput(1, p_test.data());
-  q_cost->GradientFunction().setInput(1, p_test.data());
-  q_cost->HessianFunction().setInput(1, p_test.data());
-
-  q_cost->ObjectiveFunction().call();
-  q_cost->GradientFunction().call();
-  q_cost->HessianFunction().call();
+  q_cost->eval({x_test}, {p_test});
+  q_cost->eval_hessian({x_test}, {p_test});
 
   // Evaluate the cost objectives
   Eigen::MatrixXd Q_true(2, 2);
@@ -74,27 +65,24 @@ TEST(QuadraticCost, WithDecisionVariablesAndParameters) {
   g_true << 2.0, -2.0;
   c_true = 5.0;
 
-  EXPECT_TRUE(Q_true.isApprox(q_cost->Q()));
-  EXPECT_TRUE(g_true.isApprox(q_cost->g()));
+  EXPECT_TRUE(Q_true.isApprox(q_cost->A()));
+  EXPECT_TRUE(g_true.isApprox(q_cost->b()));
   EXPECT_DOUBLE_EQ(c_true, q_cost->c());
 
   p_test << -1.0;
-  q_cost->ObjectiveFunction().call();
-  q_cost->GradientFunction().call();
-  q_cost->HessianFunction().call();
+  q_cost->eval({x_test}, {p_test});
+  q_cost->eval_hessian({x_test}, {p_test});
 
   g_true << -2.0, -2.0;
 
-  EXPECT_TRUE(Q_true.isApprox(q_cost->Q()));
-  EXPECT_TRUE(g_true.isApprox(q_cost->g()));
+  EXPECT_TRUE(Q_true.isApprox(q_cost->A()));
+  EXPECT_TRUE(g_true.isApprox(q_cost->b()));
   EXPECT_DOUBLE_EQ(c_true, q_cost->c());
 }
 
 int main(int argc, char **argv) {
-  FLAGS_logtostderr = true;
-  FLAGS_minloglevel = 5;
-  FLAGS_v = 10;
   google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

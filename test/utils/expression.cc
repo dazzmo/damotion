@@ -1,5 +1,6 @@
 #include "damotion/symbolic/expression.h"
 
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
 TEST(Expression, Expression) {
@@ -29,4 +30,11 @@ TEST(Expression, ExpressionVector) {
   // Create codegen function
 
   EXPECT_TRUE(false);
+}
+
+int main(int argc, char **argv) {
+  google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

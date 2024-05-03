@@ -33,7 +33,6 @@ FunctionWrapper<double> &FunctionWrapper<double>::operator=(
 
   // Create dense matrices for the output
   for (int i = 0; i < f_.n_out(); ++i) {
-    const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
     // Create dense matrix for output and add data to output data pointer
     // vector
     OutputVector().push_back(0.0);

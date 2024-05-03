@@ -1,5 +1,6 @@
 #include "damotion/utils/log.h"
 
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
 #include <pinocchio/spatial/se3.hpp>
@@ -201,4 +202,11 @@ TEST(Log, JLog6) {
 
   // Compare values
   EXPECT_TRUE(wd.isApprox(wp));
+}
+
+int main(int argc, char **argv) {
+  google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

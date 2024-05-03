@@ -1,5 +1,7 @@
-#ifndef CONTROL_SOLVE_QPOASES_H
-#define CONTROL_SOLVE_QPOASES_H
+#ifndef SOLVERS_QPOASES_H
+#define SOLVERS_QPOASES_H
+
+// #ifdef WITH_QPOASES
 
 #include <qpOASES.hpp>
 
@@ -439,4 +441,5 @@ class QPOASESSolver {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* SOLVE_QPOASES_H */
+// #endif /* WITH_QPOASES */
+#endif /* SOLVERS_QPOASES_H */

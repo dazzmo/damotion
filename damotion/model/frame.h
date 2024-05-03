@@ -20,7 +20,7 @@ class TargetFrame {
    *
    * @return const ::casadi::SX&
    */
-  const ::casadi::SX &pos_sym() { return x_[0]; }
+  const ::casadi::SX &pos_sx() { return x_[0]; }
   /**
    * @brief Velocity of the frame in the given reference frame
    *
@@ -35,7 +35,7 @@ class TargetFrame {
   const ::casadi::SX &acc_sym() { return x_[2]; }
 
   /**
-   * @brief \copydoc pos_sym()
+   * @brief \copydoc pos_sx()
    *
    * @return const ::casadi::SX&
    */

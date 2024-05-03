@@ -1,6 +1,7 @@
 #define DAMOTION_USE_PROFILING
 #include "damotion/solvers/constraint.h"
 
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
 namespace sym = damotion::symbolic;

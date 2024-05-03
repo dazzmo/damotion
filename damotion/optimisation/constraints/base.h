@@ -114,7 +114,7 @@ class ConstraintBase {
    *
    * @return const int
    */
-  const int Dimension() const { return dim_; }
+  const int &Dimension() const { return dim_; }
 
   /**
    * @brief Evaluate the constraint with the current input variables and
@@ -128,7 +128,7 @@ class ConstraintBase {
                     const common::InputRefVector &p, bool jac = true) const {
     VLOG(10) << this->name() << " eval()";
     common::InputRefVector in = x;
-    for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
+    for (const auto &pi : p) in.push_back(pi);
 
     // Call necessary constraint functions
     this->con_->call(in);

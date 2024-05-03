@@ -1,6 +1,9 @@
 #include "damotion/utils/codegen.h"
 
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
+
+#include "damotion/common/logging.h"
 
 TEST(Codegen, Load) {
   // Create codegen function
@@ -32,4 +35,11 @@ TEST(Codegen, LoadDifferentFolder) {
   casadi::DMVector out = f(in);
 
   EXPECT_DOUBLE_EQ(out[0]->at(0), 2.0);
+}
+
+int main(int argc, char **argv) {
+  google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

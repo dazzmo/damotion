@@ -53,7 +53,7 @@ class LinearCost : public CostBase<MatrixType> {
    *
    * @return const double
    */
-  const double b() { return fb_->getOutput(0); }
+  const double &b() { return fb_->getOutput(0); }
 
  private:
   std::shared_ptr<common::Function<Eigen::VectorXd>> fc_;

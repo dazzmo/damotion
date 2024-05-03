@@ -173,8 +173,9 @@ class FunctionWrapper : public common::Function<MatrixType> {
    */
   void callImpl(const common::InputRefVector &input) override {
     // Set vector of inputs
-    for (int i = 0; i < input.size(); ++i) {
-      in_data_ptr_[i] = input[i].data();
+    int idx = 0;
+    for (const Eigen::Ref<const Eigen::VectorXd> &in : input) {
+      in_data_ptr_[idx++] = in.data();
     }
     // Call the function
     f_(in_data_ptr_.data(), out_data_ptr_.data(), iw_.data(), dw_.data(), mem_);

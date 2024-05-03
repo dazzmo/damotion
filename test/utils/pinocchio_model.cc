@@ -1,5 +1,6 @@
 #include "damotion/utils/pinocchio_model.h"
 
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
 #include "damotion/symbolic/expression.h"
@@ -241,3 +242,10 @@ TEST(PinocchioModelWrapper, EndEffector) {
 
 // //     EXPECT_TRUE(e.isApprox(e_true));
 // // }
+
+int main(int argc, char **argv) {
+  google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}

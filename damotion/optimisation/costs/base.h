@@ -93,7 +93,7 @@ class CostBase {
    * @return true
    * @return false
    */
-  const bool HasGradient() const { return has_grd_; }
+  bool HasGradient() const { return has_grd_; }
 
   /**
    * @brief Whether the cost has a Hessian
@@ -101,7 +101,7 @@ class CostBase {
    * @return true
    * @return false
    */
-  const bool HasHessian() const { return has_hes_; }
+  bool HasHessian() const { return has_hes_; }
 
   /**
    * @brief Evaluate the cost with the current input variables and
@@ -115,7 +115,7 @@ class CostBase {
                     const common::InputRefVector &p, bool grd = true) const {
     VLOG(10) << this->name() << " eval()";
     common::InputRefVector in = x;
-    for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
+    for (const auto &pi : p) in.push_back(pi);
 
     // Call necessary cost functions
     this->obj_->call(in);
@@ -123,17 +123,17 @@ class CostBase {
   }
 
   /**
-   * @brief Evaluate the Hessian of the constraint with respec to the inputs x
+   * @brief Evaluate the Hessian of the constraint with respect to the inputs x
    *
    * @param x
    * @param p
    */
-  void eval_hessian(const common::InputRefVector &x, const Eigen::VectorXd &l,
+  void eval_hessian(const common::InputRefVector &x,
                     const common::InputRefVector &p) {
     // Create input for the lambda-hessian product
     common::InputRefVector in = x;
-    in.push_back(l);
-    for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
+    for (const auto &pi : p) in.push_back(pi);
+
     // Call necessary constraint functions
     this->hes_->call(in);
   }

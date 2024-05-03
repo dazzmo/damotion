@@ -1,5 +1,6 @@
 #include "damotion/utils/eigen_wrapper.h"
 
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
 #include "damotion/common/logging.h"
@@ -81,4 +82,11 @@ TEST(EigenWrapper, EigenWrapperCodegenLoad) {
   wrapper.call({x_in, y_in});
 
   EXPECT_DOUBLE_EQ(wrapper.getOutput(0), (x_in[0] + y_in[0]));
+}
+
+int main(int argc, char **argv) {
+  google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

@@ -197,94 +197,71 @@ class OSC {
    */
   opt::Program &GetProgram() { return program_; }
 
-  class Variables {
-   public:
-    Variables() = default;
-    ~Variables() = default;
+  // TODO - Set variables and parameter functions
+  void SetGeneralisedAccelerationVariables(const sym::VariableVector &var,
+                                           const casadi::SX &sym) {
+    assert(var.size() == nv_ && sym.rows() == nv_ &&
+           "Generalised acceleration vectors must be size nv");
+    qacc_ = var;
+    qacc_sx_ = sym;
+    program_.AddDecisionVariables(var);
+  }
+  void SetControlVariables(const sym::VariableVector &var,
+                           const casadi::SX &sym) {
+    assert(var.size() == nv_ && sym.rows() == nv_ &&
+           "Control vectors must be size nu");
+    ctrl_ = var;
+    ctrl_sx_ = sym;
+    program_.AddDecisionVariables(var);
+  }
 
-    Variables(int nq, int nv, int nu) {
-      qacc_ = sym::CreateVariableVector("qacc", nv),
-      ctrl_ = sym::CreateVariableVector("ctrl", nu);
-      lambda_ = {};
-    }
+  void AddContactForceVariables(const sym::VariableVector &var,
+                                const casadi::SX &sym) {
+    lambda_.push_back(var);
+    lambda_sx_.push_back(sym);
+    program_.AddDecisionVariables(var);
+  }
 
-    /**
-     * @brief Generalised acceleration variables for the program (nv x 1)
-     *
-     * @return const sym::VariableVector&
-     */
-    const sym::VariableVector &qacc() const { return qacc_; }
-    sym::VariableVector &qacc() { return qacc_; }
+  void AddConstraintForceVariables(const sym::VariableVector &var,
+                                   const casadi::SX &sym) {
+    lambda_.push_back(var);
+    lambda_sx_.push_back(sym);
+    program_.AddDecisionVariables(var);
+  }
 
-    /**
-     * @brief Control input variables for the program (nu x 1)
-     *
-     * @return const sym::VariableVector&
-     */
-    const sym::VariableVector &ctrl() const { return ctrl_; }
-    sym::VariableVector &ctrl() { return ctrl_; }
+  void AddGeneralisedPositionParameters(const sym::Parameter &par,
+                                        const casadi::SX &sym) {
+    assert(par.size() == nq_ && sym.rows() == nq_ &&
+           "Generalised position vectors must be size nq");
+    qpos_sx_ = sym;
+    program_.AddParameter(par);
+  }
 
-    /**
-     * @brief Constraint force variable vector
-     *
-     * @return const std::vector<sym::VariableVector>&
-     */
-    const std::vector<sym::VariableVector> &lambda() const { return lambda_; }
+  void AddGeneralisedVelocityParameters(const sym::Parameter &par,
+                                        const casadi::SX &sym) {
+    assert(par.size() == nv_ && sym.rows() == nv_ &&
+           "Generalised velocity vectors must be size nv");
+    qvel_sx_ = sym;
+    program_.AddParameter(par);
+  }
 
-    const sym::VariableVector &lambda(const int i) const { return lambda_[i]; }
+  /* Optimisation optimisation variables */
 
-    /**
-     * @brief Adds constraint force variables to the variable list
-     *
-     * @param lambda
-     */
-    void AddConstraintForces(const sym::VariableVector &lambda) {
-      lambda_.push_back(lambda);
-    }
+  sym::VariableVector qacc_;
+  sym::VariableVector ctrl_;
+  std::vector<sym::VariableVector> lambda_;
 
-   private:
-    sym::VariableVector qacc_;
-    sym::VariableVector ctrl_;
-    std::vector<sym::VariableVector> lambda_;
-  };
+  sym::Parameter qpos_;
+  sym::Parameter qvel_;
 
-  const Variables &GetVariables() const { return *variables_; }
-  Variables &GetVariables() { return *variables_; }
+  /* Casadi symbolic variables */
 
-  class SymbolicTerms {
-   public:
-    SymbolicTerms() = default;
-    ~SymbolicTerms() = default;
+  casadi::SX qacc_sx_;
+  casadi::SX ctrl_sx_;
+  casadi::SXVector lambda_sx_ = {};
 
-    SymbolicTerms(int nq, int nv, int nu) {
-      qpos_ = casadi::SX::sym("qpos", nq), qvel_ = casadi::SX::sym("qvel", nv),
-      qacc_ = casadi::SX::sym("qacc", nv), ctrl_ = casadi::SX::sym("ctrl", nu);
-      lambda_ = {};
-    }
-
-    const casadi::SX &qpos() const { return qpos_; }
-    const casadi::SX &qvel() const { return qvel_; }
-    const casadi::SX &qacc() const { return qacc_; }
-    const casadi::SX &ctrl() const { return ctrl_; }
-
-    const std::vector<casadi::SX> &lambda() const { return lambda_; }
-
-    const casadi::SX &lambda(const int i) const { return lambda_[i]; }
-
-    void AddConstraintForces(const casadi::SX &lambda) {
-      lambda_.push_back(lambda);
-    }
-
-   private:
-    casadi::SX qpos_;
-    casadi::SX qvel_;
-    casadi::SX qacc_;
-    casadi::SX ctrl_;
-    std::vector<casadi::SX> lambda_;
-  };
-
-  const SymbolicTerms &GetSymbolicTerms() const { return *symbolic_terms_; }
-  SymbolicTerms &GetSymbolicTerms() { return *symbolic_terms_; }
+  casadi::SX qpos_sx_;
+  casadi::SX qvel_sx_;
 
  private:
   int nq_ = 0;
@@ -311,15 +288,6 @@ class OSC {
     // Add to the constraint
     constrained_dynamics_ -= mtimes(J.T(), lambda);
   }
-
-  // Conventional optimisation variables
-  std::unique_ptr<Variables> variables_;
-  // Symbolic variables used for constraint/objective generation
-  std::unique_ptr<SymbolicTerms> symbolic_terms_;
-
-  // Default parameters
-  sym::Parameter qpos_param_;
-  sym::Parameter qvel_param_;
 
   // Vector of motion tasks and parameter references for the program
   std::vector<std::shared_ptr<MotionTask>> motion_tasks_;
