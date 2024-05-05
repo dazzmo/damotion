@@ -38,7 +38,6 @@ class QuadraticCost : public CostBase<MatrixType> {
   QuadraticCost(const std::string &name, const sym::Expression &ex,
                 bool jac = true, bool hes = true)
       : CostBase<MatrixType>(name, "quadratic_cost") {
-    int nvar = 0;
     casadi::SXVector in = {};
     // Extract quadratic form
     casadi::SX A, b, c;

@@ -155,6 +155,7 @@ void SparseSolver::ConstructSparseLagrangianHessian(bool with_constraints) {
 void SparseSolver::EvaluateCost(const Binding<CostType>& binding,
                                 const Eigen::VectorXd& x, bool grd, bool hes,
                                 bool update_cache) {
+  VLOG(8) << "EvaluateCost()";
   common::InputRefVector x_in = {}, p_in = {};
   GetBindingInputs(binding, x_in, p_in);
 
@@ -174,15 +175,18 @@ void SparseSolver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                                       const int& constraint_idx,
                                       const Eigen::VectorXd& x, bool jac,
                                       bool hes, bool update_cache) {
+  VLOG(8) << "EvaluateConstraint()";
   common::InputRefVector x_in = {}, p_in = {};
   GetBindingInputs(binding, x_in, p_in);
 
   const ConstraintType& constraint = binding.Get();
   // Evaluate the constraint
+  VLOG(10) << "constraint and gradient";
   constraint.eval(x_in, p_in, jac);
   // Get dual multipliers for the constraint
   Eigen::Map<Eigen::VectorXd> l(dual_variable_cache_.data() + constraint_idx,
                                 binding.Get().Dimension());
+  VLOG(10) << "hessian";
   if (hes) constraint.eval_hessian(x_in, l, p_in);
 
   // Update the caches if required, otherwise break early
@@ -197,6 +201,7 @@ void SparseSolver::EvaluateConstraint(const Binding<ConstraintType>& binding,
 
 void SparseSolver::UpdateConstraintJacobian(
     const Binding<ConstraintType>& binding) {
+  VLOG(8) << "UpdateConstraintJacobian()";
   // For each Jacobian, update the data within the constraint Jacobian
   for (int k = 0; k < binding.Get().Jacobian().nonZeros(); ++k) {
     int idx = jacobian_data_map_[binding.id()][k];
@@ -206,6 +211,7 @@ void SparseSolver::UpdateConstraintJacobian(
 }
 
 void SparseSolver::UpdateLagrangianHessian(const Binding<CostType>& binding) {
+  VLOG(8) << "UpdateLagrangianHessian()";
   // For each Jacobian, update the data within the constraint Jacobian
   for (int k = 0; k < binding.Get().Hessian().nonZeros(); ++k) {
     int idx = lagrangian_hes_data_map_[binding.id()][k];
@@ -216,6 +222,7 @@ void SparseSolver::UpdateLagrangianHessian(const Binding<CostType>& binding) {
 
 void SparseSolver::UpdateLagrangianHessian(
     const Binding<ConstraintType>& binding) {
+  VLOG(8) << "UpdateLagrangianHessian()";
   // For each Jacobian, update the data within the constraint Jacobian
   for (int k = 0; k < binding.Get().Hessian().nonZeros(); ++k) {
     int idx = lagrangian_hes_data_map_[binding.id()][k];

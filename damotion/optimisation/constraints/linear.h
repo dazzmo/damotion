@@ -118,6 +118,11 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
     c_ = fA_->getOutput(0) * x[0] + fb_->getOutput(0);
   }
 
+  void eval_hessian(const common::InputRefVector &x, const Eigen::VectorXd &l,
+                    const common::InputRefVector &p) const override {
+    // No need, as linear constraints do not have a Hessian
+  }
+
  private:
   std::shared_ptr<common::Function<MatrixType>> fA_;
   std::shared_ptr<common::Function<Eigen::VectorXd>> fb_;
@@ -129,7 +134,6 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
                            const casadi::SXVector &p, const BoundsType &bounds,
                            bool jac = true, bool sparse = false) {
     assert(A.rows() == b.rows() && "A and b must be same dimension!");
-    int nvar = 0;
     casadi::SXVector in = {};
 
     VLOG(10) << this->name() << " ConstructConstraint()";

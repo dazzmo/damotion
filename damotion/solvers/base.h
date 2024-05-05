@@ -267,6 +267,9 @@ class SolverBase {
                                        const sym::VariableVector& var,
                                        bool is_continuous = false) {
     VLOG(10) << "InsertVectorAtVariableLocations()";
+    VLOG(10) << "res\n" << res;
+    VLOG(10) << "vec\n" << vec;
+    VLOG(10) << "var\n" << var;
     if (is_continuous) {
       // Block-insert
       res.middleRows(program_.GetDecisionVariableIndex(var[0]), var.size()) +=
@@ -295,11 +298,9 @@ class SolverBase {
       J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(var[0]),
                    var.size()) += jac;
     } else {
-      VLOG(10) << "Manual Insertion";
       // For each variable, update the location in the Jacobian
       for (int i = 0; i < var.size(); ++i) {
         int idx = GetCurrentProgram().GetDecisionVariableIndex(var[i]);
-        VLOG(10) << "i = " << i << " Index = " << idx;
         J.col(idx) += jac.col(i);
       }
     }
@@ -323,6 +324,10 @@ class SolverBase {
                                         bool is_continuous_x = false,
                                         bool is_continuous_y = false) {
     VLOG(10) << "InsertHessianAtVariableLocations()";
+    VLOG(10) << "res\n" << res;
+    VLOG(10) << "mat\n" << mat;
+    VLOG(10) << "var_x\n" << var_x;
+    VLOG(10) << "var_y\n" << var_y;
     // For each variable combination
     if (is_continuous_x && is_continuous_y) {
       int x_idx = program_.GetDecisionVariableIndex(var_x[0]);
