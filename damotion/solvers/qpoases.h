@@ -94,7 +94,7 @@ class QPOASESSolverInstance : public Solver {
 
       // Update the gradient
       InsertVectorAtVariableLocations(g_, binding.Get().c(), binding.x(0),
-                                      data.continuous[0]);
+                                      data.x_continuous[0]);
     }
     // Quadratic costs
     for (Binding<QuadraticCost<Eigen::MatrixXd>>& binding :
@@ -105,11 +105,11 @@ class QPOASESSolverInstance : public Solver {
       EvaluateCost(binding, primal_solution_x_, true, true, false);
       // Update the gradient
       InsertVectorAtVariableLocations(g_, binding.Get().b(), binding.x(0),
-                                      data.continuous[0]);
+                                      data.x_continuous[0]);
       // Update the hessian
-      InsertHessianAtVariableLocations(H_, 2.0 * binding.Get().A(),
-                                       binding.x(0), binding.x(0),
-                                       data.continuous[0], data.continuous[0]);
+      InsertHessianAtVariableLocations(
+          H_, 2.0 * binding.Get().A(), binding.x(0), binding.x(0),
+          data.x_continuous[0], data.x_continuous[0]);
     }
     // Evaluate only the linear constraints of the program
     // Reset constraint jacobian

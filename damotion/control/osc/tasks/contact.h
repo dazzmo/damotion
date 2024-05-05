@@ -1,7 +1,7 @@
 #ifndef TASKS_CONTACT_H
 #define TASKS_CONTACT_H
 
-#include "damotion/control/osc/tasks/task.h"
+#include "damotion/control/osc/tasks/motion.h"
 
 namespace opt = damotion::optimisation;
 namespace sym = damotion::symbolic;
@@ -16,71 +16,12 @@ namespace osc {
  * within the environment or an object
  *
  */
-class ContactTask : public Task {
+class ContactTask : public MotionTask {
  public:
   ContactTask() = default;
   ~ContactTask() = default;
 
-  ContactTask(const std::string &name,
-              const std::shared_ptr<TargetFrame> &frame)
-      : Task(name), frame_(frame) {}
-
-  /**
-   * @brief Symbolic position of the frame the motion task is based on
-   *
-   * @return const casadi::SX
-   */
-  virtual casadi::SX pos_sym() = 0;
-
-  /**
-   * @brief Symbolic velocity of the frame the motion task is based on
-   *
-   * @return casadi::SX
-   */
-  virtual casadi::SX vel_sym() = 0;
-
-  /**
-   * @brief Symbolic acceleration of the frame the motion task is based on
-   *
-   * @return casadi::SX
-   */
-  virtual casadi::SX acc_sym() = 0;
-
-  /**
-   * @brief Position of the frame the motion task is based on
-   *
-   * @return Eigen::VectorXd
-   */
-  virtual Eigen::VectorXd pos() = 0;
-
-  /**
-   * @brief Velocity of the frame the motion task is based on
-   *
-   * @return Eigen::VectorXd
-   */
-  virtual Eigen::VectorXd vel() = 0;
-
-  /**
-   * @brief Acceleration of the frame the motion task is based on
-   *
-   * @return Eigen::VectorXd
-   */
-  virtual Eigen::VectorXd acc() = 0;
-
-  /**
-   * @brief The TargetFrame the motion task is designed for
-   *
-   * @return const TargetFrame&
-   */
-  TargetFrame &Frame() { return *frame_; }
-
-  /**
-   * @brief Compute the desired tracking task acceleration as a PD error
-   * metric on the task position and velocity errors
-   *
-   * @return Eigen::VectorXd
-   */
-  virtual void ComputeMotionError() = 0;
+  ContactTask(const std::string &name) : MotionTask(name) {}
 
   // Whether the point is in contact or not
   bool inContact = false;
@@ -101,16 +42,16 @@ class ContactTask : public Task {
   /**
    * @brief Maximum allowable contact wrench
    *
-   * @return Eigen::VectorXd
+   * @return Eigen::Ref<const Eigen::VectorXd>
    */
-  virtual Eigen::VectorXd fmin() = 0;
+  virtual Eigen::Ref<const Eigen::VectorXd> fmin() = 0;
 
   /**
    * @brief Minimum allowable contact wrench
    *
-   * @return Eigen::VectorXd
+   * @return Eigen::Ref<const Eigen::VectorXd>
    */
-  virtual Eigen::VectorXd fmax() = 0;
+  virtual Eigen::Ref<const Eigen::VectorXd> fmax() = 0;
 
  private:
   // Friction coefficient
@@ -118,9 +59,6 @@ class ContactTask : public Task {
 
   // Surface normal
   Eigen::Vector3d normal_;
-
-  // Target frame the motion task is associated with
-  std::shared_ptr<TargetFrame> frame_;
 };
 
 class ContactTask3D : public ContactTask {
@@ -128,11 +66,7 @@ class ContactTask3D : public ContactTask {
   ContactTask3D() = default;
   ~ContactTask3D() = default;
 
-  ContactTask3D(const std::string &name,
-                const std::shared_ptr<TargetFrame> &frame)
-      : ContactTask(name, frame) {
-    ResizeTask(3);
-  }
+  ContactTask3D(const std::string &name) : ContactTask(name) { ResizeTask(3); }
 
   struct Reference {
     Eigen::Vector3d x;
@@ -142,16 +76,6 @@ class ContactTask3D : public ContactTask {
 
   const Reference &GetReference() { return ref_; }
   void SetReference(const Eigen::Vector3d &x) { ref_.x = x; }
-
-  casadi::SX pos_sym() override {
-    return Frame().pos_sym()(casadi::Slice(0, 3));
-  }
-  casadi::SX vel_sym() override {
-    return Frame().vel_sym()(casadi::Slice(0, 3));
-  }
-  casadi::SX acc_sym() override {
-    return Frame().acc_sym()(casadi::Slice(0, 3));
-  }
 
   Eigen::VectorXd pos() override { return Frame().pos().topRows(3); }
   Eigen::VectorXd vel() override { return Frame().vel().topRows(3); }
@@ -165,8 +89,8 @@ class ContactTask3D : public ContactTask {
     fmax_ = fmax;
   }
 
-  Eigen::VectorXd fmin() override { return fmin_; }
-  Eigen::VectorXd fmax() override { return fmax_; }
+  Eigen::Ref<const Eigen::VectorXd> fmin() override { return fmin_; }
+  Eigen::Ref<const Eigen::VectorXd> fmax() override { return fmax_; }
 
  private:
   Reference ref_;
@@ -179,11 +103,7 @@ class ContactTask6D : public ContactTask {
   ContactTask6D() = default;
   ~ContactTask6D() = default;
 
-  ContactTask6D(const std::string &name,
-                const std::shared_ptr<TargetFrame> &frame)
-      : ContactTask(name, frame) {
-    ResizeTask(6);
-  }
+  ContactTask6D(const std::string &name) : ContactTask(name) { ResizeTask(6); }
 
   struct Reference {
     Eigen::Vector3d x;
@@ -195,18 +115,14 @@ class ContactTask6D : public ContactTask {
   const Reference &GetReference() { return ref_; }
   void SetReference(const Eigen::Vector3d &x) { ref_.x = x; }
 
-  casadi::SX pos_sym() override { return Frame().pos_sym(); }
-  casadi::SX vel_sym() override { return Frame().vel_sym(); }
-  casadi::SX acc_sym() override { return Frame().acc_sym(); }
-
   Eigen::VectorXd pos() override { return Frame().pos(); }
   Eigen::VectorXd vel() override { return Frame().vel(); }
   Eigen::VectorXd acc() override { return Frame().acc(); }
 
   void ComputeMotionError() override;
 
-  Eigen::VectorXd fmin() override { return fmin_; }
-  Eigen::VectorXd fmax() override { return fmax_; }
+  Eigen::Ref<const Eigen::VectorXd> fmin() override { return fmin_; }
+  Eigen::Ref<const Eigen::VectorXd> fmax() override { return fmax_; }
 
  private:
   Reference ref_;

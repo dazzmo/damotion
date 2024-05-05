@@ -18,7 +18,7 @@ TEST(TrackingCost, QuadraticForm) {
   damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
   // Create end-effector
-  auto tool0 = wrapper.AddEndEffector("tool0");
+  auto tool0 = wrapper.EndEffector("tool0");
 
   // Create expression of the form || J qacc + dJdt * qvel - xaccd ||^2
   casadi::SX qpos = casadi::SX::sym("qpos", model.nq),
@@ -28,7 +28,7 @@ TEST(TrackingCost, QuadraticForm) {
   casadi::SX xaccd = casadi::SX::sym("xaccd", 6);
   tool0->UpdateState(qpos, qvel, qacc);
 
-  sym::Expression obj = mtimes(tool0->acc_sym().T(), tool0->acc_sym());
+  sym::Expression obj = mtimes(tool0->acc().T(), tool0->acc());
   obj.SetInputs({qacc}, {qpos, qvel, xaccd});
 
   // Create quadratic cost

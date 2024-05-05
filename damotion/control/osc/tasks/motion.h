@@ -21,29 +21,7 @@ class MotionTask : public Task {
   MotionTask() = default;
   ~MotionTask() = default;
 
-  MotionTask(const std::string &name, const std::shared_ptr<TargetFrame> &frame)
-      : Task(name), frame_(frame) {}
-
-  /**
-   * @brief Symbolic position of the frame the motion task is based on
-   *
-   * @return const casadi::SX
-   */
-  virtual casadi::SX pos_sym() = 0;
-
-  /**
-   * @brief Symbolic velocity of the frame the motion task is based on
-   *
-   * @return casadi::SX
-   */
-  virtual casadi::SX vel_sym() = 0;
-
-  /**
-   * @brief Symbolic acceleration of the frame the motion task is based on
-   *
-   * @return casadi::SX
-   */
-  virtual casadi::SX acc_sym() = 0;
+  MotionTask(const std::string &name) : Task(name) {}
 
   /**
    * @brief Position of the frame the motion task is based on
@@ -67,11 +45,20 @@ class MotionTask : public Task {
   virtual Eigen::VectorXd acc() = 0;
 
   /**
+   * @brief Set the frame to base the motion task on
+   *
+   * @param frame
+   */
+  void SetFrame(const std::shared_ptr<model::TargetFrame> &frame) {
+    frame_ = frame;
+  }
+
+  /**
    * @brief The TargetFrame the motion task is designed for
    *
    * @return const TargetFrame&
    */
-  TargetFrame &Frame() { return *frame_; }
+  model::TargetFrame &Frame() { return *frame_; }
 
   /**
    * @brief Compute the desired tracking task acceleration as a PD error
@@ -83,7 +70,7 @@ class MotionTask : public Task {
 
  private:
   // Target frame the motion task is associated with
-  std::shared_ptr<TargetFrame> frame_;
+  std::shared_ptr<model::TargetFrame> frame_;
 };
 
 class PositionTask : public MotionTask {
@@ -96,21 +83,7 @@ class PositionTask : public MotionTask {
     Eigen::Vector3d v;
   };
 
-  PositionTask(const std::string &name,
-               const std::shared_ptr<TargetFrame> &frame)
-      : MotionTask(name, frame) {
-    ResizeTask(3);
-  }
-
-  casadi::SX pos_sym() override {
-    return Frame().pos_sym()(casadi::Slice(0, 3));
-  }
-  casadi::SX vel_sym() override {
-    return Frame().vel_sym()(casadi::Slice(0, 3));
-  }
-  casadi::SX acc_sym() override {
-    return Frame().acc_sym()(casadi::Slice(0, 3));
-  }
+  PositionTask(const std::string &name) : MotionTask(name) { ResizeTask(3); }
 
   Eigen::VectorXd pos() override { return Frame().pos().topRows(3); }
   Eigen::VectorXd vel() override { return Frame().vel().topRows(3); }
@@ -138,21 +111,7 @@ class OrientationTask : public MotionTask {
     Eigen::Vector3d w;
   };
 
-  OrientationTask(const std::string &name,
-                  const std::shared_ptr<TargetFrame> &frame)
-      : MotionTask(name, frame) {
-    ResizeTask(3);
-  }
-
-  casadi::SX pos_sym() override {
-    return Frame().pos_sym()(casadi::Slice(3, 7));
-  }
-  casadi::SX vel_sym() override {
-    return Frame().vel_sym()(casadi::Slice(3, 6));
-  }
-  casadi::SX acc_sym() override {
-    return Frame().acc_sym()(casadi::Slice(3, 6));
-  }
+  OrientationTask(const std::string &name) : MotionTask(name) { ResizeTask(3); }
 
   Eigen::VectorXd pos() override { return Frame().pos().bottomRows(4); }
   Eigen::VectorXd vel() override { return Frame().vel().bottomRows(3); }
@@ -176,10 +135,10 @@ class OrientationTask : public MotionTask {
   Reference ref_;
 };
 
-class Pose6DTask : public MotionTask {
+class PoseTask : public MotionTask {
  public:
-  Pose6DTask() = default;
-  ~Pose6DTask() = default;
+  PoseTask() = default;
+  ~PoseTask() = default;
 
   struct Reference {
     Eigen::Vector3d x;
@@ -188,14 +147,7 @@ class Pose6DTask : public MotionTask {
     Eigen::Vector3d w;
   };
 
-  Pose6DTask(const std::string &name, const std::shared_ptr<TargetFrame> &frame)
-      : MotionTask(name, frame) {
-    ResizeTask(6);
-  }
-
-  casadi::SX pos_sym() override { return Frame().pos_sym(); }
-  casadi::SX vel_sym() override { return Frame().vel_sym(); }
-  casadi::SX acc_sym() override { return Frame().acc_sym(); }
+  PoseTask(const std::string &name) : MotionTask(name) { ResizeTask(6); }
 
   Eigen::VectorXd pos() override { return Frame().pos(); }
   Eigen::VectorXd vel() override { return Frame().vel(); }

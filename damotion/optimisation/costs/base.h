@@ -114,7 +114,8 @@ class CostBase {
   virtual void eval(const common::InputRefVector &x,
                     const common::InputRefVector &p, bool grd = true) const {
     VLOG(10) << this->name() << " eval()";
-    common::InputRefVector in = x;
+    common::InputRefVector in = {};
+    for (const auto &xi : x) in.push_back(xi);
     for (const auto &pi : p) in.push_back(pi);
 
     // Call necessary cost functions
@@ -131,7 +132,8 @@ class CostBase {
   void eval_hessian(const common::InputRefVector &x,
                     const common::InputRefVector &p) {
     // Create input for the lambda-hessian product
-    common::InputRefVector in = x;
+    common::InputRefVector in = {};
+    for (const auto &xi : x) in.push_back(xi);
     for (const auto &pi : p) in.push_back(pi);
 
     // Call necessary constraint functions

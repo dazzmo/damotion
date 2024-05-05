@@ -37,8 +37,8 @@ void OrientationTask::ComputeMotionError() {
   de_ = Jlog * vel() - GetReference().w;
 }
 
-void Pose6DTask::ComputeMotionError() {
-  damotion::common::Profiler profiler("Pose6DTask::ComputeMotionError");
+void PoseTask::ComputeMotionError() {
+  damotion::common::Profiler profiler("PoseTask::ComputeMotionError");
 
   // Convert to 6D pose
   Eigen::Vector3d x = pos().topRows(3);

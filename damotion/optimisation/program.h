@@ -11,7 +11,6 @@
 #include "damotion/symbolic/expression.h"
 #include "damotion/symbolic/parameter.h"
 #include "damotion/symbolic/variable.h"
-#include "damotion/utils/casadi.h"
 #include "damotion/utils/codegen.h"
 #include "damotion/utils/eigen_wrapper.h"
 
@@ -55,7 +54,7 @@ class DecisionVariableManager {
    *
    * @param var
    */
-  void AddDecisionVariables(const Eigen::Ref<sym::VariableMatrix> &var);
+  void AddDecisionVariables(const Eigen::Ref<const sym::VariableMatrix> &var);
 
   /**
    * @brief Removes variables currently considered by the program.
@@ -122,12 +121,13 @@ class DecisionVariableManager {
 };
 
 /**
- * @brief Class that maintains and adjusts parameters
+ * @brief Class that maintains and adjusts parameters organised into a
+ * vector
  *
  */
 class ParameterManager {
  public:
-  ParameterManager() : n_parameters_(0) {}
+  ParameterManager() : n_parameters_(0) { parameter_vec_.resize(0); }
   ~ParameterManager() = default;
 
   /**
@@ -138,46 +138,89 @@ class ParameterManager {
   const int &NumberOfParameters() const { return n_parameters_; }
 
   /**
-   * @brief Whether the parameter par is included within the program
-   *
-   * @param par
-   * @return true
-   * @return false
-   */
-  bool IsParameter(const sym::Parameter &par);
-
-  /**
-   * @brief Add parameters to the program
+   * @brief Adds a parameter
    *
    * @param var
    */
-  Eigen::Ref<Eigen::MatrixXd> AddParameter(const sym::Parameter &p);
-
-  /**
-   * @brief Returns the values of the parameter p as an Eigen::MatrixXd
-   * reference
-   *
-   * @param p
-   * @return Eigen::Ref<const Eigen::MatrixXd>
-   */
-  Eigen::Ref<const Eigen::MatrixXd> GetParameterValues(const sym::Parameter &p);
-
-  /**
-   * @brief Sets the parameter p within the program to the values given by
-   * val.
-   *
-   * @param p
-   * @param val
-   */
-  void SetParameterValues(const sym::Parameter &p,
-                          Eigen::Ref<const Eigen::MatrixXd> val);
+  void AddParameter(const sym::Parameter &par);
+  void AddParameters(const sym::ParameterVector &par);
+  void AddParameters(const sym::ParameterMatrix &par);
 
   /**
    * @brief Removes variables currently considered by the program.
    *
    * @param var
    */
-  void RemoveParameters(const sym::Parameter &p);
+  void RemoveParameters(const Eigen::Ref<sym::ParameterMatrix> &par);
+
+  /**
+   * @brief Whether a variable var is a parameter within the program
+   *
+   * @param var
+   * @return true
+   * @return false
+   */
+  bool IsParameter(const sym::Parameter &par);
+
+  /**
+   * @brief Returns the index of the given variable within the created
+   * optimisation vector
+   *
+   * @param v
+   * @return int
+   */
+  int GetParameterIndex(const sym::Parameter &v);
+
+  /**
+   * @brief Determines whether a vector of variables var is continuous within
+   * the optimisation vector of the program.
+   *
+   * @param var
+   * @return true
+   * @return false
+   */
+  bool IsContinuousInParameterVector(const sym::ParameterVector &par);
+
+  /**
+   * @brief Provides a reference to the data for the parameter vector par. This
+   * is only valid for parameters that are continuous (i.e. a single parameter
+   * vector) and will not return a valid reference if the vector is not
+   * continuous in the data vector.
+   *
+   * @param par
+   * @return Eigen::Ref<Eigen::VectorXd>
+   */
+  Eigen::Map<Eigen::VectorXd> GetParameterRef(const sym::ParameterVector &par) {
+    if (IsContinuousInParameterVector(par)) {
+      return Eigen::Map<Eigen::VectorXd>(
+          parameter_vec_.data() + GetParameterIndex(par[0]), par.size());
+    } else {
+      LOG(WARNING)
+          << "GetParameterRef(): Parameter " << par
+          << " is not continuous in parameter vector to provide reference";
+      throw std::runtime_error(
+          "Not continuous in parameter vector to provide reference");
+    }
+  }
+
+  /**
+   * @brief Provides a reference to the single parameter p within the parameter
+   * data vector.
+   *
+   * @param par
+   * @return Eigen::Map<Eigen::VectorXd>
+   */
+  Eigen::Map<Eigen::VectorXd> GetParameterRef(const sym::Parameter &p) {
+    return Eigen::Map<Eigen::VectorXd>(
+        parameter_vec_.data() + GetParameterIndex(p), 1);
+  }
+
+  /**
+   * @brief Vector that holds all parameter values.
+   *
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &GetParameterVector() { return parameter_vec_; }
 
   /**
    * @brief Prints the current set of parameters for the program to the
@@ -190,10 +233,9 @@ class ParameterManager {
   // Number of parameters
   int n_parameters_;
 
-  // Parameters
   std::unordered_map<sym::Parameter::Id, int> parameter_idx_;
   std::vector<sym::Parameter> parameters_;
-  std::vector<Eigen::MatrixXd> parameter_vals_;
+  Eigen::VectorXd parameter_vec_;
 };
 
 template <typename MatrixType>
@@ -214,7 +256,7 @@ class CostManager {
    */
   Binding<CostType> AddCost(const std::shared_ptr<CostType> &cost,
                             const sym::VariableRefVector &x,
-                            const sym::ParameterVector &p) {
+                            const sym::ParameterRefVector &p) {
     Binding<CostType> binding(cost, x, p);
     costs_.push_back(binding);
     return costs_.back();
@@ -222,14 +264,14 @@ class CostManager {
 
   Binding<LinearCost<MatrixType>> AddLinearCost(
       const std::shared_ptr<LinearCost<MatrixType>> &cost,
-      const sym::VariableRefVector &x, const sym::ParameterVector &p) {
+      const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
     linear_costs_.push_back(Binding<LinearCost<MatrixType>>(cost, x, p));
     return linear_costs_.back();
   }
 
   Binding<QuadraticCost<MatrixType>> AddQuadraticCost(
       const std::shared_ptr<QuadraticCost<MatrixType>> &cost,
-      const sym::VariableRefVector &x, const sym::ParameterVector &p) {
+      const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
     quadratic_costs_.push_back(Binding<QuadraticCost<MatrixType>>(cost, x, p));
     return quadratic_costs_.back();
   }
@@ -312,7 +354,7 @@ class ConstraintManager {
    */
   Binding<ConstraintBase<MatrixType>> AddConstraint(
       const std::shared_ptr<ConstraintBase<MatrixType>> &con,
-      const sym::VariableRefVector &x, const sym::ParameterVector &p) {
+      const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
     // Create a binding for the constraint
     constraints_.push_back(Binding<ConstraintBase<MatrixType>>(con, x, p));
     n_constraints_ += con->Dimension();
@@ -321,7 +363,7 @@ class ConstraintManager {
 
   Binding<LinearConstraint<MatrixType>> AddLinearConstraint(
       const std::shared_ptr<LinearConstraint<MatrixType>> &con,
-      const sym::VariableRefVector &x, const sym::ParameterVector &p) {
+      const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
     linear_constraints_.push_back(
         Binding<LinearConstraint<MatrixType>>(con, x, p));
     n_constraints_ += con->Dimension();

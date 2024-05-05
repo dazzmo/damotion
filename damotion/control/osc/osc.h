@@ -13,7 +13,6 @@
 #include "damotion/optimisation/constraints/constraints.h"
 #include "damotion/optimisation/costs/costs.h"
 #include "damotion/optimisation/program.h"
-#include "damotion/utils/casadi.h"
 #include "damotion/utils/codegen.h"
 #include "damotion/utils/eigen_wrapper.h"
 #include "damotion/utils/pinocchio_model.h"
@@ -57,15 +56,17 @@ class OSC {
    * @param task
    * @return void
    */
-  void AddContactPoint(const std::shared_ptr<ContactTask> &task);
+  void AddContactTask(std::shared_ptr<ContactTask> &task,
+                      model::symbolic::TargetFrame &frame);
 
   /**
-   * @brief Adds a generic motion task to the OSC.
+   * @brief Registers a motion task for the
    *
    * @param task
    * @return void
    */
-  void AddMotionTask(const std::shared_ptr<MotionTask> &task);
+  void AddMotionTask(std::shared_ptr<MotionTask> &task,
+                     model::symbolic::TargetFrame &frame);
 
   /**
    * @brief For a constraint that can be written in the form h(q) = 0,
@@ -87,30 +88,9 @@ class OSC {
    *
    * @param dynamics
    */
-  void AddUnconstrainedInverseDynamics(
-      const casadi::SX &dynamics, const casadi::SXVector &parameters_sym = {},
-      const sym::ParameterVector &parameters = {}) {
-    assert(parameters_sym.size() == parameters.size() &&
-           "Parameter inputs must be same size!");
+  void AddUnconstrainedInverseDynamics(const casadi::SX &dynamics) {
     // Initialise expression
     constrained_dynamics_ = dynamics;
-    // Initialise inputs to the system
-    constrained_dynamics_sym_ =
-        casadi::SX::vertcat({symbolic_terms_->qacc(), symbolic_terms_->ctrl()});
-    constrained_dynamics_var_.resize(nv_ + nu_);
-    constrained_dynamics_var_ << variables_->qacc(), variables_->ctrl();
-
-    // Initialise parameters
-    constrained_dynamics_par_sym_ = {symbolic_terms_->qpos(),
-                                     symbolic_terms_->qvel()};
-    for (auto &pi : parameters_sym) {
-      constrained_dynamics_par_sym_.push_back(pi);
-    }
-    constrained_dynamics_par_.push_back(qpos_param_);
-    constrained_dynamics_par_.push_back(qvel_param_);
-    for (auto &pi : parameters) {
-      constrained_dynamics_par_.push_back(pi);
-    }
   }
 
   /**
@@ -121,48 +101,44 @@ class OSC {
   void CreateProgram() {
     // Create linear constraint for the constrained dynamics
     casadi::SX A, b;
-    casadi::SX::linear_coeff(constrained_dynamics_, constrained_dynamics_sym_,
-                             A, b, true);
+    // TODO Create single vector
+    casadi::SX x_dyn = casadi::SX::vertcat(constrained_dynamics_.Variables());
+    casadi::SX::linear_coeff(constrained_dynamics_, x_dyn, A, b, true);
     auto con = std::make_shared<opt::LinearConstraint<Eigen::MatrixXd>>(
-        "dynamics", A, b, constrained_dynamics_par_sym_,
+        "dynamics", A, b, constrained_dynamics_.Parameters(),
         opt::BoundsType::kEquality);
     // Add constraint to program
-    program_.AddLinearConstraint(con, {constrained_dynamics_var_},
-                                 constrained_dynamics_par_);
+    program_.AddLinearConstraint(con, {qacc_, ctrl_}, {qpos_, qvel_});
 
     // Construct the decision variable vector  [qacc, ctrl, lambda]
     sym::VariableVector x(program_.NumberOfDecisionVariables());
     // Set it as qacc, ctrl, constraint forces
-    x.topRows(nv_ + nu_) << variables_->qacc(), variables_->ctrl();
+    x.topRows(nv_ + nu_) << qacc_, ctrl_;
     // Add any constraint forces
     int idx = nv_ + nu_;
-    for (int i = 0; i < variables_->lambda().size(); ++i) {
-      x.middleRows(idx, variables_->lambda(i).size()) = variables_->lambda(i);
-      idx += variables_->lambda(i).size();
+    for (size_t i = 0; i < lambda_.size(); ++i) {
+      x.middleRows(idx, lambda_[i].size()) = lambda_[i];
+      idx += lambda_[i].size();
     }
     program_.SetDecisionVariableVector(x);
   }
 
   void Update(const Eigen::VectorXd &qpos, const Eigen::VectorXd &qvel) {
-    program_.SetParameterValues(qpos_param_, qpos);
-    program_.SetParameterValues(qvel_param_, qvel);
+    // TODO Store these references
+    program_.GetParameterRef(qpos_) << qpos;
+    program_.GetParameterRef(qvel_) << qvel;
 
     // Update each task given the updated data and references
-    for (int i = 0; i < motion_tasks_.size(); ++i) {
+    for (size_t i = 0; i < motion_tasks_.size(); ++i) {
       // Set desired task accelerations
       motion_tasks_[i]->ComputeMotionError();
-      GetProgram().SetParameterValues(motion_task_parameters_[i].xaccd,
-                                      -motion_tasks_[i]->GetPDError());
+      motion_task_parameters_[i].xaccd << -motion_tasks_[i]->GetPDError();
     }
-
-    for (int i = 0; i < contact_tasks_.size(); ++i) {
-      // Compute the pose error for their costs
+    for (size_t i = 0; i < contact_tasks_.size(); ++i) {
+      // Set desired task accelerations
       contact_tasks_[i]->ComputeMotionError();
-      GetProgram().SetParameterValues(contact_task_parameters_[i].xaccd,
-                                      -contact_tasks_[i]->GetPDError());
+      contact_task_parameters_[i].xaccd << -contact_tasks_[i]->GetPDError();
     }
-
-    // Program is updated
   }
 
   /**
@@ -173,6 +149,7 @@ class OSC {
    * @param task
    */
   void UpdateContactPoint(const std::shared_ptr<ContactTask> &task) {
+    // TODO Get task index
     int task_idx = 0;
     if (task->inContact) {
       // Get parameters related to the contact task
@@ -180,9 +157,9 @@ class OSC {
       // Set in contact
       contact_force_bounds_[task_idx].Get().SetBounds(task->fmin(),
                                                       task->fmax());
+      p.mu << task->mu();
+      p.normal << task->normal();
 
-      program_.SetParameterValues(p.mu, Eigen::Vector<double, 1>(task->mu()));
-      program_.SetParameterValues(p.normal, task->normal());
     } else {
       contact_force_bounds_[task_idx].Get().SetBounds(
           opt::BoundsType::kEquality);
@@ -229,20 +206,20 @@ class OSC {
     program_.AddDecisionVariables(var);
   }
 
-  void AddGeneralisedPositionParameters(const sym::Parameter &par,
+  void AddGeneralisedPositionParameters(const sym::ParameterVector &par,
                                         const casadi::SX &sym) {
     assert(par.size() == nq_ && sym.rows() == nq_ &&
            "Generalised position vectors must be size nq");
     qpos_sx_ = sym;
-    program_.AddParameter(par);
+    program_.AddParameters(par);
   }
 
-  void AddGeneralisedVelocityParameters(const sym::Parameter &par,
+  void AddGeneralisedVelocityParameters(const sym::ParameterVector &par,
                                         const casadi::SX &sym) {
     assert(par.size() == nv_ && sym.rows() == nv_ &&
            "Generalised velocity vectors must be size nv");
     qvel_sx_ = sym;
-    program_.AddParameter(par);
+    program_.AddParameters(par);
   }
 
   /* Optimisation optimisation variables */
@@ -251,8 +228,8 @@ class OSC {
   sym::VariableVector ctrl_;
   std::vector<sym::VariableVector> lambda_;
 
-  sym::Parameter qpos_;
-  sym::Parameter qvel_;
+  sym::ParameterVector qpos_;
+  sym::ParameterVector qvel_;
 
   /* Casadi symbolic variables */
 
@@ -268,32 +245,14 @@ class OSC {
   int nv_ = 0;
   int nu_ = 0;
 
-  void AddConstraintsToDynamics(const casadi::SX &lambda,
-                                const sym::VariableVector &lambda_var,
-                                const casadi::SX &J,
-                                const casadi::SXVector &parameters,
-                                const sym::ParameterVector &parameters_var) {
-    // Add variables to the input vectors
-    constrained_dynamics_sym_ =
-        casadi::SX::vertcat({constrained_dynamics_sym_, lambda});
-    constrained_dynamics_var_.conservativeResize(
-        constrained_dynamics_var_.size() + lambda_var.size());
-    constrained_dynamics_var_.bottomRows(lambda_var.size()) << lambda_var;
-    for (auto &pi : parameters) {
-      constrained_dynamics_par_sym_.push_back(pi);
-    }
-    for (auto &pi : parameters_var) {
-      constrained_dynamics_par_.push_back(pi);
-    }
-    // Add to the constraint
-    constrained_dynamics_ -= mtimes(J.T(), lambda);
-  }
-
   // Vector of motion tasks and parameter references for the program
   std::vector<std::shared_ptr<MotionTask>> motion_tasks_;
   struct MotionTaskParameters {
-    sym::Parameter xaccd;
-    sym::Parameter w;
+    MotionTaskParameters(const Eigen::Map<Eigen::VectorXd> &xaccd,
+                         const Eigen::Map<Eigen::VectorXd> &w)
+        : xaccd(xaccd), w(w) {}
+    Eigen::Map<Eigen::VectorXd> xaccd;
+    Eigen::Map<Eigen::VectorXd> w;
   };
   std::vector<MotionTaskParameters> motion_task_parameters_;
 
@@ -301,10 +260,16 @@ class OSC {
   std::vector<std::shared_ptr<ContactTask>> contact_tasks_;
   // Parameters for each contact point
   struct ContactTaskParameters {
-    sym::Parameter xaccd;
-    sym::Parameter w;
-    sym::Parameter mu;
-    sym::Parameter normal;
+    ContactTaskParameters(const Eigen::Map<Eigen::VectorXd> &xaccd,
+                          const Eigen::Map<Eigen::VectorXd> &w,
+                          const Eigen::Map<Eigen::VectorXd> &mu,
+                          const Eigen::Map<Eigen::VectorXd> &normal)
+        : xaccd(xaccd), w(w), mu(mu), normal(normal) {}
+
+    Eigen::Map<Eigen::VectorXd> xaccd;
+    Eigen::Map<Eigen::VectorXd> w;
+    Eigen::Map<Eigen::VectorXd> mu;
+    Eigen::Map<Eigen::VectorXd> normal;
   };
   std::vector<ContactTaskParameters> contact_task_parameters_;
   std::vector<opt::Binding<opt::BoundingBoxConstraint<Eigen::MatrixXd>>>
@@ -314,10 +279,6 @@ class OSC {
   std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>> friction_cone_con_;
 
   // Constrained dynamics
-  casadi::SX constrained_dynamics_sym_;
-  casadi::SXVector constrained_dynamics_par_sym_;
-  sym::VariableVector constrained_dynamics_var_;
-  sym::ParameterVector constrained_dynamics_par_;
   sym::Expression constrained_dynamics_;
 
   // Underlying program for the OSC

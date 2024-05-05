@@ -8,12 +8,7 @@ void Solver::EvaluateCost(const Binding<CostType>& binding,
                           const Eigen::VectorXd& x, bool grd, bool hes,
                           bool update_cache) {
   common::InputRefVector x_in = {}, p_in = {};
-  GetBindingInputs(binding, x_in);
-
-  // Set parameters
-  for (int i = 0; i < binding.np(); ++i) {
-    p_in.push_back(GetCurrentProgram().GetParameterValues(binding.p(i)));
-  }
+  GetBindingInputs(binding, x_in, p_in);
 
   const CostType& cost = binding.Get();
   // Evaluate the constraint
@@ -45,12 +40,7 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                                 const Eigen::VectorXd& x, bool jac,
                                 bool update_cache) {
   common::InputRefVector x_in = {}, p_in = {};
-  GetBindingInputs(binding, x_in);
-
-  // Set parameters
-  for (int i = 0; i < binding.np(); ++i) {
-    p_in.push_back(GetCurrentProgram().GetParameterValues(binding.p(i)));
-  }
+  GetBindingInputs(binding, x_in, p_in);
 
   const ConstraintType& constraint = binding.Get();
   // Evaluate the constraint
@@ -91,7 +81,7 @@ void Solver::UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
     Eigen::Ref<const Eigen::MatrixXd> Ji =
         binding.Get().Jacobian().middleCols(idx, xi.size());
     InsertJacobianAtVariableLocations(constraint_jacobian_cache_, Ji, xi,
-                                      constraint_idx, data.continuous[i]);
+                                      constraint_idx, data.x_continuous[i]);
     idx += xi.size();
   }
 }
@@ -110,7 +100,8 @@ void Solver::UpdateLagrangianHessian(const Binding<CostType>& binding) {
       Eigen::Ref<const Eigen::MatrixXd> Hij =
           binding.Get().Hessian().block(idx_x, idx_y, xi.size(), xj.size());
       InsertHessianAtVariableLocations(lagrangian_hes_cache_, Hij, xi, xj,
-                                       data.continuous[j], data.continuous[j]);
+                                       data.x_continuous[i],
+                                       data.x_continuous[j]);
 
       idx_y += xj.size();
     }

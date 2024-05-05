@@ -102,7 +102,6 @@ class QuadraticCost : public CostBase<MatrixType> {
   void ConstructConstraint(const casadi::SX &A, const casadi::SX &b,
                            const casadi::SX &c, const casadi::SXVector &p,
                            bool jac = true, bool hes = true) {
-    int nvar = 0;
     casadi::SXVector in = {};
     // Linear cost
     casadi::SX x = casadi::SX::sym("x", A.rows());

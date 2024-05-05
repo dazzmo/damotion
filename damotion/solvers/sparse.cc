@@ -156,12 +156,7 @@ void SparseSolver::EvaluateCost(const Binding<CostType>& binding,
                                 const Eigen::VectorXd& x, bool grd, bool hes,
                                 bool update_cache) {
   common::InputRefVector x_in = {}, p_in = {};
-  GetBindingInputs(binding, x_in);
-
-  // Set parameters
-  for (int i = 0; i < binding.np(); ++i) {
-    p_in.push_back(GetCurrentProgram().GetParameterValues(binding.p(i)));
-  }
+  GetBindingInputs(binding, x_in, p_in);
 
   const CostType& cost = binding.Get();
   // Evaluate the constraint
@@ -180,12 +175,7 @@ void SparseSolver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                                       const Eigen::VectorXd& x, bool jac,
                                       bool update_cache) {
   common::InputRefVector x_in = {}, p_in = {};
-  GetBindingInputs(binding, x_in);
-
-  // Set parameters
-  for (int i = 0; i < binding.np(); ++i) {
-    p_in.push_back(GetCurrentProgram().GetParameterValues(binding.p(i)));
-  }
+  GetBindingInputs(binding, x_in, p_in);
 
   const ConstraintType& constraint = binding.Get();
   // Evaluate the constraint

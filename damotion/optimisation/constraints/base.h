@@ -127,7 +127,8 @@ class ConstraintBase {
   virtual void eval(const common::InputRefVector &x,
                     const common::InputRefVector &p, bool jac = true) const {
     VLOG(10) << this->name() << " eval()";
-    common::InputRefVector in = x;
+    common::InputRefVector in = {};
+    for (const auto &xi : x) in.push_back(xi);
     for (const auto &pi : p) in.push_back(pi);
 
     // Call necessary constraint functions
@@ -147,9 +148,10 @@ class ConstraintBase {
   void eval_hessian(const common::InputRefVector &x, const Eigen::VectorXd &l,
                     const common::InputRefVector &p) {
     // Create input for the lambda-hessian product
-    common::InputRefVector in = x;
+    common::InputRefVector in = {};
+    for (const auto &xi : x) in.push_back(xi);
     in.push_back(l);
-    for (int i = 0; i < p.size(); ++i) in.push_back(p[i]);
+    for (const auto &pi : p) in.push_back(pi);
 
     // Call necessary constraint functions
     this->hes_->call(in);

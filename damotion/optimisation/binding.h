@@ -14,8 +14,6 @@ namespace optimisation {
 class BindingBase {
  public:
   typedef int Id;
-  typedef std::shared_ptr<sym::Parameter> ParameterPtr;
-  typedef std::vector<ParameterPtr> ParameterPtrVector;
 
   BindingBase() = default;
   ~BindingBase() = default;
@@ -30,7 +28,7 @@ class BindingBase {
    * @param p
    */
   BindingBase(const sym::VariableRefVector &x,
-              const sym::ParameterVector &p = {}) {
+              const sym::ParameterRefVector &p = {}) {
     // Set variable vector
     x_.reserve(x.size());
     for (auto xi : x) {
@@ -40,7 +38,7 @@ class BindingBase {
     // Create vector of parameters
     p_.reserve(p.size());
     for (auto pi : p) {
-      p_.push_back(std::make_shared<sym::Parameter>(pi));
+      p_.push_back(std::make_shared<sym::ParameterVector>(pi));
     }
 
     // Create a concatenated variable vector
@@ -63,7 +61,7 @@ class BindingBase {
     return *xc_;
   }
 
-  const sym::Parameter &p(const int &i) const { return *p_[i]; }
+  const sym::ParameterVector &p(const int &i) const { return *p_[i]; }
 
  protected:
   Id id_;
@@ -73,8 +71,8 @@ class BindingBase {
 
   // Vector of variables bound to the constraint
   std::vector<std::shared_ptr<sym::VariableVector>> x_ = {};
+  std::vector<std::shared_ptr<sym::ParameterVector>> p_ = {};
   std::shared_ptr<sym::VariableVector> xc_ = nullptr;
-  ParameterPtrVector p_ = {};
 };
 
 template <typename T>
@@ -94,7 +92,7 @@ class Binding : public BindingBase {
    * @param p
    */
   Binding(const std::shared_ptr<T> &c, const sym::VariableRefVector &x,
-          const sym::ParameterVector &p = {})
+          const sym::ParameterRefVector &p = {})
       : BindingBase(x, p) {
     c_ = c;
   }

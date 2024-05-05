@@ -16,8 +16,7 @@ void DecisionVariableManager::AddDecisionVariable(const sym::Variable &var) {
 }
 
 void DecisionVariableManager::AddDecisionVariables(
-    const Eigen::Ref<sym::VariableMatrix> &var) {
-  std::vector<sym::Variable> v;
+    const Eigen::Ref<const sym::VariableMatrix> &var) {
   // Append to our map
   for (int i = 0; i < var.rows(); ++i) {
     for (int j = 0; j < var.cols(); ++j) {
@@ -115,72 +114,86 @@ void DecisionVariableManager::ListDecisionVariables() {
   }
 }
 
-bool ParameterManager::IsParameter(const sym::Parameter &par) {
-  // Check if variable is already added to the program
-  return parameter_idx_.find(par.id()) != parameter_idx_.end();
-}
-
-Eigen::Ref<Eigen::MatrixXd> ParameterManager::AddParameter(
-    const sym::Parameter &p) {
-  // Check if parameter already exists
-  if (IsParameter(p)) {
-    throw std::runtime_error("Parameter " + p.name() +
-                             " already in the program!");
-  } else {
-    // Add parameter values
-    parameter_idx_[p.id()] = parameters_.size();
+void ParameterManager::AddParameter(const sym::Parameter &p) {
+  if (!IsParameter(p)) {
+    // Add to parameter vector
     parameters_.push_back(p);
-    parameter_vals_.push_back(Eigen::MatrixXd::Zero(p.rows(), p.cols()));
-    n_parameters_ += p.rows() * p.cols();
-    return parameter_vals_.back();
+    parameter_idx_[p.id()] = n_parameters_;
+    // Increase count of decision parameters
+    n_parameters_++;
+    parameter_vec_.conservativeResize(n_parameters_);
+  } else {
+    // Parameter already added to program!
+    std::cout << p << " is already added to program!\n";
   }
 }
 
-Eigen::Ref<const Eigen::MatrixXd> ParameterManager::GetParameterValues(
-    const sym::Parameter &p) {
-  auto it = parameter_idx_.find(p.id());
-  if (it == parameter_idx_.end()) {
-    throw std::runtime_error("Parameter " + p.name() +
-                             " is not in the program!");
-  } else {
-    return parameter_vals_[it->second];
+void ParameterManager::AddParameters(const sym::ParameterVector &par) {
+  // Append to our map
+  for (int i = 0; i < par.size(); ++i) {
+    AddParameter(par(i));
   }
 }
 
-void ParameterManager::SetParameterValues(
-    const sym::Parameter &p, Eigen::Ref<const Eigen::MatrixXd> val) {
-  auto it = parameter_idx_.find(p.id());
-  if (it == parameter_idx_.end()) {
-    throw std::runtime_error("Parameter " + p.name() +
-                             " is not in the program!");
-  } else {
-    assert(val.rows() == p.rows() && val.cols() == p.cols() &&
-           "Parameter dimension mismatch!");
-    parameter_vals_[it->second] = val;
+void ParameterManager::AddParameters(const sym::ParameterMatrix &par) {
+  for (int i = 0; i < par.rows(); ++i) {
+    for (int j = 0; j < par.cols(); ++j) {
+      AddParameter(par(i, j));
+    }
   }
 }
 
-void ParameterManager::RemoveParameters(const sym::Parameter &p) {
-  // Check if parameter exists
+bool ParameterManager::IsParameter(const sym::Parameter &par) {
+  // Check if parameter is already added to the program
+  return std::find(parameters_.begin(), parameters_.end(), par) !=
+         parameters_.end();
+}
+
+void ParameterManager::RemoveParameters(
+    const Eigen::Ref<sym::ParameterMatrix> &var) {
+  // TODO - Implement
+}
+
+int ParameterManager::GetParameterIndex(const sym::Parameter &p) {
   auto it = parameter_idx_.find(p.id());
-  if (it == parameter_idx_.end()) {
-    std::cout << "Parameter " << p.name() << " is not in the program!";
+  if (it != parameter_idx_.end()) {
+    return it->second;
   } else {
-    parameters_.erase(parameters_.begin() + it->second);
-    parameter_vals_.erase(parameter_vals_.begin() + it->second);
-    parameter_idx_.erase(p.id());
-    n_parameters_ -= p.rows() * p.cols();
+    std::cout << p << " is not a parameter within this program!\n";
+    return -1;
   }
+}
+
+bool ParameterManager::IsContinuousInParameterVector(
+    const sym::ParameterVector &par) {
+  VLOG(10) << "IsContinuousInParameterVector(), checking " << par;
+  // Determine the index of the first element within par
+  int idx = GetParameterIndex(par[0]);
+  // Move through parameter vector and see if each entry follows one
+  // after the other
+  for (int i = 1; i < par.size(); ++i) {
+    // If not, return false
+    int idx_next = GetParameterIndex(par[i]);
+
+    if (idx_next - idx != 1) {
+      VLOG(10) << "false";
+      return false;
+    }
+    idx = idx_next;
+  }
+  // Return true if all together in the vector
+  VLOG(10) << "true";
+  return true;
 }
 
 void ParameterManager::ListParameters() {
   std::cout << "----------------------\n";
-  std::cout << "Parameter\tCurrent Value\n";
+  std::cout << "parameter\n";
   std::cout << "----------------------\n";
-  for (const auto &p : parameters_) {
-    std::cout << p.name() << '\t' << parameter_vals_[parameter_idx_[p.id()]]
-              << '\n';
+  for (sym::Parameter &p : parameters_) {
+    std::cout << p << '\n';
   }
 }
+
 }  // namespace optimisation
 }  // namespace damotion

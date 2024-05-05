@@ -61,8 +61,8 @@ TEST(Program, CreateOptimisationVector) {
 TEST(Program, CreateParameters) {
   // Create codegen function
   opt::Program program;
-  sym::Parameter a("a", 2, 3);
-  program.AddParameter(a);
+  sym::ParameterMatrix a = sym::CreateParameterMatrix("a", 2, 3);
+  program.AddParameters(a);
 
   EXPECT_EQ(a.rows(), 2);
   EXPECT_EQ(a.cols(), 3);
@@ -70,12 +70,9 @@ TEST(Program, CreateParameters) {
   Eigen::MatrixXd b(2, 3);
   b.setRandom();
 
-  program.SetParameterValues(a, b);
+  program.GetParameterRef(a) = b;
 
-  EXPECT_TRUE(program.GetParameterValues(a).isApprox(b));
-
-  Eigen::MatrixXd c = program.GetParameterValues(a);
-  EXPECT_TRUE(c.isApprox(b));
+  EXPECT_TRUE(program.GetParameterRef(a).isApprox(b));
 }
 
 TEST(Program, AddLinearConstraint) {
@@ -103,8 +100,9 @@ TEST(Program, AddLinearConstraint) {
   program.AddLinearConstraint(con, {xy}, {});
   LOG(INFO) << "Added Linear Constraint";
 
-  sym::Parameter a("a", 2);
-  program.AddParameter(a);
+  sym::ParameterVector a = sym::CreateParameterVector("a", 2);
+  program.AddParameters(a);
+  Eigen::Map<Eigen::VectorXd> aref = program.GetParameterRef(a);
 
   LOG(INFO) << "Added Parameter";
 

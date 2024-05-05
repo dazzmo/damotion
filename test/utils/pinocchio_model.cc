@@ -149,7 +149,7 @@ TEST(PinocchioModelWrapper, EndEffector) {
 
   damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
 
-  auto tool0 = wrapper.AddEndEffector("tool0");
+  auto tool0 = wrapper.EndEffector("tool0")->CreateFrame();
 
   Eigen::VectorXd q = pinocchio::randomConfiguration(model);
   Eigen::VectorXd v = Eigen::VectorXd::Random(model.nv);
