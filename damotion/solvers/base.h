@@ -287,16 +287,19 @@ class SolverBase {
                                          bool is_continuous = false) {
     VLOG(8) << "InsertJacobianAtVariableLocations()";
     VLOG(10) << "res\n" << res;
-    VLOG(10) << "var\n" << var;
     VLOG(10) << "jac\n" << jac;
-    Eigen::Ref<Eigen::MatrixXd> J = res.middleCols(constraint_idx, jac.rows());
+    VLOG(10) << "var\n" << var;
+    VLOG(10) << "constraint index " << constraint_idx;
+    Eigen::Ref<Eigen::MatrixXd> J = res.middleRows(constraint_idx, jac.rows());
     if (is_continuous) {
       J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(var[0]),
                    var.size()) += jac;
     } else {
+      VLOG(10) << "Manual Insertion";
       // For each variable, update the location in the Jacobian
       for (int i = 0; i < var.size(); ++i) {
         int idx = GetCurrentProgram().GetDecisionVariableIndex(var[i]);
+        VLOG(10) << "i = " << i << " Index = " << idx;
         J.col(idx) += jac.col(i);
       }
     }

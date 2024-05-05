@@ -1,20 +1,20 @@
-#ifndef SOLVE_IPOPT_H
-#define SOLVE_IPOPT_H
+// #ifndef SOLVERS_IPOPT_H
+// #define SOLVERS_IPOPT_H
 
 // #include <coin-or/IpIpoptApplication.hpp>
 // #include <coin-or/IpTNLP.hpp>
 
-// #include "damotion/solvers/program.h"
-// #include "damotion/solvers/solver.h"
+// #include "damotion/optimisation/program.h"
+// #include "damotion/solvers/sparse.h"
 
 // namespace damotion {
 // namespace optimisation {
-
+// namespace solvers {
 // using namespace Ipopt;
 // using Ipopt::Index;
 // using Ipopt::Number;
 
-// class IpoptSolverInstance : public Ipopt::TNLP, SolverBase {
+// class IpoptSolverInstance : public Ipopt::TNLP, public SparseSolver {
 //    public:
 //     IpoptSolverInstance(Program& prog);
 
@@ -65,7 +65,8 @@
 //     Program& prog_;
 // };
 
-}  // namespace optimisation
-}  // namespace damotion
+// }
+// }  // namespace optimisation
+// }  // namespace damotion
 
-#endif /* SOLVE_IPOPT_H */
+// #endif/* SOLVERS_IPOPT_H */

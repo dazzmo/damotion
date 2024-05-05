@@ -20,7 +20,7 @@ class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
   // Evaluates the constraint and updates the cache for the gradients
   void EvaluateConstraint(const Binding<ConstraintType>& binding,
                           const int& constraint_idx, const Eigen::VectorXd& x,
-                          bool jac, bool update_cache = true);
+                          bool jac, bool hes, bool update_cache = true);
 
   void EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {}
 
@@ -31,9 +31,14 @@ class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
     return constraint_jacobian_cache_;
   }
 
+  const Eigen::SparseMatrix<double>& GetSparseLagrangianHessian() const {
+    return lagrangian_hes_cache_;
+  }
+
   void UpdateConstraintJacobian(const Binding<ConstraintType>& binding);
 
   void UpdateLagrangianHessian(const Binding<CostType>& binding);
+  void UpdateLagrangianHessian(const Binding<ConstraintType>& binding);
 
  protected:
   Eigen::SparseMatrix<double> constraint_jacobian_cache_;

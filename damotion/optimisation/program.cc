@@ -116,6 +116,7 @@ void DecisionVariableManager::ListDecisionVariables() {
 
 void ParameterManager::AddParameter(const sym::Parameter &p) {
   if (!IsParameter(p)) {
+    VLOG(10) << "Adding parameter " << p << " to the program";
     // Add to parameter vector
     parameters_.push_back(p);
     parameter_idx_[p.id()] = n_parameters_;
@@ -188,7 +189,7 @@ bool ParameterManager::IsContinuousInParameterVector(
 
 void ParameterManager::ListParameters() {
   std::cout << "----------------------\n";
-  std::cout << "parameter\n";
+  std::cout << "Parameter\n";
   std::cout << "----------------------\n";
   for (sym::Parameter &p : parameters_) {
     std::cout << p << '\n';

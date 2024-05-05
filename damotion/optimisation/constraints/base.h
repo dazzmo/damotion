@@ -146,7 +146,7 @@ class ConstraintBase {
    * @param p Vector of parameters
    */
   void eval_hessian(const common::InputRefVector &x, const Eigen::VectorXd &l,
-                    const common::InputRefVector &p) {
+                    const common::InputRefVector &p) const {
     // Create input for the lambda-hessian product
     common::InputRefVector in = {};
     for (const auto &xi : x) in.push_back(xi);

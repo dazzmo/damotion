@@ -134,13 +134,13 @@ class QPOASESSolverInstance : public Solver {
                           Eigen::RowMajor>
         RowMajorMatrixXd;
 
-    // ! See about effects of copying
     RowMajorMatrixXd H =
         Eigen::Map<RowMajorMatrixXd>(H_.data(), H_.rows(), H_.cols());
     RowMajorMatrixXd A = Eigen::Map<RowMajorMatrixXd>(
         constraint_jacobian_cache_.data(), constraint_jacobian_cache_.rows(),
         constraint_jacobian_cache_.cols());
-    // Show the problem coeffcients
+
+    // Show the problem coefficients
     VLOG(10) << "H = " << H;
     VLOG(10) << "g = " << g_;
     VLOG(10) << "A = " << A;

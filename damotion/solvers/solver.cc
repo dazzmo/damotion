@@ -55,6 +55,7 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
   VLOG(10) << "constraint_cache = " << constraint_cache_;
 
   UpdateConstraintJacobian(binding, constraint_idx);
+  VLOG(10) << "jacobian_cache = " << constraint_jacobian_cache_;
 }
 
 void Solver::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {

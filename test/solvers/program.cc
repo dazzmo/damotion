@@ -61,13 +61,13 @@ TEST(Program, CreateOptimisationVector) {
 TEST(Program, CreateParameters) {
   // Create codegen function
   opt::Program program;
-  sym::ParameterMatrix a = sym::CreateParameterMatrix("a", 2, 3);
+  sym::ParameterVector a = sym::CreateParameterVector("a", 2);
   program.AddParameters(a);
 
   EXPECT_EQ(a.rows(), 2);
-  EXPECT_EQ(a.cols(), 3);
+  EXPECT_EQ(a.cols(), 1);
 
-  Eigen::MatrixXd b(2, 3);
+  Eigen::VectorXd b(2);
   b.setRandom();
 
   program.GetParameterRef(a) = b;

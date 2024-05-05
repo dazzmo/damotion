@@ -173,14 +173,17 @@ void SparseSolver::EvaluateCost(const Binding<CostType>& binding,
 void SparseSolver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                                       const int& constraint_idx,
                                       const Eigen::VectorXd& x, bool jac,
-                                      bool update_cache) {
+                                      bool hes, bool update_cache) {
   common::InputRefVector x_in = {}, p_in = {};
   GetBindingInputs(binding, x_in, p_in);
 
   const ConstraintType& constraint = binding.Get();
   // Evaluate the constraint
   constraint.eval(x_in, p_in, jac);
-  // if(hes) constraint.eval_hessian(x_in, p_in, l_in)
+  // Get dual multipliers for the constraint
+  Eigen::Map<Eigen::VectorXd> l(dual_variable_cache_.data() + constraint_idx,
+                                binding.Get().Dimension());
+  if (hes) constraint.eval_hessian(x_in, l, p_in);
 
   // Update the caches if required, otherwise break early
   if (update_cache == false) return;
@@ -203,6 +206,16 @@ void SparseSolver::UpdateConstraintJacobian(
 }
 
 void SparseSolver::UpdateLagrangianHessian(const Binding<CostType>& binding) {
+  // For each Jacobian, update the data within the constraint Jacobian
+  for (int k = 0; k < binding.Get().Hessian().nonZeros(); ++k) {
+    int idx = lagrangian_hes_data_map_[binding.id()][k];
+    lagrangian_hes_cache_.valuePtr()[idx] +=
+        binding.Get().Hessian().valuePtr()[k];
+  }
+}
+
+void SparseSolver::UpdateLagrangianHessian(
+    const Binding<ConstraintType>& binding) {
   // For each Jacobian, update the data within the constraint Jacobian
   for (int k = 0; k < binding.Get().Hessian().nonZeros(); ++k) {
     int idx = lagrangian_hes_data_map_[binding.id()][k];

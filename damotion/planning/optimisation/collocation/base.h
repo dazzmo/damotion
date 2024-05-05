@@ -4,6 +4,7 @@
 #include <casadi/casadi.hpp>
 
 #include "damotion/optimisation/constraints/base.h"
+#include "damotion/symbolic/expression.h"
 
 namespace damotion {
 namespace planning {
@@ -11,17 +12,30 @@ namespace optimisation {
 
 class CollocationConstraintBase {
  public:
+  CollocationConstraintBase() = default;
+  ~CollocationConstraintBase() = default;
+
   // CollocationConstraintBase(const &model)
-  // virtual std::shared_ptr<Constraint> CollocationConstraint();
+  template <typename MatrixType>
+  std::shared_ptr<damotion::optimisation::ConstraintBase<MatrixType>>
+  GetConstraint() {
+    auto c = std::make_shared<ConstraintBase<MatrixType>>(
+        "collocation", con_, damotion::optimisation::BoundsType::kEquality,
+        true, true);
+    return c;
+  }
+
+ protected:
+  symbolic::Expression &GetConstraintExpression() { return con_; }
+
  private:
   int nx_ = 0;
   int nu_ = 0;
 
-  // Function for dynamics
-  void f() {}
+  symbolic::Expression con_;
 };
 
-class TrapezoidalCollocationConstraint {
+class TrapezoidalCollocationConstraint : public CollocationConstraintBase {
  public:
   TrapezoidalCollocationConstraint(int nx, int ndx, int nu, const casadi::SX &f,
                                    const casadi::SX &x, const casadi::SX &u) {
@@ -34,11 +48,10 @@ class TrapezoidalCollocationConstraint {
     casadi::SX h = casadi::SX::sym("h", 1);
 
     // Integrate over interval to provide collocation constraint
-    casadi::SX c = x1 - x0 - 0.5 * h * (f0 + f1);
-
-    // Create constraint to be bound to
+    GetConstraintExpression() = x1 - x0 - 0.5 * h * (f0 + f1);
+    GetConstraintExpression().SetInputs({x0, x1, u0, u1}, {});
   }
-  // std::shared_ptr<Constraint> GetConstraint();
+
  private:
 };
 
