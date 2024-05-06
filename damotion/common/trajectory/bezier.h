@@ -3,9 +3,9 @@
 
 #include <memory>
 
-#include "common/math/binomial.h"
-#include "common/math/random.h"
-#include "common/trajectory/trajectory.h"
+#include "damotion/common/math/binomial.h"
+#include "damotion/common/math/random.h"
+#include "damotion/common/trajectory/trajectory.h"
 
 namespace damotion {
 namespace trajectory {

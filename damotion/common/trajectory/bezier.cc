@@ -1,4 +1,4 @@
-#include "common/trajectory/bezier.h"
+#include "damotion/common/trajectory/bezier.h"
 
 namespace damotion {
 namespace trajectory {

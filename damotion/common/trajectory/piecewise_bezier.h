@@ -1,7 +1,7 @@
 #ifndef PIECEWISE_BEZIER_H
 #define PIECEWISE_BEZIER_H
 
-#include "common/trajectory/bezier.h"
+#include "damotion/common/trajectory/bezier.h"
 
 namespace damotion {
 namespace trajectory {

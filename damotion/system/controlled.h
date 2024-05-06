@@ -1,8 +1,8 @@
 #ifndef SYSTEM_CONTROLLED_H
 #define SYSTEM_CONTROLLED_H
 
-#include "system/system.h"
-#include "utils/pinocchio_model.h"
+#include "damotion/system/system.h"
+#include "damotion/utils/pinocchio_model.h"
 
 namespace damotion {
 

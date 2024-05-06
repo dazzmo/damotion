@@ -1,4 +1,4 @@
-#include "common/trajectory/trajectory.h"
+#include "damotion/common/trajectory/trajectory.h"
 
 namespace damotion {
 namespace trajectory {

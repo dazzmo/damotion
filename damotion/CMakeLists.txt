@@ -4,7 +4,7 @@ find_package(Eigen3 3.3 REQUIRED)
 find_package(glog REQUIRED)
 find_package(pinocchio REQUIRED)
 
-option(USE_QPOASES "Build using qpOASES" ON)
+option(WITH_QPOASES "Build using qpOASES" ON)
 
 
 # Collect source files
@@ -37,13 +37,12 @@ casadi
 glog
 )
 
-if(USE_QPOASES)
-  message(STATUS "Using qpOASES as numeric optimization solver")
-
+if(WITH_QPOASES)
+  message(STATUS "Adding qpOASES as a numeric optimisation solver")
   find_package(qpOASES REQUIRED)
   list(APPEND ${PROJECT_NAME}_LIBRARIES qpOASES)
   list(APPEND ${PROJECT_NAME}_SOURCES solvers/solve_qpoases.cc)
-endif(USE_QPOASES)
+endif(WITH_QPOASES)
 
 
 # if(WITH_IPOPT)
@@ -57,14 +56,9 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${${PROJECT_NAME}_LIBRARIES})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
-message("CMAKE_CURRENT_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}")
-
-# Jesse: not actually sure what it does, since we dont have a include folder do we need the INSTALL_INTERFACE
-# dont know about the build interface
 target_include_directories(${PROJECT_NAME}
   PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"
-    "$<INSTALL_INTERFACE:include>"
+    "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-unused-parameter -pipe)
