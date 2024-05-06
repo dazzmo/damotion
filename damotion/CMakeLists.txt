@@ -5,12 +5,12 @@ find_package(glog REQUIRED)
 find_package(pinocchio REQUIRED)
 
 option(WITH_QPOASES "Build with qpOASES functionality" ON)
+option(WITH_IPOPT "Build with IPOPT functionality" ON)
 
 # Collect source files
 SET(${PROJECT_NAME}_SOURCES
 solvers/sparse.cc
 solvers/solver.cc
-solvers/ipopt.cc
 utils/eigen_wrapper.cc
 utils/log.cc
 utils/codegen.cc
@@ -41,17 +41,18 @@ glog
 )
 
 if(WITH_QPOASES)
-  message(STATUS "Using qpOASES as numeric optimization solver")
+  message(STATUS "Including qpOASES as numeric optimization solver")
   find_package(qpOASES REQUIRED)
   list(APPEND ${PROJECT_NAME}_LIBRARIES qpOASES)
   add_compile_definitions(WITH_QPOASES)
 endif(WITH_QPOASES)
 
-# if(WITH_IPOPT)
-# list(APPEND ${PROJECT_NAME}_LIBRARIES ipopt)
-# list(APPEND ${PROJECT_NAME}_SOURCES solvers/solve_ipopt.cc)
-# list(APPEND ${PROJECT_NAME}_HEADERS solvers/solve_ipopt.h)
-# endif(WITH_IPOPT)
+if(WITH_IPOPT)
+  message(STATUS "Including IPOPT as numeric optimization solver")
+  list(APPEND ${PROJECT_NAME}_LIBRARIES ipopt)
+  list(APPEND ${PROJECT_NAME}_SOURCES solvers/ipopt.cc)
+  add_compile_definitions(WITH_IPOPT)
+endif(WITH_IPOPT)
 
 add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_SOURCES})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${${PROJECT_NAME}_LIBRARIES})

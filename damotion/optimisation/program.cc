@@ -6,7 +6,9 @@ namespace optimisation {
 void DecisionVariableManager::AddDecisionVariable(const sym::Variable &var) {
   if (!IsDecisionVariable(var)) {
     // Add to variable vector
+    decision_variable_vec_idx_[var.id()] = decision_variables_.size();
     decision_variables_.push_back(var);
+    decision_variables_data_.push_back(DecisionVariableData());
     // Increase count of decision variables
     n_decision_variables_++;
   } else {
@@ -103,6 +105,49 @@ bool DecisionVariableManager::IsContinuousInDecisionVariableVector(
   // Return true if all together in the vector
   VLOG(10) << "true";
   return true;
+}
+
+void DecisionVariableManager::SetDecisionVariableBounds(const sym::Variable &v,
+                                                        const double &bl,
+                                                        const double &bu) {
+  auto it = decision_variable_vec_idx_.find(v.id());
+  if (it != decision_variable_vec_idx_.end()) {
+  } else {
+    std::cout << v << " is not a variable within this program!\n";
+    return;
+  }
+  DecisionVariableData &data = decision_variables_data_[it->second];
+  data.bl = bl;
+  data.bu = bu;
+  data.bounds_updated = true;
+}
+
+void DecisionVariableManager::SetDecisionVariableBounds(
+    const sym::VariableVector &v, const Eigen::VectorXd &bl,
+    const Eigen::VectorXd &bu) {
+  for (size_t i = 0; i < v.size(); ++i) {
+    SetDecisionVariableBounds(v[i], bl[i], bu[i]);
+  }
+}
+
+void DecisionVariableManager::SetDecisionVariableInitialvalue(
+    const sym::Variable &v, const double &x0) {
+  auto it = decision_variable_vec_idx_.find(v.id());
+  if (it != decision_variable_vec_idx_.end()) {
+  } else {
+    std::cout << v << " is not a variable within this program!\n";
+    return;
+  }
+  DecisionVariableData &data = decision_variables_data_[it->second];
+  data.x0 = x0;
+  data.initial_value_updated = true;
+}
+
+void DecisionVariableManager::SetDecisionVariableInitialvalue(
+    const sym::VariableVector &v, const Eigen::VectorXd &x0) {
+  for (size_t i = 0; i < v.size(); ++i) {
+    SetDecisionVariableInitialvalue(v[i], x0[i]);
+  }
 }
 
 void DecisionVariableManager::ListDecisionVariables() {

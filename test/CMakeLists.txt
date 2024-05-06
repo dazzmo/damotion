@@ -20,6 +20,7 @@ common/profiler.cc
 control/osc.cc
 solvers/cost.cc
 solvers/program.cc
+solvers/ipopt.cc
 )
 
 include(GoogleTest)

@@ -106,6 +106,70 @@ class DecisionVariableManager {
   bool IsContinuousInDecisionVariableVector(const sym::VariableVector &var);
 
   /**
+   * @brief Updates the decision variable bound vectors with all the current
+   * values set for the decision variables.
+   *
+   */
+  void UpdateDecisionVariableBoundVectors() {
+    for (size_t i = 0; i < decision_variables_.size(); ++i) {
+      DecisionVariableData &data = decision_variables_data_[i];
+      if (data.bounds_updated) {
+        int idx = GetDecisionVariableIndex(decision_variables_[i]);
+        xbl_[idx] = data.bl;
+        xbu_[idx] = data.bu;
+      }
+    }
+  }
+
+  /**
+   * @brief Updates the initial value vector for the decision variables with all
+   * the current values set for the decision variables.
+   *
+   */
+  void UpdateInitialValueVector() {
+    for (size_t i = 0; i < decision_variables_.size(); ++i) {
+      DecisionVariableData &data = decision_variables_data_[i];
+      if (data.initial_value_updated) {
+        int idx = GetDecisionVariableIndex(decision_variables_[i]);
+        x0_[idx] = data.x0;
+      }
+    }
+  }
+
+  /**
+   * @brief Vector of initial values for the decision variables within the
+   * program.
+   *
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &DecisionVariableInitialValue() const { return x0_; }
+
+  /**
+   * @brief Upper bound for decision variables within the current program.
+   *
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &DecisionVariablesUpperBound() const { return xbu_; }
+
+  /**
+   * @brief Upper bound for decision variables within the current program.
+   *
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &DecisionVariablesLowerBound() const { return xbl_; }
+
+  void SetDecisionVariableBounds(const sym::Variable &v, const double &lb,
+                                 const double &ub);
+  void SetDecisionVariableBounds(const sym::VariableVector &v,
+                                 const Eigen::VectorXd &lb,
+                                 const Eigen::VectorXd &ub);
+
+  void SetDecisionVariableInitialvalue(const sym::Variable &v,
+                                       const double &x0);
+  void SetDecisionVariableInitialvalue(const sym::VariableVector &v,
+                                       const Eigen::VectorXd &x0);
+
+  /**
    * @brief Prints the current set of parameters for the program to the
    * screen
    *
@@ -116,8 +180,29 @@ class DecisionVariableManager {
   // Number of decision variables
   int n_decision_variables_;
 
+  // Decision variable upper bounds
+  Eigen::VectorXd xbu_;
+  // Decision variable lower bounds
+  Eigen::VectorXd xbl_;
+  // Initial values for decision variables
+  Eigen::VectorXd x0_;
+
+  // Location of each decision variable within the optimisation vector
   std::unordered_map<sym::Variable::Id, int> decision_variable_idx_;
+  // Index locations for data related to each variable
+  std::unordered_map<sym::Variable::Id, int> decision_variable_vec_idx_;
+  // Vector of all decision variables used
   std::vector<sym::Variable> decision_variables_;
+
+  struct DecisionVariableData {
+    bool bounds_updated = false;
+    bool initial_value_updated = false;
+    double bl = -std::numeric_limits<double>::infinity();
+    double bu = std::numeric_limits<double>::infinity();
+    double x0 = 0.0;
+  };
+
+  std::vector<DecisionVariableData> decision_variables_data_;
 };
 
 /**
