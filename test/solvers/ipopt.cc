@@ -60,7 +60,8 @@ TEST(IpoptTest, IpoptSolverCreation) {
 
   program.PrintProgramSummary();
 
-  opt::solvers::IpoptSolverInstance solver(program);
+  opt::solvers::IpoptSolver solver(program);
+  solver.solve();
 
   // Create dummy optimisation variable
   Eigen::VectorXd xopt(10);

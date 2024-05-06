@@ -11,6 +11,9 @@ void DecisionVariableManager::AddDecisionVariable(const sym::Variable &var) {
     decision_variables_data_.push_back(DecisionVariableData());
     // Increase count of decision variables
     n_decision_variables_++;
+    xbl_.conservativeResize(n_decision_variables_);
+    xbu_.conservativeResize(n_decision_variables_);
+    x0_.conservativeResize(n_decision_variables_);
   } else {
     // Variable already added to program!
     std::cout << var << " is already added to program!\n";

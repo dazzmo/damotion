@@ -15,14 +15,14 @@ class SparseSolver : public SolverBase<Eigen::SparseMatrix<double>> {
   void EvaluateCost(const Binding<CostType>& binding, const Eigen::VectorXd& x,
                     bool grd, bool hes, bool update_cache = true);
 
-  void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes) {}
+  void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes);
 
   // Evaluates the constraint and updates the cache for the gradients
   void EvaluateConstraint(const Binding<ConstraintType>& binding,
                           const int& constraint_idx, const Eigen::VectorXd& x,
                           bool jac, bool hes, bool update_cache = true);
 
-  void EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {}
+  void EvaluateConstraints(const Eigen::VectorXd& x, bool jac, bool hes);
 
   void ConstructSparseConstraintJacobian();
   void ConstructSparseLagrangianHessian(bool with_constraints = true);

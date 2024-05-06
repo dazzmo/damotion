@@ -171,6 +171,19 @@ void SparseSolver::EvaluateCost(const Binding<CostType>& binding,
   if (hes) UpdateLagrangianHessian(binding);
 }
 
+void SparseSolver::EvaluateCosts(const Eigen::VectorXd& x, bool grad,
+                                 bool hes) {
+  // Reset terms
+  objective_cache_ = 0.0;
+  if (grad) objective_gradient_cache_.setZero();
+  if (hes) lagrangian_hes_cache_.setZero();
+
+  // Evaluate all costs in the program
+  for (Binding<CostType>& b : GetCosts()) {
+    EvaluateCost(b, x, grad, hes);
+  }
+}
+
 void SparseSolver::EvaluateConstraint(const Binding<ConstraintType>& binding,
                                       const int& constraint_idx,
                                       const Eigen::VectorXd& x, bool jac,
@@ -197,6 +210,20 @@ void SparseSolver::EvaluateConstraint(const Binding<ConstraintType>& binding,
   VLOG(10) << "constraint_cache = " << constraint_cache_;
 
   UpdateConstraintJacobian(binding);
+}
+
+void SparseSolver::EvaluateConstraints(const Eigen::VectorXd& x, bool jac,
+                                       bool hes) {
+  // Reset constraint vector
+  constraint_cache_.setZero();
+  // Reset objective gradient
+  if (jac) {
+    constraint_jacobian_cache_.setZero();
+  }
+  // Loop through all constraints
+  for (Binding<ConstraintType>& b : GetConstraints()) {
+    EvaluateConstraint(b, 0, x, jac, hes);
+  }
 }
 
 void SparseSolver::UpdateConstraintJacobian(

@@ -4,6 +4,7 @@
 #include <coin-or/IpIpoptApplication.hpp>
 #include <coin-or/IpTNLP.hpp>
 
+#include "damotion/common/logging.h"
 #include "damotion/optimisation/program.h"
 #include "damotion/solvers/sparse.h"
 

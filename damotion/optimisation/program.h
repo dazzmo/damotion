@@ -142,21 +142,21 @@ class DecisionVariableManager {
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &DecisionVariableInitialValue() const { return x0_; }
+  const Eigen::VectorXd &DecisionVariableInitialValues() const { return x0_; }
 
   /**
    * @brief Upper bound for decision variables within the current program.
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &DecisionVariablesUpperBound() const { return xbu_; }
+  const Eigen::VectorXd &DecisionVariableUpperBounds() const { return xbu_; }
 
   /**
    * @brief Upper bound for decision variables within the current program.
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &DecisionVariablesLowerBound() const { return xbl_; }
+  const Eigen::VectorXd &DecisionVariableLowerBounds() const { return xbl_; }
 
   void SetDecisionVariableBounds(const sym::Variable &v, const double &lb,
                                  const double &ub);
@@ -532,6 +532,21 @@ class ConstraintManager {
     }
   }
 
+  void UpdateConstraintBoundVectors() {
+    lbg_.resize(n_constraints_);
+    ubg_.resize(n_constraints_);
+    // Set first-in-first out order
+    int idx = 0;
+    for (Binding<ConstraintBase<MatrixType>> &b : GetAllConstraintBindings()) {
+      lbg_.middleRows(idx, b.Get().Dimension()) = b.Get().LowerBound();
+      ubg_.middleRows(idx, b.Get().Dimension()) = b.Get().UpperBound();
+      idx += b.Get().Dimension();
+    }
+  }
+
+  const Eigen::VectorXd &ConstraintLowerBounds() { return lbg_; }
+  const Eigen::VectorXd &ConstraintUpperBounds() { return ubg_; }
+
  private:
   // Number of constraints
   int n_constraints_;
@@ -540,6 +555,11 @@ class ConstraintManager {
   std::vector<Binding<LinearConstraint<MatrixType>>> linear_constraints_;
   std::vector<Binding<BoundingBoxConstraint<MatrixType>>>
       bounding_box_constraints_;
+
+  // Constraint vector lower bound
+  Eigen::VectorXd lbg_;
+  // Constraint vector upper bound
+  Eigen::VectorXd ubg_;
 };
 
 /**
@@ -576,9 +596,6 @@ class ProgramBase : public DecisionVariableManager,
    */
   const Eigen::VectorXd &DecisionVariableVector() const { return x_; }
 
-  Eigen::VectorXd &ConstraintsLowerBound() { return lbg_; }
-  Eigen::VectorXd &ConstraintsUpperBound() { return ubg_; }
-
   /**
    * @brief Prints a summary of the program, listing number of variables,
    * parameters, constraints and costs
@@ -604,11 +621,6 @@ class ProgramBase : public DecisionVariableManager,
  private:
   // Program name
   std::string name_;
-
-  // Constrain vector lower bound
-  Eigen::VectorXd lbg_;
-  // Constrain vector upper bound
-  Eigen::VectorXd ubg_;
 
   // Optimisation vector
   Eigen::VectorXd x_;
