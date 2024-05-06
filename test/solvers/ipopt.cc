@@ -41,8 +41,8 @@ TEST(IpoptTest, IpoptSolverCreation) {
 
   program.AddDecisionVariables(x);
 
-  auto binding1 = program.AddLinearConstraint(con1, {x}, {});
-  auto binding2 = program.AddLinearConstraint(con2, {xcon2}, {});
+  program.AddLinearConstraint(con1, {x}, {});
+  program.AddLinearConstraint(con2, {xcon2}, {});
 
   casadi::SX xx = casadi::SX::sym("x", 10);
   sym::Expression J = dot(xx, xx) + xx(0) + xx(0) * xx(2);

@@ -33,6 +33,8 @@ bool IpoptSolverInstance::eval_f(Index n, const Number* x, bool new_x,
   EvaluateCosts(decision_variable_cache_, false, false);
   // Set objective to most recently cached value
   obj_value = objective_cache_;
+  VLOG(10) << "x : " << decision_variable_cache_.transpose();
+  VLOG(10) << "f : " << obj_value;
   return true;
 }
 
@@ -48,6 +50,8 @@ bool IpoptSolverInstance::eval_grad_f(Index n, const Number* x, bool new_x,
   EvaluateCosts(decision_variable_cache_, true, false);
   // TODO - See about mapping these
   std::copy_n(objective_gradient_cache_.data(), n, grad_f);
+  VLOG(10) << "x : " << decision_variable_cache_.transpose();
+  VLOG(10) << "grad f : " << objective_gradient_cache_.transpose();
   return true;
 }
 
@@ -60,6 +64,8 @@ bool IpoptSolverInstance::eval_g(Index n, const Number* x, bool new_x, Index m,
   }
   // Update caches
   EvaluateConstraints(decision_variable_cache_, false, false);
+  VLOG(10) << "x : " << decision_variable_cache_.transpose();
+  VLOG(10) << "c : " << constraint_cache_.transpose();
   std::copy_n(constraint_cache_.data(), m, g);
   return true;
 };
@@ -91,6 +97,8 @@ bool IpoptSolverInstance::eval_jac_g(Index n, const Number* x, bool new_x,
     }
     // Update caches
     EvaluateConstraints(decision_variable_cache_, true, false);
+    VLOG(10) << "x : " << decision_variable_cache_.transpose();
+    VLOG(10) << "jac : " << constraint_jacobian_cache_;
     std::copy_n(constraint_jacobian_cache_.valuePtr(), nele_jac, values);
   }
   return true;
@@ -187,6 +195,9 @@ void IpoptSolverInstance::finalize_solution(
     Number obj_value, const IpoptData* ip_data,
     IpoptCalculatedQuantities* ip_cq) {
   VLOG(10) << "finalize_solution()";
+  for (Index i = 0; i < n; ++i) {
+    VLOG(10) << x[i];
+  }
 }
 
 int IpoptSolver::solve() {
@@ -213,18 +224,10 @@ int IpoptSolver::solve() {
   status = app->OptimizeTNLP(nlp);
 
   if (status == Solve_Succeeded) {
-    std::cout << std::endl
-              << std::endl
-              << "*** The problem solved!" << std::endl;
+    std::cout << "*** The problem solved!" << std::endl;
   } else {
-    std::cout << std::endl
-              << std::endl
-              << "*** The problem FAILED!" << std::endl;
+    std::cout << "*** The problem FAILED!" << std::endl;
   }
-
-  // As the SmartPtrs go out of scope, the reference count
-  // will be decremented and the objects will automatically
-  // be deleted.
 
   return (int)status;
 }

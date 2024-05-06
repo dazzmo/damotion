@@ -179,7 +179,7 @@ class ConstraintBase {
    * @param j
    * @return const MatrixType&
    */
-  const MatrixType &Hessian() const { return hes_->getOutput(0); }
+  virtual const MatrixType &Hessian() const { return hes_->getOutput(0); }
 
   /**
    * @brief Set the Bounds type for the constraint.

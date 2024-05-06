@@ -79,6 +79,14 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
   const MatrixType &Jacobian() const override { return fA_->getOutput(0); }
 
   /**
+   * @brief The Hessian of the constraint (the zero matrix for linear
+   * constraints)
+   *
+   * @return const MatrixType&
+   */
+  const MatrixType &Hessian() const override { return hes_; }
+
+  /**
    * @brief The coefficient matrix A for the expression A x + b.
    *
    * @return const MatrixType&
@@ -129,6 +137,7 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
 
   // Contraint vector (c = Ax + b)
   mutable Eigen::VectorXd c_;
+  mutable MatrixType hes_;
 
   void ConstructConstraint(const casadi::SX &A, const casadi::SX &b,
                            const casadi::SXVector &p, const BoundsType &bounds,
@@ -149,12 +158,14 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
       in.push_back(pi);
     }
 
+    hes_.resize(b.rows(), b.rows());
     if (std::is_same<MatrixType, Eigen::SparseMatrix<double>>::value) {
       fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
           casadi::Function(this->name() + "_A", in, {A}));
     } else {
       fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
           casadi::Function(this->name() + "_A", in, {densify(A)}));
+      hes_.setZero();
     }
 
     fb_ = std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
