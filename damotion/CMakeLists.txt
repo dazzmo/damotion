@@ -19,6 +19,7 @@ optimisation/program.cc
 optimisation/bounds.cc
 common/function.cc
 common/math/binomial.cc
+common/math/quaternion.cc
 common/trajectory/bezier.cc
 common/trajectory/trajectory.cc
 common/sparsity.cc

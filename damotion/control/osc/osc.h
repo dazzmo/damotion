@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 
+#include "damotion/common/math/quaternion.h"
 #include "damotion/common/profiler.h"
 #include "damotion/control/osc/tasks/contact.h"
 #include "damotion/control/osc/tasks/motion.h"
@@ -30,20 +31,13 @@ typedef model::TargetFrame TargetFrame;
 std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>>
 LinearisedFrictionConstraint();
 
-// TODO - Place this in a utility
-Eigen::Quaternion<double> RPYToQuaterion(const double roll, const double pitch,
-                                         const double yaw);
-
 /**
  * @brief Basic implementation of an Operational Space Controller for a system
  * with state (qpos, qvel, qacc) that undergoes contact as well as performing
- * motion tasks. For anything more sophisticated such as including other
- * parameters or objectives, this controller can be modified explicitly by
- * accessing its underlying program through GetProgram(). If that is not enough,
- * we encourage creating a custom controller using the Program class.
+ * motion tasks.
  *
  */
-class OSC {
+class OSC : public opt::ProgramBase<Eigen::MatrixXd> {
  public:
   OSC() = default;
   ~OSC() = default;
@@ -82,51 +76,26 @@ class OSC {
                               const casadi::SX &dcdt, const casadi::SX &d2cdt2);
 
   /**
-   * @brief Sets the unconstrained inverse dynamics for the OSC program. Note
-   * that this must be called before adding any other tasks so that constraint
-   * forces can be added to this expression.
+   * @brief Returns the collective joint-space forces created by the
+   * equality-constraints currently within the program.
    *
-   * @param dynamics
+   * @return const casadi::SX
    */
-  void AddUnconstrainedInverseDynamics(const casadi::SX &dynamics) {
-    // Initialise expression
-    constrained_dynamics_ = dynamics;
+  casadi::SX GetJointSpaceConstraintForces() {
+    return joint_space_constraint_forces_;
   }
 
   /**
-   * @brief Creates the program after adding all necessary tasks, constraints
-   * and objectives
+   * @brief Update the program given changes to the configuration and velocity
+   * of the system.
    *
+   * @param qpos
+   * @param qvel
    */
-  void CreateProgram() {
-    // Create linear constraint for the constrained dynamics
-    casadi::SX A, b;
-    // TODO Create single vector
-    casadi::SX x_dyn = casadi::SX::vertcat(constrained_dynamics_.Variables());
-    casadi::SX::linear_coeff(constrained_dynamics_, x_dyn, A, b, true);
-    auto con = std::make_shared<opt::LinearConstraint<Eigen::MatrixXd>>(
-        "dynamics", A, b, constrained_dynamics_.Parameters(),
-        opt::BoundsType::kEquality);
-    // Add constraint to program
-    program_.AddLinearConstraint(con, {qacc_, ctrl_}, {qpos_, qvel_});
-
-    // Construct the decision variable vector  [qacc, ctrl, lambda]
-    sym::VariableVector x(program_.NumberOfDecisionVariables());
-    // Set it as qacc, ctrl, constraint forces
-    x.topRows(nv_ + nu_) << qacc_, ctrl_;
-    // Add any constraint forces
-    int idx = nv_ + nu_;
-    for (size_t i = 0; i < lambda_.size(); ++i) {
-      x.middleRows(idx, lambda_[i].size()) = lambda_[i];
-      idx += lambda_[i].size();
-    }
-    program_.SetDecisionVariableVector(x);
-  }
-
   void Update(const Eigen::VectorXd &qpos, const Eigen::VectorXd &qvel) {
     // TODO Store these references
-    program_.GetParameterRef(qpos_) << qpos;
-    program_.GetParameterRef(qvel_) << qvel;
+    GetParameterRef(qpos_) << qpos;
+    GetParameterRef(qvel_) << qvel;
 
     // Update each task given the updated data and references
     for (size_t i = 0; i < motion_tasks_.size(); ++i) {
@@ -154,7 +123,7 @@ class OSC {
     if (task->inContact) {
       // Get parameters related to the contact task
       ContactTaskParameters &p = contact_task_parameters_[task_idx];
-      // Set in contact
+      // Update bounding box constraints
       contact_force_bounds_[task_idx].Get().SetBounds(task->fmin(),
                                                       task->fmax());
       p.mu << task->mu();
@@ -167,43 +136,49 @@ class OSC {
   }
 
   /**
-   * @brief Get the underlying program for the OSC. Allows you to add
-   * additional variables, parameters, costs, constraints that are not
-   * included in conventional OSC programs.
+   * @brief Set the Generalised Acceleration Variables object by providing
+   * symbolic and optimisation variables to the program.
    *
+   * @param var
+   * @param sym
    */
-  opt::Program &GetProgram() { return program_; }
-
-  // TODO - Set variables and parameter functions
   void SetGeneralisedAccelerationVariables(const sym::VariableVector &var,
                                            const casadi::SX &sym) {
     assert(var.size() == nv_ && sym.rows() == nv_ &&
            "Generalised acceleration vectors must be size nv");
     qacc_ = var;
     qacc_sx_ = sym;
-    program_.AddDecisionVariables(var);
+    AddDecisionVariables(var);
   }
   void SetControlVariables(const sym::VariableVector &var,
                            const casadi::SX &sym) {
-    assert(var.size() == nv_ && sym.rows() == nv_ &&
+    assert(var.size() == nu_ && sym.rows() == nu_ &&
            "Control vectors must be size nu");
     ctrl_ = var;
     ctrl_sx_ = sym;
-    program_.AddDecisionVariables(var);
+    AddDecisionVariables(var);
   }
 
   void AddContactForceVariables(const sym::VariableVector &var,
                                 const casadi::SX &sym) {
     lambda_.push_back(var);
     lambda_sx_.push_back(sym);
-    program_.AddDecisionVariables(var);
+    AddDecisionVariables(var);
   }
 
   void AddConstraintForceVariables(const sym::VariableVector &var,
                                    const casadi::SX &sym) {
     lambda_.push_back(var);
     lambda_sx_.push_back(sym);
-    program_.AddDecisionVariables(var);
+    AddDecisionVariables(var);
+  }
+
+  std::vector<sym::VariableVector> &ConstraintForceVariables() {
+    return lambda_;
+  }
+
+  std::vector<casadi::SX> &ConstraintForceVariablesSymbolic() {
+    return lambda_sx_;
   }
 
   void AddGeneralisedPositionParameters(const sym::ParameterVector &par,
@@ -211,7 +186,7 @@ class OSC {
     assert(par.size() == nq_ && sym.rows() == nq_ &&
            "Generalised position vectors must be size nq");
     qpos_sx_ = sym;
-    program_.AddParameters(par);
+    AddParameters(par);
   }
 
   void AddGeneralisedVelocityParameters(const sym::ParameterVector &par,
@@ -219,14 +194,14 @@ class OSC {
     assert(par.size() == nv_ && sym.rows() == nv_ &&
            "Generalised velocity vectors must be size nv");
     qvel_sx_ = sym;
-    program_.AddParameters(par);
+    AddParameters(par);
   }
 
   /* Optimisation optimisation variables */
 
   sym::VariableVector qacc_;
   sym::VariableVector ctrl_;
-  std::vector<sym::VariableVector> lambda_;
+  std::vector<sym::VariableVector> lambda_ = {};
 
   sym::ParameterVector qpos_;
   sym::ParameterVector qvel_;
@@ -272,6 +247,8 @@ class OSC {
     Eigen::Map<Eigen::VectorXd> normal;
   };
   std::vector<ContactTaskParameters> contact_task_parameters_;
+
+  // Bounding box constraints for contact forces
   std::vector<opt::Binding<opt::BoundingBoxConstraint<Eigen::MatrixXd>>>
       contact_force_bounds_;
 
@@ -279,10 +256,7 @@ class OSC {
   std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>> friction_cone_con_;
 
   // Constrained dynamics
-  sym::Expression constrained_dynamics_;
-
-  // Underlying program for the OSC
-  opt::Program program_;
+  casadi::SX joint_space_constraint_forces_;
 };
 
 }  // namespace osc
