@@ -51,7 +51,7 @@ class QuadraticCost : public CostBase<MatrixType> {
   }
 
   /**
-   * @brief Quadratic objective value
+   * @brief Objective value
    *
    * @return const double&
    */
