@@ -136,10 +136,11 @@ bool IpoptSolverInstance::eval_h(Index n, const Number* x, bool new_x,
           Eigen::Map<Eigen::VectorXd>(const_cast<double*>(lambda), m);
     }
     // Reset cache for hessian
-    lagrangian_hes_cache_.setZero();
+    lagrangian_hes_cache_ *= 0.0;
     // Update caches
     EvaluateCosts(decision_variable_cache_, false, true);
     EvaluateConstraints(decision_variable_cache_, false, true);
+    VLOG(10) << "hes\n" << lagrangian_hes_cache_;
     std::copy_n(lagrangian_hes_cache_.valuePtr(), nele_hess, values);
   }
 

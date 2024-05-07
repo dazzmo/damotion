@@ -117,6 +117,22 @@ class ConstraintBase {
   const int &Dimension() const { return dim_; }
 
   /**
+   * @brief If the constraint has a non-zero Jacobian
+   *
+   * @return true
+   * @return false
+   */
+  bool HasJacobian() const { return has_jac_; }
+
+  /**
+   * @brief If the constraint has a non-zero Hessian
+   *
+   * @return true
+   * @return false
+   */
+  bool HasHessian() const { return has_hes_; }
+
+  /**
    * @brief Evaluate the constraint with the current input variables and
    * parameters, indicating if jacobian and hessians are required
    *
@@ -294,7 +310,7 @@ class ConstraintBase {
    * @param f
    */
   void SetConstraintFunction(
-      const std::shared_ptr<common::Function<Eigen::VectorXd>> &f) {
+      const common::Function<Eigen::VectorXd>::SharedPtr &f) {
     con_ = f;
   }
 
@@ -304,7 +320,7 @@ class ConstraintBase {
    * @param f
    */
   void SetJacobianFunction(
-      const std::shared_ptr<common::Function<MatrixType>> &f) {
+      const typename common::Function<MatrixType>::SharedPtr &f) {
     jac_ = f;
     has_jac_ = true;
   }
@@ -315,10 +331,14 @@ class ConstraintBase {
    * @param f
    */
   void SetHessianFunction(
-      const std::shared_ptr<common::Function<MatrixType>> &f) {
+      const typename common::Function<MatrixType>::SharedPtr &f) {
     hes_ = f;
     has_hes_ = true;
   }
+
+  // Flags to indicate if constraint can compute derivatives
+  bool has_jac_ = false;
+  bool has_hes_ = false;
 
  private:
   // Dimension of the constraint
@@ -329,10 +349,6 @@ class ConstraintBase {
 
   // Name of the constraint
   std::string name_;
-
-  // Flags to indicate if constraint can compute derivatives
-  bool has_jac_ = false;
-  bool has_hes_ = false;
 
   BoundsType bounds_type_ = BoundsType::kUnbounded;
 

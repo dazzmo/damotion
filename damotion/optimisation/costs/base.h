@@ -69,17 +69,6 @@ class CostBase {
     }
   }
 
-  const std::shared_ptr<common::Function<double>> &ObjectiveFunction() const {
-    return obj_;
-  }
-  const std::shared_ptr<common::Function<Eigen::VectorXd>> &GradientFunction()
-      const {
-    return grd_;
-  }
-  const std::shared_ptr<common::Function<MatrixType>> &HessianFunction() const {
-    return hes_;
-  }
-
   /**
    * @brief Name of the cost
    *
@@ -88,7 +77,7 @@ class CostBase {
   const std::string &name() const { return name_; }
 
   /**
-   * @brief Whether the cost has a Gradient
+   * @brief Whether the cost has a non-zero gradient
    *
    * @return true
    * @return false
@@ -96,7 +85,7 @@ class CostBase {
   bool HasGradient() const { return has_grd_; }
 
   /**
-   * @brief Whether the cost has a Hessian
+   * @brief Whether the cost has a non-zero hessian
    *
    * @return true
    * @return false
@@ -129,8 +118,9 @@ class CostBase {
    * @param x
    * @param p
    */
-  void eval_hessian(const common::InputRefVector &x,
-                    const common::InputRefVector &p) {
+  virtual void eval_hessian(const common::InputRefVector &x,
+                            const common::InputRefVector &p) const {
+    VLOG(10) << this->name() << " eval_hessian()";
     // Create input for the lambda-hessian product
     common::InputRefVector in = {};
     for (const auto &xi : x) in.push_back(xi);
@@ -155,14 +145,14 @@ class CostBase {
    */
   virtual const Eigen::VectorXd &Gradient() const { return grd_->getOutput(0); }
   /**
-   * @brief Returns the Hessian block with respect to the variables.
+   * @brief Returns the Hessian with respect to the variables.
    * Please note that this formulation produces only the lower-triangular.
    *
    * @param i
    * @param j
    * @return const MatrixType&
    */
-  const MatrixType &Hessian() const { return hes_->getOutput(0); }
+  virtual const MatrixType &Hessian() const { return hes_->getOutput(0); }
 
   /**
    * @brief Number of parameters used to determine the constraint
@@ -203,10 +193,11 @@ class CostBase {
     has_hes_ = true;
   }
 
- private:
+  // Flags to indicate if cost can compute derivatives
   bool has_grd_ = false;
   bool has_hes_ = false;
 
+ private:
   // Number of variable inputs
   int nx_ = 0;
   // Number of parameter inputs
@@ -215,22 +206,11 @@ class CostBase {
   // Name of the cost
   std::string name_;
 
-  /**
-   * @brief Objective function
-   *
-   */
+  // Objective function
   common::Function<double>::SharedPtr obj_;
-
-  /**
-   * @brief Gradient function
-   *
-   */
+  // Gradient function of the objective
   common::Function<Eigen::VectorXd>::SharedPtr grd_;
-
-  /**
-   * @brief Hessian function
-   *
-   */
+  // Hessian funciton of the objective
   typename common::Function<MatrixType>::SharedPtr hes_;
 
   /**

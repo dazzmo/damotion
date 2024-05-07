@@ -1,5 +1,6 @@
 #ifndef COSTS_QUADRATIC_H
 #define COSTS_QUADRATIC_H
+#include <Eigen/Core>
 
 #include "damotion/optimisation/costs/base.h"
 
@@ -49,54 +50,79 @@ class QuadraticCost : public CostBase<MatrixType> {
     ConstructConstraint(A, b, c, ex.Parameters(), jac, hes);
   }
 
+  /**
+   * @brief Quadratic objective value
+   *
+   * @return const double&
+   */
+  const double &Objective() const override { return obj_; }
+
+  /**
+   * @brief The Gradient of the quadratic objective
+   *
+   * @param i
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &Gradient() const override { return grd_; }
+
+  /**
+   * @brief Hessian of the quadratic objective
+   *
+   * @return const MatrixType&
+   */
+  const MatrixType &Hessian() const { return hes_; }
+
+  /**
+   * @brief Lower triangle representation of the quadratic cost Hessian
+   *
+   * @return const MatrixType&
+   */
   const MatrixType &A() const { return fA_->getOutput(0); }
+
   const Eigen::VectorXd &b() const { return fb_->getOutput(0); }
+
   const double &c() const { return fc_->getOutput(0); }
+
+  /**
+   * @brief Evaluate the constraint and Jacobian (optional) given input
+   * variables x and parameters p.
+   *
+   * @param x
+   * @param p
+   * @param jac Flag for computing the Jacobian
+   */
+  void eval(const common::InputRefVector &x, const common::InputRefVector &p,
+            bool grd = true) const override {
+    VLOG(10) << this->name() << " eval()";
+    // Evaluate the coefficients
+    fA_->call(p);
+    fb_->call(p);
+    fc_->call(p);
+
+    // Evaluate the constraint
+    obj_ = x[0].dot(A().template selfadjointView<Eigen::Lower>() * x[0]) +
+           b().dot(x[0]) + c();
+    if (grd) {
+      grd_ = 2.0 * static_cast<Eigen::VectorXd>(
+                       A().template selfadjointView<Eigen::Lower>() * x[0]) +
+             b();
+    }
+  }
+
+  void eval_hessian(const common::InputRefVector &x,
+                    const common::InputRefVector &p) const override {
+    VLOG(10) << this->name() << " eval_hessian()";
+    hes_ = 2.0 * A();
+  }
 
  private:
   std::shared_ptr<common::Function<MatrixType>> fA_;
   std::shared_ptr<common::Function<Eigen::VectorXd>> fb_;
   std::shared_ptr<common::Function<double>> fc_;
 
-  /**
-   * @brief Compute the cost with use of A, b and c
-   *
-   * @param input
-   * @param out
-   */
-  void ObjectiveCallback(const common::InputRefVector &input,
-                         std::vector<double> &out) {
-    fA_->call(input);
-    fb_->call(input);
-    fc_->call(input);
-    out[0] = input[0].dot(fA_->getOutput(0) * input[0]) +
-             fb_->getOutput(0).dot(input[0]) + fc_->getOutput(0);
-  }
-
-  /**
-   * @brief Compute the gradient of the cost with A and b
-   *
-   * @param input
-   * @param out
-   */
-  void GradientCallback(const common::InputRefVector &input,
-                        std::vector<Eigen::VectorXd> &out) {
-    fA_->call(input);
-    fb_->call(input);
-    out[0] = 2.0 * fA_->getOutput(0) * input[0] + fb_->getOutput(0);
-  }
-
-  /**
-   * @brief Compute the hessian of the cost with A
-   *
-   * @param input
-   * @param out
-   */
-  void HessianCallback(const common::InputRefVector &input,
-                       std::vector<MatrixType> &out) {
-    fA_->call(input);
-    out[0] = 2.0 * fA_->getOutput(0);
-  }
+  mutable double obj_;
+  mutable Eigen::VectorXd grd_;
+  mutable MatrixType hes_;
 
   void ConstructConstraint(const casadi::SX &A, const casadi::SX &b,
                            const casadi::SX &c, const casadi::SXVector &p,
@@ -111,49 +137,25 @@ class QuadraticCost : public CostBase<MatrixType> {
     }
 
     // Create coefficient functions
+    casadi::SX A_lt = casadi::SX::tril(A);
     if (std::is_same<MatrixType, Eigen::SparseMatrix<double>>::value) {
       fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
-          casadi::Function(this->name() + "_A", in, {A}));
+          casadi::Function(this->name() + "_A", in, {A_lt}));
     } else {
       fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
-          casadi::Function(this->name() + "_A", in, {densify(A)}));
+          casadi::Function(this->name() + "_A", in, {densify(A_lt)}));
     }
     fb_ = std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
         casadi::Function(this->name() + "_b", in, {densify(b)}));
     fc_ = std::make_shared<utils::casadi::FunctionWrapper<double>>(
         casadi::Function(this->name() + "_c", in, {densify(c)}));
 
-    // Create callback functions
-    std::shared_ptr<common::CallbackFunction<double>> obj_cb =
-        std::make_shared<common::CallbackFunction<double>>(
-            in.size(), 1,
-            [this](const common::InputRefVector &in, std::vector<double> &out) {
-              this->ObjectiveCallback(in, out);
-            });
-    std::shared_ptr<common::CallbackFunction<Eigen::VectorXd>> grd_cb =
-        std::make_shared<common::CallbackFunction<Eigen::VectorXd>>(
-            in.size(), 1,
-            [this](const common::InputRefVector &in,
-                   std::vector<Eigen::VectorXd> &out) {
-              this->GradientCallback(in, out);
-            });
-    std::shared_ptr<common::CallbackFunction<MatrixType>> hes_cb =
-        std::make_shared<common::CallbackFunction<MatrixType>>(
-            in.size(), 1,
-            [this](const common::InputRefVector &in,
-                   std::vector<MatrixType> &out) {
-              this->HessianCallback(in, out);
-            });
+    // Set hessian structure
+    common::Sparsity sparsity(A_lt.sparsity());
+    hes_ = common::CreateSparseEigenMatrix(sparsity);
 
-    // Set output sizes for the callbacks
-    obj_cb->InitialiseOutput(0, common::Sparsity());
-    grd_cb->InitialiseOutput(0, common::Sparsity(b.size1(), b.size2()));
-    hes_cb->InitialiseOutput(0, common::Sparsity(A.sparsity()));
-
-    // Create functions through callbacks
-    this->SetObjectiveFunction(obj_cb);
-    this->SetGradientFunction(grd_cb);
-    this->SetHessianFunction(hes_cb);
+    this->has_grd_ = true;
+    this->has_hes_ = true;
   }
 };
 

@@ -17,7 +17,7 @@ void Solver::EvaluateCost(const Binding<CostType>& binding,
 
   if (update_cache == false) return;
 
-  objective_cache_ += cost.ObjectiveFunction()->getOutput(0);
+  objective_cache_ += cost.Objective();
   if (grd) UpdateCostGradient(binding);
   if (hes) UpdateLagrangianHessian(binding);
 }

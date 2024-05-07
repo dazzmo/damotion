@@ -29,9 +29,11 @@ class SolverBase {
     // Register all bindings
     for (auto& b : program.GetAllConstraintBindings()) {
       RegisterBinding(b);
+      constraint_base_bindings_.push_back(b);
     }
     for (auto& b : program.GetAllCostBindings()) {
       RegisterBinding(b);
+      cost_base_bindings_.push_back(b);
     }
   }
 
@@ -71,6 +73,26 @@ class SolverBase {
    * @return false
    */
   bool IsSolved() const { return is_solved_; }
+
+  /**
+   * @brief Returns a vector of bindings to CostBase<MatrixType> for each
+   * binding within the program.
+   *
+   * @return const std::vector<Binding<CostType>>&
+   */
+  const std::vector<Binding<CostType>>& GetCostBindings() const {
+    return cost_base_bindings_;
+  }
+
+  /**
+   * @brief Returns a vector of bindings to ConstraintBase<MatrixType> for each
+   * binding within the program.
+   *
+   * @return const std::vector<Binding<ConstraintType>>&
+   */
+  const std::vector<Binding<ConstraintType>>& GetConstraintBindings() const {
+    return constraint_base_bindings_;
+  }
 
   /**
    * @brief Returns a vector of the current values of the variables provided
@@ -323,11 +345,9 @@ class SolverBase {
                                         const sym::VariableVector& var_y,
                                         bool is_continuous_x = false,
                                         bool is_continuous_y = false) {
-    VLOG(10) << "InsertHessianAtVariableLocations()";
-    VLOG(10) << "res\n" << res;
-    VLOG(10) << "mat\n" << mat;
-    VLOG(10) << "var_x\n" << var_x;
-    VLOG(10) << "var_y\n" << var_y;
+    VLOG(10) << "InsertHessianAtVariableLocations()"
+             << "\nres" << res << "\nmat" << mat << "\nvar_x" << var_x
+             << "\nvar_y" << var_y;
     // For each variable combination
     if (is_continuous_x && is_continuous_y) {
       int x_idx = program_.GetDecisionVariableIndex(var_x[0]);
@@ -366,6 +386,8 @@ class SolverBase {
   // Provides data for each variable
   std::unordered_map<int, int> binding_idx_;
   std::vector<BindingInputData> data_ = {};
+  std::vector<Binding<CostType>> cost_base_bindings_ = {};
+  std::vector<Binding<ConstraintType>> constraint_base_bindings_ = {};
 
   /**
    * @brief Register a binding with the solver
@@ -418,6 +440,7 @@ class SolverBase {
     // Register data
     binding_idx_[binding.id()] = data_.size();
     data_.push_back(data);
+
     VLOG(10) << "Binding Data ID " << binding.id();
     VLOG(10) << "Binding Data at Index " << binding_idx_[binding.id()];
   }
