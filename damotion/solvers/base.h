@@ -146,6 +146,7 @@ class SolverBase {
     VLOG(10) << "UpdateCostGradient()";
     BindingInputData& data = GetBindingInputData(binding);
     int g_idx = 0;
+    VLOG(10) << "Binding gradient\n" << binding.Get().Gradient();
     for (int i = 0; i < binding.nx(); ++i) {
       const sym::VariableVector& xi = binding.x(i);
       // Get slice of the gradient vector

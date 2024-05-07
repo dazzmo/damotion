@@ -51,28 +51,6 @@ class QuadraticCost : public CostBase<MatrixType> {
   }
 
   /**
-   * @brief Objective value
-   *
-   * @return const double&
-   */
-  const double &Objective() const override { return obj_; }
-
-  /**
-   * @brief The Gradient of the quadratic objective
-   *
-   * @param i
-   * @return const Eigen::VectorXd&
-   */
-  const Eigen::VectorXd &Gradient() const override { return grd_; }
-
-  /**
-   * @brief Hessian of the quadratic objective
-   *
-   * @return const MatrixType&
-   */
-  const MatrixType &Hessian() const { return hes_; }
-
-  /**
    * @brief Lower triangle representation of the quadratic cost Hessian
    *
    * @return const MatrixType&
@@ -100,29 +78,26 @@ class QuadraticCost : public CostBase<MatrixType> {
     fc_->call(p);
 
     // Evaluate the constraint
-    obj_ = x[0].dot(A().template selfadjointView<Eigen::Lower>() * x[0]) +
-           b().dot(x[0]) + c();
+    this->obj_ = x[0].dot(A().template selfadjointView<Eigen::Lower>() * x[0]) +
+                 b().dot(x[0]) + c();
     if (grd) {
-      grd_ = 2.0 * static_cast<Eigen::VectorXd>(
-                       A().template selfadjointView<Eigen::Lower>() * x[0]) +
-             b();
+      this->grd_ =
+          2.0 * static_cast<Eigen::VectorXd>(
+                    A().template selfadjointView<Eigen::Lower>() * x[0]) +
+          b();
     }
   }
 
   void eval_hessian(const common::InputRefVector &x,
                     const common::InputRefVector &p) const override {
     VLOG(10) << this->name() << " eval_hessian()";
-    hes_ = 2.0 * A();
+    this->hes_ = 2.0 * A();
   }
 
  private:
   std::shared_ptr<common::Function<MatrixType>> fA_;
   std::shared_ptr<common::Function<Eigen::VectorXd>> fb_;
   std::shared_ptr<common::Function<double>> fc_;
-
-  mutable double obj_;
-  mutable Eigen::VectorXd grd_;
-  mutable MatrixType hes_;
 
   void ConstructConstraint(const casadi::SX &A, const casadi::SX &b,
                            const casadi::SX &c, const casadi::SXVector &p,
@@ -152,7 +127,9 @@ class QuadraticCost : public CostBase<MatrixType> {
 
     // Set hessian structure
     common::Sparsity sparsity(A_lt.sparsity());
-    hes_ = common::CreateSparseEigenMatrix(sparsity);
+
+    this->grd_ = Eigen::VectorXd::Zero(A.rows());
+    this->hes_ = common::CreateSparseEigenMatrix(sparsity);
 
     this->has_grd_ = true;
     this->has_hes_ = true;

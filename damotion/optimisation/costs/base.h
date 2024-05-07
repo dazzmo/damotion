@@ -57,6 +57,7 @@ class CostBase {
       SetGradientFunction(
           std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
               casadi::Function(name + "_grd", in, gradient(ex, x))));
+      grd_.resize(nx_);
     }
 
     // Hessian
@@ -66,6 +67,7 @@ class CostBase {
           std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
               casadi::Function(name + "_hes", in,
                                casadi::SX::tril(hessian(ex, x)))));
+      hes_.resize(nx_, nx_);
     }
   }
 
@@ -108,8 +110,8 @@ class CostBase {
     for (const auto &pi : p) in.push_back(pi);
 
     // Call necessary cost functions
-    this->obj_->call(in);
-    if (grd) this->grd_->call(in);
+    this->fobj_->call(in);
+    if (grd) this->fgrd_->call(in);
   }
 
   /**
@@ -127,7 +129,7 @@ class CostBase {
     for (const auto &pi : p) in.push_back(pi);
 
     // Call necessary constraint functions
-    this->hes_->call(in);
+    this->fhes_->call(in);
   }
 
   /**
@@ -135,7 +137,7 @@ class CostBase {
    *
    * @return const double&
    */
-  virtual const double &Objective() const { return obj_->getOutput(0); }
+  const double &Objective() const { return obj_; }
   /**
    * @brief The gradient of the cost with respect to the i-th variable
    * vector
@@ -143,7 +145,10 @@ class CostBase {
    * @param i
    * @return const VectorXd&
    */
-  virtual const Eigen::VectorXd &Gradient() const { return grd_->getOutput(0); }
+  const Eigen::VectorXd &Gradient() const {
+    assert(has_grd_ && "This cost does not have a gradient to access");
+    return grd_;
+  }
   /**
    * @brief Returns the Hessian with respect to the variables.
    * Please note that this formulation produces only the lower-triangular.
@@ -152,7 +157,10 @@ class CostBase {
    * @param j
    * @return const MatrixType&
    */
-  virtual const MatrixType &Hessian() const { return hes_->getOutput(0); }
+  const MatrixType &Hessian() const {
+    assert(has_hes_ && "This cost does not have a hessian to access");
+    return hes_;
+  }
 
   /**
    * @brief Number of parameters used to determine the constraint
@@ -162,13 +170,17 @@ class CostBase {
   const int &NumberOfInputParameters() const { return np_; }
 
  protected:
+  mutable double obj_;
+  mutable Eigen::VectorXd grd_;
+  mutable MatrixType hes_;
+
   /**
    * @brief Set the Objective Function object
    *
    * @param f
    */
   void SetObjectiveFunction(const common::Function<double>::SharedPtr &f) {
-    obj_ = f;
+    fobj_ = f;
   }
 
   /**
@@ -178,7 +190,7 @@ class CostBase {
    */
   void SetGradientFunction(
       const common::Function<Eigen::VectorXd>::SharedPtr &f) {
-    grd_ = f;
+    fgrd_ = f;
     has_grd_ = true;
   }
 
@@ -189,7 +201,7 @@ class CostBase {
    */
   void SetHessianFunction(
       const typename common::Function<MatrixType>::SharedPtr &f) {
-    hes_ = f;
+    fhes_ = f;
     has_hes_ = true;
   }
 
@@ -207,11 +219,11 @@ class CostBase {
   std::string name_;
 
   // Objective function
-  common::Function<double>::SharedPtr obj_;
+  common::Function<double>::SharedPtr fobj_;
   // Gradient function of the objective
-  common::Function<Eigen::VectorXd>::SharedPtr grd_;
+  common::Function<Eigen::VectorXd>::SharedPtr fgrd_;
   // Hessian funciton of the objective
-  typename common::Function<MatrixType>::SharedPtr hes_;
+  typename common::Function<MatrixType>::SharedPtr fhes_;
 
   /**
    * @brief Creates a unique id for each cost

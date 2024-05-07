@@ -56,28 +56,14 @@ class LinearCost : public CostBase<MatrixType> {
     fc_->call(p);
     fb_->call(p);
     // Evaluate the constraint
-    obj_ = fc_->getOutput(0).dot(x[0]) + fb_->getOutput(0);
+    this->obj_ = c().dot(x[0]) + b();
+    this->grd_ = c();
   }
 
   void eval_hessian(const common::InputRefVector &x,
                     const common::InputRefVector &p) const override {
     // No need, as linear costs do not have a Hessian
   }
-
-  /**
-   * @brief Returns the most recent evaluation of the constraint
-   *
-   * @return const Eigen::VectorXd&
-   */
-  const double &Objective() const override { return obj_; }
-
-  /**
-   * @brief The Gradient of the objective
-   *
-   * @param i
-   * @return const Eigen::VectorXd&
-   */
-  const Eigen::VectorXd &Gradient() const override { return fc_->getOutput(0); }
 
   /**
    * @brief Returns the coefficients of x for the cost expression.
@@ -94,8 +80,6 @@ class LinearCost : public CostBase<MatrixType> {
   const double &b() { return fb_->getOutput(0); }
 
  private:
-  mutable double obj_;
-
   std::shared_ptr<common::Function<Eigen::VectorXd>> fc_;
   std::shared_ptr<common::Function<double>> fb_;
 
