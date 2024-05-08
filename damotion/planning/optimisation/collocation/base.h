@@ -3,6 +3,7 @@
 
 #include <casadi/casadi.hpp>
 
+#include "damotion/common/logging.h"
 #include "damotion/optimisation/constraints/base.h"
 #include "damotion/symbolic/expression.h"
 
@@ -19,9 +20,10 @@ class CollocationConstraintBase {
   template <typename MatrixType>
   std::shared_ptr<damotion::optimisation::ConstraintBase<MatrixType>>
   GetConstraint() {
-    auto c = std::make_shared<ConstraintBase<MatrixType>>(
-        "collocation", con_, damotion::optimisation::BoundsType::kEquality,
-        true, true);
+    auto c =
+        std::make_shared<damotion::optimisation::ConstraintBase<MatrixType>>(
+            "collocation", con_, damotion::optimisation::BoundsType::kEquality,
+            true, true);
     return c;
   }
 
@@ -37,11 +39,13 @@ class CollocationConstraintBase {
 
 class TrapezoidalCollocationConstraint : public CollocationConstraintBase {
  public:
-  TrapezoidalCollocationConstraint(int nx, int ndx, int nu, const casadi::SX &f,
-                                   const casadi::SX &x, const casadi::SX &u) {
+  TrapezoidalCollocationConstraint(const int &nx, const int &ndx, const int &nu,
+                                   const casadi::SX &f, const casadi::SX &x,
+                                   const casadi::SX &u) {
     // Evaluate the constraint
     casadi::SX x0 = casadi::SX::sym("x0", nx), x1 = casadi::SX::sym("x1", nx);
     casadi::SX u0 = casadi::SX::sym("u0", nu), u1 = casadi::SX::sym("u1", nu);
+
     // Evaluate function at selected points
     casadi::SX f0 = casadi::SX::substitute(f, vertcat(x, u), vertcat(x0, u0)),
                f1 = casadi::SX::substitute(f, vertcat(x, u), vertcat(x1, u1));
@@ -49,13 +53,45 @@ class TrapezoidalCollocationConstraint : public CollocationConstraintBase {
 
     // Integrate over interval to provide collocation constraint
     GetConstraintExpression() = x1 - x0 - 0.5 * h * (f0 + f1);
-    GetConstraintExpression().SetInputs({x0, x1, u0, u1}, {});
+    GetConstraintExpression().SetInputs({x0, x1, u0, u1, h}, {});
+
+    VLOG(10) << "Trapezoidal Collocation Constraint:";
+    VLOG(10) << GetConstraintExpression();
   }
 
  private:
 };
 
-class HermiteSimpsonCollocationConstraint {};
+class HermiteSimpsonCollocationConstraint : public CollocationConstraintBase {
+ public:
+  HermiteSimpsonCollocationConstraint(const int &nx, const int &ndx,
+                                      const int &nu, const casadi::SX &f,
+                                      const casadi::SX &x,
+                                      const casadi::SX &u) {
+    // Evaluate the constraint
+    casadi::SX x0 = casadi::SX::sym("x0", nx), xm = casadi::SX::sym("xm", nx),
+               x1 = casadi::SX::sym("x1", nx);
+    casadi::SX u0 = casadi::SX::sym("u0", nu), um = casadi::SX::sym("um", nu),
+               u1 = casadi::SX::sym("u1", nu);
+
+    // Evaluate function at selected points
+    casadi::SX f0 = casadi::SX::substitute(f, vertcat(x, u), vertcat(x0, u0)),
+               fm = casadi::SX::substitute(f, vertcat(x, u), vertcat(xm, um)),
+               f1 = casadi::SX::substitute(f, vertcat(x, u), vertcat(x1, u1));
+    casadi::SX h = casadi::SX::sym("h", 1);
+
+    // Integrate over interval to provide collocation constraint
+    GetConstraintExpression() =
+        casadi::SX::vertcat({x1 - x0 - (h / 6.0) * (f0 + 4.0 * fm + f1),
+                             xm - 0.5 * (x0 + x1) + (h / 8.0) * (f0 - f1)});
+    GetConstraintExpression().SetInputs({x0, xm, x1, u0, um, u1, h}, {});
+
+    VLOG(10) << "Hermite-Simpson Collocation Constraint:";
+    VLOG(10) << GetConstraintExpression();
+  }
+
+ private:
+};
 
 }  // namespace optimisation
 }  // namespace planning

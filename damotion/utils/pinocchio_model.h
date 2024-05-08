@@ -12,6 +12,8 @@
 #include <pinocchio/autodiff/casadi/utils/static-if.hpp>
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/multibody/model.hpp>
+// Centroidal momentum
+#include <pinocchio/algorithm/centroidal.hpp>
 
 #include "damotion/model/frame.h"
 #include "damotion/utils/eigen_wrapper.h"
@@ -173,6 +175,25 @@ class PinocchioModelWrapper {
 
     // Create frame
     return std::make_shared<model::symbolic::TargetFrame>(f);
+  }
+
+  // Centroidal momentum
+  ::casadi::Function CentroidalMomentum() {
+    typedef ::casadi::Matrix<AD> MatrixType;
+
+    // Create the function for the end-effector
+    MatrixType qpos = MatrixType::sym("q", model_.nq),
+               qvel = MatrixType::sym("v", model_.nv),
+               qacc = MatrixType::sym("a", model_.nv);
+
+    // Eigen-equivalents
+    Eigen::VectorX<MatrixType> qpos_e, qvel_e, qacc_e;
+    toEigen(qpos, qpos_e);
+    toEigen(qvel, qvel_e);
+    toEigen(qacc, qacc_e);
+    pinocchio::computeCentroidalMomentum(model_, data_, qpos_e, qvel_e);
+    // Create a six-dimensional vector for the centroidal momentum
+    data_.hg.toVector();
   }
 
   pinocchio::ModelTpl<::casadi::Matrix<AD>> &model() { return model_; }

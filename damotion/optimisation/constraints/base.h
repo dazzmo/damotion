@@ -75,7 +75,7 @@ class ConstraintBase {
     if (jac) {
       SetJacobianFunction(
           std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
-              casadi::Function(this->name() + "_jac", in, jacobian(c, x))));
+              casadi::Function(this->name() + "_jac", in, {jacobian(c, x)})));
     }
 
     // Hessian
@@ -91,11 +91,12 @@ class ConstraintBase {
       for (const casadi::SX &pi : c.Parameters()) {
         in.push_back(pi);
       }
-
+      casadi::SX H = hessian(lTc, x);
       // Compute the Hessian of the product
       SetHessianFunction(
           std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
-              casadi::Function(this->name() + "_hes", in, hessian(lTc, x))));
+              casadi::Function(this->name() + "_hes", in,
+                               {casadi::SX::tril(H)})));
     }
 
     // Update bounds for the constraint

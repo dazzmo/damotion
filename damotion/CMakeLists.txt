@@ -26,8 +26,6 @@ common/sparsity.cc
 model/frame.cc
 symbolic/parameter.cc
 symbolic/variable.cc
-system/controlled.cc
-system/system.cc
 control/osc/tasks/contact.cc
 control/osc/tasks/motion.cc
 control/osc/osc.cc

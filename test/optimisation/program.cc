@@ -199,20 +199,6 @@ TEST(Program, SparseProgram) {
   program.AddBoundingBoxConstraint(-10.0, 10.0, x);
 
   program.PrintProgramSummary();
-
-  opt::solvers::SparseSolver solver(program);
-
-  // Create dummy optimisation variable
-  Eigen::VectorXd xopt(10);
-  xopt.setOnes();
-
-  // Update constraint and assess if it's correct
-  solver.EvaluateConstraint(binding1, 0, xopt, true, true);
-  solver.EvaluateConstraint(binding2, 0, xopt, true, true);
-
-  LOG(INFO) << solver.GetSparseConstraintJacobian();
-
-  damotion::common::Profiler summary;
 }
 }  // namespace
 

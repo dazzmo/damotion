@@ -5,6 +5,7 @@
 #include <coin-or/IpTNLP.hpp>
 
 #include "damotion/common/logging.h"
+#include "damotion/common/profiler.h"
 #include "damotion/optimisation/program.h"
 #include "damotion/solvers/sparse.h"
 

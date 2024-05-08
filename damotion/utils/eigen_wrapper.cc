@@ -76,7 +76,7 @@ FunctionWrapper<Eigen::SparseMatrix<double>>::operator=(::casadi::Function f) {
     OutputVector().push_back(M);
     out_data_ptr_.push_back(OutputVector().back().valuePtr());
 
-    VLOG(10) << f.name() << "Sparse Output " << i;
+    VLOG(10) << f.name() << " Sparse Output " << i;
     VLOG(10) << OutputVector().back();
   }
 
