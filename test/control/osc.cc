@@ -1,11 +1,11 @@
 #define DAMOTION_USE_PROFILING
-#include "control/osc/osc.h"
+#include "damotion/control/osc/osc.h"
 
 #include <gtest/gtest.h>
 
+#include "damotion/solvers/solver.h"
+#include "damotion/utils/pinocchio_model.h"
 #include "pinocchio/parsers/urdf.hpp"
-#include "solvers/solver.h"
-#include "utils/pinocchio_model.h"
 
 TEST(TrackingCost, QuadraticForm) {
   pinocchio::Model model;

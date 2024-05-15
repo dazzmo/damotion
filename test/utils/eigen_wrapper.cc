@@ -1,8 +1,8 @@
-#include "utils/eigen_wrapper.h"
+#include "damotion/utils/eigen_wrapper.h"
 
 #include <gtest/gtest.h>
 
-#include "utils/codegen.h"
+#include "damotion/utils/codegen.h"
 
 TEST(EigenWrapper, EigenWrapperLoad) {
   // Create codegen function

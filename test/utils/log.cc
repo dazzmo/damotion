@@ -1,11 +1,11 @@
-#include "utils/log.h"
+#include "damotion/utils/log.h"
 
 #include <gtest/gtest.h>
 
 #include <pinocchio/spatial/se3.hpp>
 
-#include "utils/codegen.h"
-#include "utils/eigen_wrapper.h"
+#include "damotion/utils/codegen.h"
+#include "damotion/utils/eigen_wrapper.h"
 
 TEST(Log, Log3) {
   // Create codegen function

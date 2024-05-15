@@ -4,8 +4,8 @@
 // #include <coin-or/IpIpoptApplication.hpp>
 // #include <coin-or/IpTNLP.hpp>
 
-// #include "solvers/program.h"
-// #include "solvers/solver.h"
+// #include "damotion/solvers/program.h"
+// #include "damotion/solvers/solver.h"
 
 // namespace damotion {
 // namespace optimisation {

@@ -16,6 +16,10 @@
 /.vscode
 /.history
 
+# Doxygen
+/doc/html
+/doc/latex
+
 # (Possible) CMake build artifacts
 /build/
 /cmake-build-*/

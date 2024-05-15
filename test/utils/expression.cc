@@ -1,4 +1,4 @@
-#include "symbolic/expression.h"
+#include "damotion/symbolic/expression.h"
 
 #include <gtest/gtest.h>
 

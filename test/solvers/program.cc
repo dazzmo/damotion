@@ -1,9 +1,9 @@
 #define DAMOTION_USE_PROFILING
-#include "solvers/program.h"
+#include "damotion/solvers/program.h"
 
 #include <gtest/gtest.h>
 
-#include "solvers/solve_qpoases.h"
+#include "damotion/solvers/solve_qpoases.h"
 
 namespace sym = damotion::symbolic;
 namespace opt = damotion::optimisation;
