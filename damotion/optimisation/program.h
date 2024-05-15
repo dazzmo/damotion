@@ -79,6 +79,15 @@ class DecisionVariableManager {
   int GetDecisionVariableIndex(const sym::Variable &v);
 
   /**
+   * @brief Returns a vector of indices for the position of each entry in v in
+   * the current decision variable vector.
+   *
+   * @param v
+   * @return std::vector<int>
+   */
+  std::vector<int> GetDecisionVariableIndices(const sym::VariableVector &v);
+
+  /**
    * @brief Set the vector of decision variables to the default ordering of
    * variables (ordered by when they were added)
    *

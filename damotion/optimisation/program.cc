@@ -88,6 +88,20 @@ int DecisionVariableManager::GetDecisionVariableIndex(const sym::Variable &v) {
   }
 }
 
+std::vector<int> DecisionVariableManager::GetDecisionVariableIndices(
+    const sym::VariableVector &v) {
+  std::vector<int> indices;
+  indices.reserve(v.size());
+  for (size_t i = 0; i < v.size(); ++i) {
+    int idx = GetDecisionVariableIndex(v[i]);
+    if (idx >= 0) {
+      indices.push_back(idx);
+    }
+  }
+  // Return vector of indices
+  return indices;
+}
+
 bool DecisionVariableManager::IsContinuousInDecisionVariableVector(
     const sym::VariableVector &var) {
   VLOG(10) << "IsContinuousInDecisionVariableVector(), checking " << var;

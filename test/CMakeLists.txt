@@ -16,6 +16,7 @@ utils/log.cc
 utils/expression.cc
 common/profiler.cc
 control/osc.cc
+optimisation/block.cc
 optimisation/program.cc
 planning/collocation.cc
 solvers/cost.cc
