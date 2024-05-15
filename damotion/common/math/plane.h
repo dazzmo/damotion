@@ -4,7 +4,8 @@
 #include <Eigen/Core>
 #include <casadi/casadi.hpp>
 
-#include "damotion/utils/eigen_wrapper.h"
+#include "damotion/casadi/eigen.h"
+#include "damotion/casadi/function.h"
 
 namespace damotion {
 namespace common {
@@ -29,8 +30,8 @@ class Hyperplane {
    */
   casadi::SX SymbolicDistance(const casadi::SX &point) {
     casadi::DM a, p;
-    utils::casadi::toCasadi(this->normal, a);
-    utils::casadi::toCasadi(this->p, p);
+    damotion::casadi::toCasadi(this->normal, a);
+    damotion::casadi::toCasadi(this->p, p);
     // Get signed distance
     return (casadi::SX::dot(a, point) - casadi::SX::dot(a, p)) /
            casadi::SX::norm_2(a);

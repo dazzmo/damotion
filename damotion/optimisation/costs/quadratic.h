@@ -23,8 +23,8 @@ class QuadraticCost : public CostBase<MatrixType> {
     // Cost
     casadi::DM Ad, bd;
     casadi::SX csx = c;
-    damotion::utils::casadi::toCasadi(A, Ad);
-    damotion::utils::casadi::toCasadi(b, bd);
+    damotion::casadi::toCasadi(A, Ad);
+    damotion::casadi::toCasadi(b, bd);
     casadi::SX Asx = Ad, bsx = bd;
     ConstructConstraint(Asx, bsx, csx, {}, jac, hes);
   }
@@ -114,15 +114,15 @@ class QuadraticCost : public CostBase<MatrixType> {
     // Create coefficient functions
     casadi::SX A_lt = casadi::SX::tril(A);
     if (std::is_same<MatrixType, Eigen::SparseMatrix<double>>::value) {
-      fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
+      fA_ = std::make_shared<damotion::casadi::FunctionWrapper<MatrixType>>(
           casadi::Function(this->name() + "_A", in, {A_lt}));
     } else {
-      fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
+      fA_ = std::make_shared<damotion::casadi::FunctionWrapper<MatrixType>>(
           casadi::Function(this->name() + "_A", in, {densify(A_lt)}));
     }
-    fb_ = std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
+    fb_ = std::make_shared<damotion::casadi::FunctionWrapper<Eigen::VectorXd>>(
         casadi::Function(this->name() + "_b", in, {densify(b)}));
-    fc_ = std::make_shared<utils::casadi::FunctionWrapper<double>>(
+    fc_ = std::make_shared<damotion::casadi::FunctionWrapper<double>>(
         casadi::Function(this->name() + "_c", in, {densify(c)}));
 
     // Set hessian structure

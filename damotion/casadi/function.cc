@@ -1,7 +1,6 @@
-#include "damotion/utils/eigen_wrapper.h"
+#include "damotion/casadi/function.h"
 
 namespace damotion {
-namespace utils {
 namespace casadi {
 
 // Class specialisations
@@ -84,5 +83,4 @@ FunctionWrapper<Eigen::SparseMatrix<double>>::operator=(::casadi::Function f) {
 }
 
 }  // namespace casadi
-}  // namespace utils
 }  // namespace damotion

@@ -5,20 +5,23 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include "damotion/casadi/pinocchio_model.h"
 #include "damotion/common/function.h"
 #include "damotion/solvers/solver.h"
-#include "damotion/utils/pinocchio_model.h"
 #include "pinocchio/parsers/urdf.hpp"
+
+namespace sym = damotion::symbolic;
+namespace opt = damotion::optimisation;
 
 TEST(TrackingCost, QuadraticForm) {
   pinocchio::Model model;
   pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
   pinocchio::Data data(model);
 
-  damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
+  damotion::casadi::PinocchioModelWrapper wrapper(model);
 
   // Create end-effector
-  auto tool0 = wrapper.EndEffector("tool0");
+  casadi::Function tool0 = wrapper.EndEffector("tool0");
 
   // Create expression of the form || J qacc + dJdt * qvel - xaccd ||^2
   casadi::SX qpos = casadi::SX::sym("qpos", model.nq),
@@ -26,9 +29,11 @@ TEST(TrackingCost, QuadraticForm) {
              qacc = casadi::SX::sym("qacc", model.nv);
 
   casadi::SX xaccd = casadi::SX::sym("xaccd", 6);
-  tool0->UpdateState(qpos, qvel, qacc);
+  // Compute state of end-effector
+  casadi::SXVector ee = tool0(casadi::SXVector({qpos, qvel, qacc}));
+  casadi::SX xpos = ee[0], xvel = ee[1], xacc = ee[2];
 
-  sym::Expression obj = mtimes(tool0->acc().T(), tool0->acc());
+  sym::Expression obj = mtimes(xacc.T(), xacc);
   obj.SetInputs({qacc}, {qpos, qvel, xaccd});
 
   // Create quadratic cost

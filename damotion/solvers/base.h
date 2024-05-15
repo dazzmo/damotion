@@ -86,7 +86,8 @@ class SolverBase {
 
   /**
    * @brief Returns a vector of bindings to ConstraintBase<MatrixType> for each
-   * binding within the program.
+   * binding within the program. Useful for iterating through all constraint's
+   * base classes.
    *
    * @return const std::vector<Binding<ConstraintType>>&
    */

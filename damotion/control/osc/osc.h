@@ -7,26 +7,25 @@
 #include <map>
 #include <string>
 
+#include "damotion/casadi/codegen.h"
+#include "damotion/casadi/eigen.h"
+#include "damotion/casadi/function.h"
+#include "damotion/casadi/pinocchio_model.h"
 #include "damotion/common/math/quaternion.h"
 #include "damotion/common/profiler.h"
+#include "damotion/control/fwd.h"
 #include "damotion/control/osc/tasks/contact.h"
 #include "damotion/control/osc/tasks/motion.h"
 #include "damotion/optimisation/constraints/constraints.h"
 #include "damotion/optimisation/costs/costs.h"
 #include "damotion/optimisation/program.h"
-#include "damotion/utils/codegen.h"
-#include "damotion/utils/eigen_wrapper.h"
-#include "damotion/utils/pinocchio_model.h"
-
-namespace opt = damotion::optimisation;
-namespace sym = damotion::symbolic;
-namespace utils = damotion::utils;
 
 namespace damotion {
 namespace control {
 namespace osc {
 
-typedef model::TargetFrame TargetFrame;
+// Think about not making it a solver, but instead a collection of utilities to
+// create a program?
 
 std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>>
 LinearisedFrictionConstraint();
@@ -45,22 +44,30 @@ class OSC : public opt::ProgramBase<Eigen::MatrixXd> {
   OSC(int nq, int nv, int nu);
 
   /**
-   * @brief Add a contact point to the OSC.
-   *
-   * @param task
-   * @return void
-   */
-  void AddContactTask(std::shared_ptr<ContactTask> &task,
-                      model::symbolic::TargetFrame &frame);
-
-  /**
    * @brief Registers a motion task for the
    *
    * @param task
+   * @param xpos Symbolic representation of the task \f$ x(q) \f$
+   * @param xvel Symbolic representation of the task velocity \f$ \dot{x}(q) \f$
+   * @param xacc Symbolic representation of the task acceleration \f$
+   * \ddot{x}(q) \f$
    * @return void
    */
-  void AddMotionTask(std::shared_ptr<MotionTask> &task,
-                     model::symbolic::TargetFrame &frame);
+  void AddMotionTask(MotionTask::SharedPtr &task, const casadi::SX &xpos,
+                     const casadi::SX &xvel, const casadi::SX &xacc);
+
+  /**
+   * @brief Add a contact point to the OSC.
+   *
+   * @param task
+   * @param xpos Symbolic representation of the task \f$ x(q) \f$
+   * @param xvel Symbolic representation of the task velocity \f$ \dot{x}(q) \f$
+   * @param xacc Symbolic representation of the task acceleration \f$
+   * \ddot{x}(q) \f$
+   * @return void
+   */
+  void AddContactTask(ContactTask::SharedPtr &task, const casadi::SX &xpos,
+                      const casadi::SX &xvel, const casadi::SX &xacc);
 
   /**
    * @brief For a constraint that can be written in the form h(q) = 0,
@@ -117,7 +124,7 @@ class OSC : public opt::ProgramBase<Eigen::MatrixXd> {
    * @param name
    * @param task
    */
-  void UpdateContactPoint(const std::shared_ptr<ContactTask> &task) {
+  void UpdateContactPoint(const ContactTask::SharedPtr &task) {
     // TODO Get task index
     int task_idx = 0;
     if (task->inContact) {
@@ -221,7 +228,7 @@ class OSC : public opt::ProgramBase<Eigen::MatrixXd> {
   int nu_ = 0;
 
   // Vector of motion tasks and parameter references for the program
-  std::vector<std::shared_ptr<MotionTask>> motion_tasks_;
+  std::vector<MotionTask::SharedPtr> motion_tasks_;
   struct MotionTaskParameters {
     MotionTaskParameters(const Eigen::Map<Eigen::VectorXd> &xaccd,
                          const Eigen::Map<Eigen::VectorXd> &w)
@@ -232,7 +239,7 @@ class OSC : public opt::ProgramBase<Eigen::MatrixXd> {
   std::vector<MotionTaskParameters> motion_task_parameters_;
 
   // Vector of contact tasks and parameter references for the program
-  std::vector<std::shared_ptr<ContactTask>> contact_tasks_;
+  std::vector<ContactTask::SharedPtr> contact_tasks_;
   // Parameters for each contact point
   struct ContactTaskParameters {
     ContactTaskParameters(const Eigen::Map<Eigen::VectorXd> &xaccd,

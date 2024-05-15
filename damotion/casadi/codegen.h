@@ -7,7 +7,6 @@
 #include <filesystem>
 
 namespace damotion {
-namespace utils {
 namespace casadi {
 
 /**
@@ -23,7 +22,6 @@ namespace casadi {
                            const std::string &dir = "./");
 
 }  // namespace casadi
-}  // namespace utils
 }  // namespace damotion
 
 #endif /* UTILS_CODEGEN_H */

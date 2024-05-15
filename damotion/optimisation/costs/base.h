@@ -3,14 +3,13 @@
 
 #include <casadi/casadi.hpp>
 
-#include "damotion/symbolic/expression.h"
-#include "damotion/utils/codegen.h"
-#include "damotion/utils/eigen_wrapper.h"
+#include "damotion/casadi/codegen.h"
+#include "damotion/casadi/eigen.h"
+#include "damotion/casadi/function.h"
+#include "damotion/optimisation/fwd.h"
 
 namespace damotion {
 namespace optimisation {
-
-namespace sym = damotion::symbolic;
 
 template <typename MatrixType>
 class CostBase {
@@ -27,8 +26,8 @@ class CostBase {
     }
   }
 
-  CostBase(const std::string &name, const symbolic::Expression &ex,
-           bool grd = false, bool hes = false)
+  CostBase(const std::string &name, const sym::Expression &ex, bool grd = false,
+           bool hes = false)
       : CostBase(name, "cost") {
     // Get input sizes
     nx_ = ex.Variables().size();
@@ -49,13 +48,13 @@ class CostBase {
     // Create functions for each and wrap them
     // Constraint
     SetObjectiveFunction(
-        std::make_shared<utils::casadi::FunctionWrapper<double>>(
+        std::make_shared<damotion::casadi::FunctionWrapper<double>>(
             casadi::Function(name, in, {ex})));
     // Jacobian
     if (grd) {
       // Wrap the functions
       SetGradientFunction(
-          std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
+          std::make_shared<damotion::casadi::FunctionWrapper<Eigen::VectorXd>>(
               casadi::Function(name + "_grd", in, gradient(ex, x))));
       grd_.resize(nx_);
     }
@@ -64,7 +63,7 @@ class CostBase {
     if (hes) {
       // Wrap the functions
       SetHessianFunction(
-          std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
+          std::make_shared<damotion::casadi::FunctionWrapper<MatrixType>>(
               casadi::Function(name + "_hes", in,
                                casadi::SX::tril(hessian(ex, x)))));
       hes_.resize(nx_, nx_);

@@ -3,10 +3,6 @@
 
 #include "damotion/control/osc/tasks/motion.h"
 
-namespace opt = damotion::optimisation;
-namespace sym = damotion::symbolic;
-namespace utils = damotion::utils;
-
 namespace damotion {
 namespace control {
 namespace osc {
@@ -21,7 +17,10 @@ class ContactTask : public MotionTask {
   ContactTask() = default;
   ~ContactTask() = default;
 
-  ContactTask(const std::string &name) : MotionTask(name) {}
+  using SharedPtr = std::shared_ptr<ContactTask>;
+
+  ContactTask(const std::string &name, const int &xdim, const int &vdim)
+      : MotionTask(name, xdim, vdim) {}
 
   // Whether the point is in contact or not
   bool inContact = false;
@@ -66,7 +65,9 @@ class ContactTask3D : public ContactTask {
   ContactTask3D() = default;
   ~ContactTask3D() = default;
 
-  ContactTask3D(const std::string &name) : ContactTask(name) { ResizeTask(3); }
+  ContactTask3D(const std::string &name, const casadi::SX &xpos,
+                const casadi::SX &xvel, const casadi::SX &xacc)
+      : ContactTask(name, 3, 3) {}
 
   struct Reference {
     Eigen::Vector3d x;
@@ -76,10 +77,6 @@ class ContactTask3D : public ContactTask {
 
   const Reference &GetReference() { return ref_; }
   void SetReference(const Eigen::Vector3d &x) { ref_.x = x; }
-
-  Eigen::VectorXd pos() override { return Frame().pos().topRows(3); }
-  Eigen::VectorXd vel() override { return Frame().vel().topRows(3); }
-  Eigen::VectorXd acc() override { return Frame().acc().topRows(3); }
 
   void ComputeMotionError() override;
 
@@ -103,7 +100,9 @@ class ContactTask6D : public ContactTask {
   ContactTask6D() = default;
   ~ContactTask6D() = default;
 
-  ContactTask6D(const std::string &name) : ContactTask(name) { ResizeTask(6); }
+  ContactTask6D(const std::string &name, const casadi::SX &xpos,
+                const casadi::SX &xvel, const casadi::SX &xacc)
+      : ContactTask(name, 6, 6) {}
 
   struct Reference {
     Eigen::Vector3d x;
@@ -114,10 +113,6 @@ class ContactTask6D : public ContactTask {
 
   const Reference &GetReference() { return ref_; }
   void SetReference(const Eigen::Vector3d &x) { ref_.x = x; }
-
-  Eigen::VectorXd pos() override { return Frame().pos(); }
-  Eigen::VectorXd vel() override { return Frame().vel(); }
-  Eigen::VectorXd acc() override { return Frame().acc(); }
 
   void ComputeMotionError() override;
 

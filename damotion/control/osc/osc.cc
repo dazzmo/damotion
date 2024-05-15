@@ -33,17 +33,14 @@ OSC::OSC(int nq, int nv, int nu)
   friction_cone_con_ = LinearisedFrictionConstraint();
 }
 
-void OSC::AddMotionTask(std::shared_ptr<MotionTask> &task,
-                        model::symbolic::TargetFrame &frame) {
-  // Register frame with task
-  task->SetFrame(frame.CreateFrame());
+void OSC::AddMotionTask(MotionTask::SharedPtr &task, const casadi::SX &xpos,
+                        const casadi::SX &xvel, const casadi::SX &xacc) {
   /* Motion task parameters */
-
   sym::ParameterVector xaccd = sym::CreateParameterVector(
-                           task->name() + "_motion_acc_ref", task->dim()),
+                           task->name() + "_motion_acc_ref", task->vdim()),
                        w = sym::CreateParameterVector(
                            task->name() + "_motion_task_weighting",
-                           task->dim());
+                           task->vdim());
 
   AddParameters(xaccd);
   AddParameters(w);
@@ -54,11 +51,11 @@ void OSC::AddMotionTask(std::shared_ptr<MotionTask> &task,
   parameters.w << task->Weighting();
 
   // Create objective for tracking
-  casadi::SX xaccd_sx = casadi::SX::sym("xaccd", task->dim());
-  casadi::SX w_sx = casadi::SX::sym("w", task->dim());
+  casadi::SX xaccd_sx = casadi::SX::sym("xaccd", task->vdim());
+  casadi::SX w_sx = casadi::SX::sym("w", task->vdim());
 
   // Create weighted objective as || xacc - xacc_d ||^2_W
-  casadi::SX e = frame.acc() - xaccd_sx;
+  casadi::SX e = xacc - xaccd_sx;
   sym::Expression obj = mtimes(mtimes(e.T(), casadi::SX::diag(w_sx)), e);
 
   // Set inputs to the expression
@@ -76,29 +73,31 @@ void OSC::AddMotionTask(std::shared_ptr<MotionTask> &task,
   motion_task_parameters_.push_back(parameters);
 }
 
-void OSC::AddContactTask(std::shared_ptr<ContactTask> &task,
-                         model::symbolic::TargetFrame &frame) {
-  // Register frame with task
-  task->SetFrame(frame.CreateFrame());
-
+void OSC::AddContactTask(ContactTask::SharedPtr &task, const casadi::SX &xpos,
+                         const casadi::SX &xvel, const casadi::SX &xacc) {
+  // Set up task function
+  casadi::Function f("frame", {qpos_sx_, qvel_sx_, qacc_sx_},
+                     {xpos, xvel, xacc});
+  task->SetFunction(
+      std::make_shared<damotion::casadi::FunctionWrapper<Eigen::VectorXd>>(f));
   /* Contact task parameters */
-  sym::ParameterVector xacc = sym::CreateParameterVector(
-                           task->name() + "_contact_acc_ref", task->dim()),
+  sym::ParameterVector xaccd = sym::CreateParameterVector(
+                           task->name() + "_contact_acc_ref", task->vdim()),
                        w = sym::CreateParameterVector(
                            task->name() + "_contact_task_weighting",
-                           task->dim()),
+                           task->vdim()),
                        normal = sym::CreateParameterVector(
                            task->name() + "_normal", 3),
                        mu = sym::CreateParameterVector(
                            task->name() + "_friction_mu", 1);
 
-  AddParameters(xacc);
+  AddParameters(xaccd);
   AddParameters(w);
   AddParameters(normal);
   AddParameters(mu);
 
   // Set parameters
-  ContactTaskParameters parameters(GetParameterRef(xacc), GetParameterRef(w),
+  ContactTaskParameters parameters(GetParameterRef(xaccd), GetParameterRef(w),
                                    GetParameterRef(mu),
                                    GetParameterRef(normal));
 
@@ -108,18 +107,19 @@ void OSC::AddContactTask(std::shared_ptr<ContactTask> &task,
 
   /* Add constraint forces to program */
   sym::VariableVector lambda =
-      sym::CreateVariableVector(task->name() + "_lambda", task->dim());
-  casadi::SX lambda_sx = casadi::SX::sym(task->name() + "_lambda", task->dim());
+      sym::CreateVariableVector(task->name() + "_lambda", task->vdim());
+  casadi::SX lambda_sx =
+      casadi::SX::sym(task->name() + "_lambda", task->vdim());
   AddConstraintForceVariables(lambda, lambda_sx);
 
   // Compute joint-space constraint forces
-  casadi::SX J = jacobian(frame.vel(), qvel_sx_);
+  casadi::SX J = jacobian(xvel, qvel_sx_);
   joint_space_constraint_forces_ += mtimes(J.T(), lambda_sx);
 
   // Create weighted objective as || xacc - xacc_d ||^2_W
-  casadi::SX xaccd_sx = casadi::SX::sym("xaccd", task->dim());
-  casadi::SX w_sx = casadi::SX::sym("w", task->dim());
-  casadi::SX e = frame.acc() - xaccd_sx;
+  casadi::SX xaccd_sx = casadi::SX::sym("xaccd", task->vdim());
+  casadi::SX w_sx = casadi::SX::sym("w", task->vdim());
+  casadi::SX e = xacc - xaccd_sx;
   sym::Expression obj = mtimes(mtimes(e.T(), casadi::SX::diag(w_sx)), e);
 
   // Set inputs to the expression
@@ -130,7 +130,7 @@ void OSC::AddContactTask(std::shared_ptr<ContactTask> &task,
       std::make_shared<opt::QuadraticCost<Eigen::MatrixXd>>(
           task->name() + "_contact", obj);
 
-  AddQuadraticCost(task_cost, {qacc_}, {qpos_, qvel_, xacc, w});
+  AddQuadraticCost(task_cost, {qacc_}, {qpos_, qvel_, xaccd, w});
 
   // Add friction constraint
   AddLinearConstraint(friction_cone_con_, {lambda}, {normal, mu});

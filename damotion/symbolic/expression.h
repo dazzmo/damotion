@@ -4,8 +4,9 @@
 #include <casadi/casadi.hpp>
 #include <cassert>
 
-#include "damotion/utils/codegen.h"
-#include "damotion/utils/eigen_wrapper.h"
+#include "damotion/casadi/codegen.h"
+#include "damotion/casadi/eigen.h"
+#include "damotion/casadi/function.h"
 
 namespace damotion {
 namespace symbolic {

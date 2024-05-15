@@ -5,6 +5,7 @@
 
 namespace damotion {
 namespace optimisation {
+
 /**
  * @brief Cost of the form \f$ c^T x + b \f$
  *
@@ -17,7 +18,7 @@ class LinearCost : public CostBase<MatrixType> {
       : CostBase<MatrixType>(name, "linear_cost") {
     // Create Costs
     casadi::DM cd, bd = b;
-    damotion::utils::casadi::toCasadi(c, cd);
+    damotion::casadi::toCasadi(c, cd);
     casadi::SX cs = cd, bs = bd;
 
     ConstructCost(cs, bs, {}, jac, true);
@@ -93,9 +94,9 @@ class LinearCost : public CostBase<MatrixType> {
     }
 
     // Create coefficient functions
-    fc_ = std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
+    fc_ = std::make_shared<damotion::casadi::FunctionWrapper<Eigen::VectorXd>>(
         casadi::Function(this->name() + "_A", in, {densify(c)}));
-    fb_ = std::make_shared<utils::casadi::FunctionWrapper<double>>(
+    fb_ = std::make_shared<damotion::casadi::FunctionWrapper<double>>(
         casadi::Function(this->name() + "_b", in, {densify(b)}));
 
     this->has_grd_ = true;

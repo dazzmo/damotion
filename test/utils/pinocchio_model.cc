@@ -1,10 +1,10 @@
-#include "damotion/utils/pinocchio_model.h"
+#include "damotion/casadi/pinocchio_model.h"
 
 #include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
+#include "damotion/casadi/codegen.h"
 #include "damotion/symbolic/expression.h"
-#include "damotion/utils/codegen.h"
 #include "pinocchio/parsers/urdf.hpp"
 
 // TEST(PinocchioModelWrapper, LoadModel) {
@@ -19,7 +19,7 @@
 //     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
 //     pinocchio::Data data(model);
 
-//     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
+//     damotion::casadi::PinocchioModelWrapper wrapper(model);
 
 //     casadi::Function aba = damotion::symbolic::toFunction("aba",
 //     wrapper.aba());
@@ -34,14 +34,14 @@
 
 //     // Compute through function
 //     casadi::DM qd, vd, ud;
-//     damotion::utils::casadi::toCasadi(q, qd);
-//     damotion::utils::casadi::toCasadi(v, vd);
-//     damotion::utils::casadi::toCasadi(tau, ud);
+//     damotion::casadi::toCasadi(q, qd);
+//     damotion::casadi::toCasadi(v, vd);
+//     damotion::casadi::toCasadi(tau, ud);
 
 //     casadi::DM ad = aba(casadi::DMVector({vertcat(qd, vd, ud)}))[0];
 
 //     Eigen::VectorXd ac;
-//     damotion::utils::casadi::toEigen(ad, ac);
+//     damotion::casadi::toEigen(ad, ac);
 
 //     EXPECT_TRUE(a.isApprox(ac));
 // }
@@ -51,10 +51,10 @@
 //     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
 //     pinocchio::Data data(model);
 
-//     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
+//     damotion::casadi::PinocchioModelWrapper wrapper(model);
 
 //     casadi::Function aba = damotion::symbolic::toFunction("aba",
-//     wrapper.aba()); aba = damotion::utils::casadi::codegen(aba, "./tmp/");
+//     wrapper.aba()); aba = damotion::casadi::codegen(aba, "./tmp/");
 
 //     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
 //     Eigen::VectorXd v(model.nv);
@@ -66,14 +66,14 @@
 
 //     // Compute through function
 //     casadi::DM qd, vd, ud;
-//     damotion::utils::casadi::toCasadi(q, qd);
-//     damotion::utils::casadi::toCasadi(v, vd);
-//     damotion::utils::casadi::toCasadi(tau, ud);
+//     damotion::casadi::toCasadi(q, qd);
+//     damotion::casadi::toCasadi(v, vd);
+//     damotion::casadi::toCasadi(tau, ud);
 
 //     casadi::DM ad = aba(casadi::DMVector({vertcat(qd, vd, ud)}))[0];
 
 //     Eigen::VectorXd ac;
-//     damotion::utils::casadi::toEigen(ad, ac);
+//     damotion::casadi::toEigen(ad, ac);
 
 //     EXPECT_TRUE(a.isApprox(ac));
 // }
@@ -83,7 +83,7 @@
 //     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
 //     pinocchio::Data data(model);
 
-//     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
+//     damotion::casadi::PinocchioModelWrapper wrapper(model);
 
 //     casadi::Function rnea = damotion::symbolic::toFunction("rnea",
 //     wrapper.rnea());
@@ -98,14 +98,14 @@
 
 //     // Compute through function
 //     casadi::DM qd, vd, ad;
-//     damotion::utils::casadi::toCasadi(q, qd);
-//     damotion::utils::casadi::toCasadi(v, vd);
-//     damotion::utils::casadi::toCasadi(a, ad);
+//     damotion::casadi::toCasadi(q, qd);
+//     damotion::casadi::toCasadi(v, vd);
+//     damotion::casadi::toCasadi(a, ad);
 
 //     casadi::DM ud = rnea(casadi::DMVector({vertcat(qd, vd, ad)}))[0];
 
 //     Eigen::VectorXd uc;
-//     damotion::utils::casadi::toEigen(ud, uc);
+//     damotion::casadi::toEigen(ud, uc);
 
 //     EXPECT_TRUE(u.isApprox(uc));
 // }
@@ -115,10 +115,10 @@
 //     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
 //     pinocchio::Data data(model);
 
-//     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
+//     damotion::casadi::PinocchioModelWrapper wrapper(model);
 
 //     casadi::Function rnea = damotion::symbolic::toFunction("rnea",
-//     wrapper.rnea()); rnea = damotion::utils::casadi::codegen(rnea, "./tmp/");
+//     wrapper.rnea()); rnea = damotion::casadi::codegen(rnea, "./tmp/");
 
 //     Eigen::VectorXd q = pinocchio::randomConfiguration(model);
 //     Eigen::VectorXd v(model.nv);
@@ -130,14 +130,14 @@
 
 //     // Compute through function
 //     casadi::DM qd, vd, ad;
-//     damotion::utils::casadi::toCasadi(q, qd);
-//     damotion::utils::casadi::toCasadi(v, vd);
-//     damotion::utils::casadi::toCasadi(a, ad);
+//     damotion::casadi::toCasadi(q, qd);
+//     damotion::casadi::toCasadi(v, vd);
+//     damotion::casadi::toCasadi(a, ad);
 
 //     casadi::DM ud = rnea(casadi::DMVector({vertcat(qd, vd, ad)}))[0];
 
 //     Eigen::VectorXd uc;
-//     damotion::utils::casadi::toEigen(ud, uc);
+//     damotion::casadi::toEigen(ud, uc);
 
 //     EXPECT_TRUE(u.isApprox(uc));
 // }
@@ -147,17 +147,17 @@ TEST(PinocchioModelWrapper, EndEffector) {
   pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
   pinocchio::Data data(model);
 
-  damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
+  damotion::casadi::PinocchioModelWrapper wrapper(model);
 
-  auto tool0 = wrapper.EndEffector("tool0")->CreateFrame();
+  auto tool0 =
+      std::make_shared<damotion::casadi::FunctionWrapper<Eigen::VectorXd>>(
+          wrapper.EndEffector("tool0"));
 
   Eigen::VectorXd q = pinocchio::randomConfiguration(model);
   Eigen::VectorXd v = Eigen::VectorXd::Random(model.nv);
   Eigen::VectorXd a = Eigen::VectorXd::Random(model.nv);
 
   // Create function wrapper for end-effector function
-  tool0->UpdateState(q, v, a);
-
   Eigen::MatrixXd J(6, model.nv), dJ(6, model.nv);
   J.setZero();
   dJ.setZero();
@@ -175,8 +175,8 @@ TEST(PinocchioModelWrapper, EndEffector) {
   Eigen::VectorXd xacc = J * a + dJdt_v;
 
   // Test joint position, velocity and acceleration
-  EXPECT_TRUE(xvel.isApprox(tool0->vel()));
-  EXPECT_TRUE(xacc.isApprox(tool0->acc()));
+  EXPECT_TRUE(xvel.isApprox(tool0->getOutput(1)));
+  EXPECT_TRUE(xacc.isApprox(tool0->getOutput(2)));
 }
 
 // // TEST(PinocchioModelWrapper, RNEAWithEndEffector) {
@@ -184,7 +184,7 @@ TEST(PinocchioModelWrapper, EndEffector) {
 // //     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
 // //     pinocchio::Data data(model);
 
-// //     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
+// //     damotion::casadi::PinocchioModelWrapper wrapper(model);
 
 // //     wrapper.addEndEffector("tool0");
 // //     Eigen::Matrix<double, 6, 3> S;
@@ -205,14 +205,14 @@ TEST(PinocchioModelWrapper, EndEffector) {
 // //     pinocchio::urdf::buildModel("./ur10_robot.urdf", model, false);
 // //     pinocchio::Data data(model);
 
-// //     damotion::utils::casadi::PinocchioModelWrapper wrapper(model);
+// //     damotion::casadi::PinocchioModelWrapper wrapper(model);
 
 // //     wrapper.addEndEffector("tool0");
 
-// //     damotion::utils::casadi::FunctionWrapper fee(
-// //         damotion::utils::casadi::codegen(wrapper.end_effector(0).x,
+// //     damotion::casadi::FunctionWrapper fee(
+// //         damotion::casadi::codegen(wrapper.end_effector(0).x,
 // "./tmp")),
-// //         f_err(damotion::utils::casadi::codegen(
+// //         f_err(damotion::casadi::codegen(
 // //             wrapper.end_effector(0).pose_error, "./tmp"));
 
 // //     // Get two random configurations and compute transforms

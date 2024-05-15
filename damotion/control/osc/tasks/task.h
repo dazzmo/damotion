@@ -7,18 +7,15 @@
 #include <map>
 #include <string>
 
+#include "damotion/casadi/codegen.h"
+#include "damotion/casadi/eigen.h"
+#include "damotion/casadi/function.h"
+#include "damotion/casadi/pinocchio_model.h"
 #include "damotion/common/profiler.h"
-#include "damotion/model/frame.h"
+#include "damotion/control/fwd.h"
 #include "damotion/optimisation/constraints/constraints.h"
 #include "damotion/optimisation/costs/costs.h"
 #include "damotion/optimisation/program.h"
-#include "damotion/utils/codegen.h"
-#include "damotion/utils/eigen_wrapper.h"
-#include "damotion/utils/pinocchio_model.h"
-
-namespace opt = damotion::optimisation;
-namespace sym = damotion::symbolic;
-namespace utils = damotion::utils;
 
 namespace damotion {
 namespace control {
@@ -29,36 +26,79 @@ class Task {
   Task() = default;
   ~Task() = default;
 
-  Task(const std::string &name) : name_(name) {}
+  using SharedPtr = std::shared_ptr<Task>;
 
   /**
-   * @brief Dimension of the task.
+   * @brief Construct a new Task object with name, configuration space of size
+   * xdim and tangent space of size vdim.
+   *
+   * @param name Name of the task
+   * @param xdim Dimension of the configuration space of the task
+   * @param vdim Dimension of the tangent space of the task
+   */
+  Task(const std::string &name, const int &xdim, const int &vdim)
+      : name_(name) {
+    ResizeTask(xdim, vdim);
+  }
+
+  /**
+   * @brief Dimension of the task configuration space.
    *
    * @return const int
    */
-  const int &dim() const { return dim_; }
+  const int &xdim() const { return xdim_; }
+
+  /**
+   * @brief Dimension of the task tangent space
+   *
+   * @return const int&
+   */
+  const int &vdim() const { return vdim_; }
 
   const std::string &name() const { return name_; }
 
   /**
+   * @brief Position of the task (xdim x 1)
+   *
+   * @return Eigen::VectorXd
+   */
+  Eigen::VectorXd pos() { return f_->getOutput(0); };
+
+  /**
+   * @brief Velocity of the task (vdim x 1)
+   *
+   * @return Eigen::VectorXd
+   */
+  Eigen::VectorXd vel() { return f_->getOutput(1); }
+
+  /**
+   * @brief Acceleration of the task (vdim x 1)
+   *
+   * @return Eigen::VectorXd
+   */
+  Eigen::VectorXd acc() { return f_->getOutput(2); }
+
+  /**
    * @brief Resizes the dimension of the task.
    *
-   * @param ndim
+   * @param xdim Dimension of the task configuration space
+   * @param vdim Dimension of the task tangent space
    */
-  void ResizeTask(const int ndim) {
+  void ResizeTask(const int &xdim, const int &vdim) {
     // Set dimension of task
-    dim_ = ndim;
+    xdim_ = xdim;
+    vdim_ = vdim;
     // Weighting
-    w_ = Eigen::VectorXd::Ones(ndim);
+    w_ = Eigen::VectorXd::Ones(vdim);
     // Task error
-    e_ = Eigen::VectorXd::Zero(ndim);
+    e_ = Eigen::VectorXd::Zero(vdim);
     // Task error derivative
-    de_ = Eigen::VectorXd::Zero(ndim);
+    de_ = Eigen::VectorXd::Zero(vdim);
     // Task PD proportional gain
-    Kp_ = Eigen::DiagonalMatrix<double, Eigen::Dynamic>(ndim);
+    Kp_ = Eigen::DiagonalMatrix<double, Eigen::Dynamic>(vdim);
     Kp_.setZero();
     // Task PD derivative gain
-    Kd_ = Eigen::DiagonalMatrix<double, Eigen::Dynamic>(ndim);
+    Kd_ = Eigen::DiagonalMatrix<double, Eigen::Dynamic>(vdim);
     Kd_.setZero();
   }
 
@@ -116,6 +156,21 @@ class Task {
 
   virtual Eigen::VectorXd GetPDError() { return Kp_ * e_ + Kd_ * de_; }
 
+  void UpdateState(const Eigen::VectorXd &qpos, const Eigen::VectorXd &qvel,
+                   const Eigen::VectorXd &qacc) {
+    f_->call({qpos, qvel, qacc});
+  }
+
+  /**
+   * @brief Set function to compute the task position, velocity and
+   * acceleration.
+   *
+   * @param f
+   */
+  void SetFunction(const common::Function<Eigen::VectorXd>::SharedPtr &f) {
+    f_ = f;
+  }
+
  protected:
   // Task error
   Eigen::VectorXd e_;
@@ -127,8 +182,14 @@ class Task {
   Eigen::VectorXd w_;
 
  private:
-  int dim_ = 0;
+  // Dimension of the task configurations space
+  int xdim_ = 0;
+  // Dimension of the task tangent space
+  int vdim_ = 0;
   std::string name_;
+
+  // Wrapper for the function of the symbolic function
+  common::Function<Eigen::VectorXd>::SharedPtr f_;
 };
 
 }  // namespace osc

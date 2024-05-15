@@ -42,7 +42,7 @@ class Sparsity {
    *
    * @param sparsity
    */
-  Sparsity(const casadi::Sparsity &sparsity) {
+  Sparsity(const ::casadi::Sparsity &sparsity) {
     // Copy sparsity pattern
     rows_ = sparsity.rows();
     cols_ = sparsity.columns();

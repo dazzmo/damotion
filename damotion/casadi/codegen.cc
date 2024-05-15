@@ -1,7 +1,6 @@
-#include "damotion/utils/codegen.h"
+#include "damotion/casadi/codegen.h"
 
 namespace damotion {
-namespace utils {
 namespace casadi {
 
 ::casadi::Function codegen(const ::casadi::Function &f,
@@ -52,5 +51,4 @@ namespace casadi {
 }
 
 }  // namespace casadi
-}  // namespace utils
 }  // namespace damotion

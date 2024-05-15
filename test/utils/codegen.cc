@@ -1,4 +1,4 @@
-#include "damotion/utils/codegen.h"
+#include "damotion/casadi/codegen.h"
 
 #include <gflags/gflags.h>
 #include <gtest/gtest.h>
@@ -10,7 +10,7 @@ TEST(Codegen, Load) {
   casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
   casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});
 
-  f = damotion::utils::casadi::codegen(f, "./");
+  f = damotion::casadi::codegen(f, "./");
 
   // Evaluate function
   casadi::DMVector in(2);
@@ -26,7 +26,7 @@ TEST(Codegen, LoadDifferentFolder) {
   casadi::SX x = casadi::SX::sym("x"), y = casadi::SX::sym("y");
   casadi::Function f("test", {x, y}, {x + y}, {"x", "y"}, {"l"});
 
-  f = damotion::utils::casadi::codegen(f, "./tmp/");
+  f = damotion::casadi::codegen(f, "./tmp/");
 
   // Evaluate function
   casadi::DMVector in(2);

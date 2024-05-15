@@ -6,6 +6,7 @@
 #include <pinocchio/spatial/explog.hpp>
 
 namespace damotion {
+namespace math {
 
 template <typename T>
 Eigen::Matrix<T, 3, -1> log3(const Eigen::Matrix<T, 3, 3> &R) {
@@ -27,11 +28,12 @@ Eigen::Matrix<T, 3, -1> log3(const Eigen::Matrix<T, 3, 3> &R, T &theta) {
  * @return Eigen::Matrix<casadi::SX, 3, -1>
  */
 template <>
-Eigen::Matrix<casadi::SX, 3, -1> log3(const Eigen::Matrix<casadi::SX, 3, 3> &R,
-                                      casadi::SX &theta);
+Eigen::Matrix<::casadi::SX, 3, -1> log3(
+    const Eigen::Matrix<::casadi::SX, 3, 3> &R, ::casadi::SX &theta);
 
 template <>
-Eigen::Matrix<casadi::SX, 3, -1> log3(const Eigen::Matrix<casadi::SX, 3, 3> &R);
+Eigen::Matrix<::casadi::SX, 3, -1> log3(
+    const Eigen::Matrix<::casadi::SX, 3, 3> &R);
 
 template <typename T>
 void Jlog3(T &theta, const Eigen::Matrix<T, 3, 1> &log,
@@ -40,8 +42,8 @@ void Jlog3(T &theta, const Eigen::Matrix<T, 3, 1> &log,
 }
 
 template <>
-void Jlog3(casadi::SX &theta, const Eigen::Matrix<casadi::SX, 3, 1> &log,
-           Eigen::Matrix<casadi::SX, 3, 3> &J);
+void Jlog3(::casadi::SX &theta, const Eigen::Matrix<::casadi::SX, 3, 1> &log,
+           Eigen::Matrix<::casadi::SX, 3, 3> &J);
 
 template <typename T>
 Eigen::Matrix<T, 6, -1> log6(const Eigen::Matrix<T, 3, 3> &R,
@@ -58,8 +60,9 @@ Eigen::Matrix<T, 6, -1> log6(const Eigen::Matrix<T, 3, 3> &R,
  * @return Eigen::Matrix<casadi::SX, 3, -1>
  */
 template <>
-Eigen::Matrix<casadi::SX, 6, -1> log6(const Eigen::Matrix<casadi::SX, 3, 3> &R,
-                                      const Eigen::Matrix<casadi::SX, 3, 1> &p);
+Eigen::Matrix<::casadi::SX, 6, -1> log6(
+    const Eigen::Matrix<::casadi::SX, 3, 3> &R,
+    const Eigen::Matrix<::casadi::SX, 3, 1> &p);
 
 template <typename T>
 void Jlog6(const Eigen::Matrix<T, 3, 3> &R, const Eigen::Matrix<T, 3, 1> &p,
@@ -68,10 +71,11 @@ void Jlog6(const Eigen::Matrix<T, 3, 3> &R, const Eigen::Matrix<T, 3, 1> &p,
 }
 
 template <>
-void Jlog6(const Eigen::Matrix<casadi::SX, 3, 3> &R,
-           const Eigen::Matrix<casadi::SX, 3, 1> &p,
-           Eigen::Matrix<casadi::SX, 6, 6> &J);
+void Jlog6(const Eigen::Matrix<::casadi::SX, 3, 3> &R,
+           const Eigen::Matrix<::casadi::SX, 3, 1> &p,
+           Eigen::Matrix<::casadi::SX, 6, 6> &J);
 
+}  // namespace math
 }  // namespace damotion
 
 #endif /* UTILS_POSE_H */

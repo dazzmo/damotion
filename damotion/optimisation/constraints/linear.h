@@ -36,8 +36,8 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
       : ConstraintBase<MatrixType>(name, "linear_constraint") {
     // Constant vector b
     casadi::DM Ad, bd;
-    damotion::utils::casadi::toCasadi(b, bd);
-    damotion::utils::casadi::toCasadi(A, Ad);
+    damotion::casadi::toCasadi(b, bd);
+    damotion::casadi::toCasadi(A, Ad);
     casadi::SX bsx = bd;
     casadi::SX Asx = Ad;
 
@@ -150,14 +150,14 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
     }
 
     if (std::is_same<MatrixType, Eigen::SparseMatrix<double>>::value) {
-      fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
+      fA_ = std::make_shared<damotion::casadi::FunctionWrapper<MatrixType>>(
           casadi::Function(this->name() + "_A", in, {A}));
     } else {
-      fA_ = std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
+      fA_ = std::make_shared<damotion::casadi::FunctionWrapper<MatrixType>>(
           casadi::Function(this->name() + "_A", in, {densify(A)}));
     }
 
-    fb_ = std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
+    fb_ = std::make_shared<damotion::casadi::FunctionWrapper<Eigen::VectorXd>>(
         casadi::Function(this->name() + "_b", in, {densify(b)}));
 
     this->has_jac_ = true;

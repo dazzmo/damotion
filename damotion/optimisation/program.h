@@ -3,18 +3,15 @@
 
 #include <casadi/casadi.hpp>
 
+#include "damotion/casadi/codegen.h"
+#include "damotion/casadi/eigen.h"
+#include "damotion/casadi/function.h"
 #include "damotion/common/logging.h"
 #include "damotion/common/profiler.h"
 #include "damotion/optimisation/binding.h"
 #include "damotion/optimisation/constraints/constraints.h"
 #include "damotion/optimisation/costs/costs.h"
-#include "damotion/symbolic/expression.h"
-#include "damotion/symbolic/parameter.h"
-#include "damotion/symbolic/variable.h"
-#include "damotion/utils/codegen.h"
-#include "damotion/utils/eigen_wrapper.h"
-
-namespace sym = damotion::symbolic;
+#include "damotion/optimisation/fwd.h"
 
 namespace damotion {
 namespace optimisation {

@@ -3,10 +3,6 @@
 
 #include "damotion/control/osc/tasks/task.h"
 
-namespace opt = damotion::optimisation;
-namespace sym = damotion::symbolic;
-namespace utils = damotion::utils;
-
 namespace damotion {
 namespace control {
 namespace osc {
@@ -21,44 +17,10 @@ class MotionTask : public Task {
   MotionTask() = default;
   ~MotionTask() = default;
 
-  MotionTask(const std::string &name) : Task(name) {}
+  using SharedPtr = std::shared_ptr<MotionTask>;
 
-  /**
-   * @brief Position of the frame the motion task is based on
-   *
-   * @return Eigen::VectorXd
-   */
-  virtual Eigen::VectorXd pos() = 0;
-
-  /**
-   * @brief Velocity of the frame the motion task is based on
-   *
-   * @return Eigen::VectorXd
-   */
-  virtual Eigen::VectorXd vel() = 0;
-
-  /**
-   * @brief Acceleration of the frame the motion task is based on
-   *
-   * @return Eigen::VectorXd
-   */
-  virtual Eigen::VectorXd acc() = 0;
-
-  /**
-   * @brief Set the frame to base the motion task on
-   *
-   * @param frame
-   */
-  void SetFrame(const std::shared_ptr<model::TargetFrame> &frame) {
-    frame_ = frame;
-  }
-
-  /**
-   * @brief The TargetFrame the motion task is designed for
-   *
-   * @return const TargetFrame&
-   */
-  model::TargetFrame &Frame() { return *frame_; }
+  MotionTask(const std::string &name, const int &xdim, const int &vdim)
+      : Task(name, xdim, vdim) {}
 
   /**
    * @brief Compute the desired tracking task acceleration as a PD error
@@ -69,8 +31,6 @@ class MotionTask : public Task {
   virtual void ComputeMotionError() = 0;
 
  private:
-  // Target frame the motion task is associated with
-  std::shared_ptr<model::TargetFrame> frame_;
 };
 
 class PositionTask : public MotionTask {
@@ -78,16 +38,17 @@ class PositionTask : public MotionTask {
   PositionTask() = default;
   ~PositionTask() = default;
 
+  PositionTask(const std::string &name, const casadi::SX &xpos,
+               const casadi::SX &xvel, const casadi::SX &xacc)
+      : MotionTask(name, 3, 3) {
+    assert(xpos.size1() == 3 && xvel.size1() == 3 && xacc.size1() == 3 &&
+           "Symbolic vectors are incorrect size for PositionTask!");
+  }
+
   struct Reference {
     Eigen::Vector3d x;
     Eigen::Vector3d v;
   };
-
-  PositionTask(const std::string &name) : MotionTask(name) { ResizeTask(3); }
-
-  Eigen::VectorXd pos() override { return Frame().pos().topRows(3); }
-  Eigen::VectorXd vel() override { return Frame().vel().topRows(3); }
-  Eigen::VectorXd acc() override { return Frame().acc().topRows(3); }
 
   void ComputeMotionError();
 
@@ -106,16 +67,24 @@ class OrientationTask : public MotionTask {
   OrientationTask() = default;
   ~OrientationTask() = default;
 
+  /**
+   * @brief Construct a new Orientation Task object
+   *
+   * @param xpos Quaternion representing the orientation of the task frame
+   * @param xvel
+   * @param xacc
+   */
+  OrientationTask(const std::string &name, const casadi::SX &xpos,
+                  const casadi::SX &xvel, const casadi::SX &xacc)
+      : MotionTask(name, 4, 3) {
+    assert(xpos.size1() == 4 && xvel.size1() == 3 && xacc.size1() == 3 &&
+           "Symbolic vectors are incorrect size for OrientationTask!");
+  }
+
   struct Reference {
     Eigen::Quaterniond q;
     Eigen::Vector3d w;
   };
-
-  OrientationTask(const std::string &name) : MotionTask(name) { ResizeTask(3); }
-
-  Eigen::VectorXd pos() override { return Frame().pos().bottomRows(4); }
-  Eigen::VectorXd vel() override { return Frame().vel().bottomRows(3); }
-  Eigen::VectorXd acc() override { return Frame().acc().bottomRows(3); }
 
   /**
    * @brief Compute the desired tracking task acceleration as a PD error
@@ -147,11 +116,20 @@ class PoseTask : public MotionTask {
     Eigen::Vector3d w;
   };
 
-  PoseTask(const std::string &name) : MotionTask(name) { ResizeTask(6); }
-
-  Eigen::VectorXd pos() override { return Frame().pos(); }
-  Eigen::VectorXd vel() override { return Frame().vel(); }
-  Eigen::VectorXd acc() override { return Frame().acc(); }
+  /**
+   * @brief Construct a new PoseTask object
+   *
+   * @param xpos Vector rerpresenting the state (position and orientation) of
+   * the task frame (position vector and quaternion representation)
+   * @param xvel
+   * @param xacc
+   */
+  PoseTask(const std::string &name, const casadi::SX &xpos,
+           const casadi::SX &xvel, const casadi::SX &xacc)
+      : MotionTask(name, 7, 6) {
+    assert(xpos.size1() == 7 && xvel.size1() == 6 && xacc.size1() == 6 &&
+           "Symbolic vectors are incorrect size for PoseTask!");
+  }
 
   /**
    * @brief Compute the desired tracking task acceleration as a PD error

@@ -1,3 +1,12 @@
+/**
+ * @file bounds.h
+ * @author Damian Abood (damian.abood@sydney.edu.au)
+ * @brief Bound types used for conventional constrained optimisation
+ * @version 0.1
+ * @date 2024-05-09
+ *
+ *
+ */
 #ifndef BOUNDS_H
 #define BOUNDS_H
 

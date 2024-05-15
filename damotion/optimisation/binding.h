@@ -3,10 +3,7 @@
 
 #include <memory>
 
-#include "damotion/symbolic/parameter.h"
-#include "damotion/symbolic/variable.h"
-
-namespace sym = damotion::symbolic;
+#include "damotion/optimisation/fwd.h"
 
 namespace damotion {
 namespace optimisation {
@@ -53,15 +50,50 @@ class BindingBase {
     VLOG(10) << "Created binding with ID " << id_;
   }
 
+  /**
+   * @brief Number of inputs x for the binding
+   *
+   * @return const int&
+   */
   const int &nx() const { return nx_; }
+
+  /**
+   * @brief Number of parameters p for the binding
+   *
+   * @return const int&
+   */
   const int &np() const { return np_; }
 
-  const sym::VariableVector &x(const int i) const { return *x_[i]; }
+  /**
+   * @brief The i-th input x_i for the binding
+   *
+   * @param i
+   * @return const sym::VariableVector&
+   */
+  const sym::VariableVector &x(const int i) const {
+    assert(i < 0 && i >= nx() && "Out of range for binding inputs");
+    return *x_[i];
+  }
+
+  /**
+   * @brief Returns the vector of concatenated inputs x
+   *
+   * @return const sym::VariableVector&
+   */
   const sym::VariableVector &GetConcatenatedVariableVector() const {
     return *xc_;
   }
 
-  const sym::ParameterVector &p(const int &i) const { return *p_[i]; }
+  /**
+   * @brief The i-th parameter p_i for the binding
+   *
+   * @param i
+   * @return const sym::ParameterVector&
+   */
+  const sym::ParameterVector &p(const int &i) const {
+    assert(i < 0 && i >= np() && "Out of range for binding parameters");
+    return *p_[i];
+  }
 
  protected:
   Id id_;
@@ -133,6 +165,7 @@ class Binding : public BindingBase {
   const std::shared_ptr<T> &GetPtr() const { return c_; }
 
  private:
+  // Pointer to bound class T
   std::shared_ptr<T> c_;
 };
 

@@ -4,14 +4,13 @@
 #include <Eigen/Core>
 #include <casadi/casadi.hpp>
 
+#include "damotion/casadi/eigen.h"
+#include "damotion/casadi/function.h"
 #include "damotion/optimisation/bounds.h"
-#include "damotion/symbolic/expression.h"
-#include "damotion/utils/eigen_wrapper.h"
+#include "damotion/optimisation/fwd.h"
 
 namespace damotion {
 namespace optimisation {
-
-namespace sym = damotion::symbolic;
 
 template <typename MatrixType>
 class ConstraintBase {
@@ -68,13 +67,13 @@ class ConstraintBase {
 
     // Constraint
     SetConstraintFunction(
-        std::make_shared<utils::casadi::FunctionWrapper<Eigen::VectorXd>>(
+        std::make_shared<damotion::casadi::FunctionWrapper<Eigen::VectorXd>>(
             casadi::Function(this->name(), in, {c})));
 
     // Jacobian
     if (jac) {
       SetJacobianFunction(
-          std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
+          std::make_shared<damotion::casadi::FunctionWrapper<MatrixType>>(
               casadi::Function(this->name() + "_jac", in, {jacobian(c, x)})));
     }
 
@@ -94,7 +93,7 @@ class ConstraintBase {
       casadi::SX H = hessian(lTc, x);
       // Compute the Hessian of the product
       SetHessianFunction(
-          std::make_shared<utils::casadi::FunctionWrapper<MatrixType>>(
+          std::make_shared<damotion::casadi::FunctionWrapper<MatrixType>>(
               casadi::Function(this->name() + "_hes", in,
                                {casadi::SX::tril(H)})));
     }
@@ -347,6 +346,8 @@ class ConstraintBase {
 
   // Flag to indicate if the constraint has changed since it was used
   bool updated_;
+
+  bool code_generated_ = false;
 
   // Name of the constraint
   std::string name_;

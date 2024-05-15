@@ -11,6 +11,8 @@ namespace damotion {
 namespace planning {
 namespace optimisation {
 
+namespace casadi = ::casadi;
+
 class CollocationConstraintBase {
  public:
   CollocationConstraintBase() = default;
