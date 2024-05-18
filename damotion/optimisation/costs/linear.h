@@ -10,12 +10,11 @@ namespace optimisation {
  * @brief Cost of the form \f$ c^T x + b \f$
  *
  */
-template <typename MatrixType>
-class LinearCost : public CostBase<MatrixType> {
+class LinearCost : public CostBase {
  public:
   LinearCost(const std::string &name, const Eigen::VectorXd &c, const double &b,
              bool jac = true)
-      : CostBase<MatrixType>(name, "linear_cost") {
+      : CostBase(name, "linear_cost") {
     // Create Costs
     casadi::DM cd, bd = b;
     damotion::casadi::toCasadi(c, cd);
@@ -25,21 +24,20 @@ class LinearCost : public CostBase<MatrixType> {
   }
 
   LinearCost(const std::string &name, const casadi::SX &c, const casadi::SX &b,
-             const casadi::SXVector &p, bool jac = true)
-      : Cost(name, "linear_cost") {
+             const casadi::SXVector &p, bool jac = true) {
     ConstructCost(c, b, p, jac, true);
   }
 
-  LinearCost(const std::string &name, const sym::Expression &ex,
-             bool jac = true, bool hes = true)
-      : Cost(name, "linear_cost") {
+  LinearCost(const std::string &name, const casadi::SX &ex,
+             const casadi::SXVector &x, const casadi::SXVector &p,
+             bool jac = true, bool hes = true) {
     int nvar = 0;
     casadi::SXVector in = {};
     // Extract quadratic form
     casadi::SX c, b;
-    casadi::SX::linear_coeff(ex, ex.Variables()[0], c, b, true);
+    casadi::SX::linear_coeff(ex, x[0], c, b, true);
 
-    ConstructCost(c, b, ex.Parameters(), jac, hes);
+    ConstructCost(c, b, p, jac, hes);
   }
 
   /**
@@ -71,7 +69,7 @@ class LinearCost : public CostBase<MatrixType> {
    *
    * @return Eigen::VectorXd
    */
-  const Eigen::Ref<const Eigen::VectorXd> c() { return fc_->getOutput(0); }
+  const GenericMatrixData &c() { return fc_->getOutput(0); }
 
   /**
    * @brief Returns the constant term b in the cost expression.

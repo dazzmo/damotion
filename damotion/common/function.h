@@ -6,6 +6,7 @@
 #include <functional>
 #include <iostream>
 
+#include "damotion/common/eigen.h"
 #include "damotion/common/logging.h"
 #include "damotion/common/sparsity.h"
 
@@ -18,11 +19,10 @@ namespace common {
  */
 typedef std::vector<Eigen::Ref<const Eigen::VectorXd>> InputRefVector;
 
-template <typename MatrixType>
 class Function {
  public:
-  using UniquePtr = std::unique_ptr<Function<MatrixType>>;
-  using SharedPtr = std::shared_ptr<Function<MatrixType>>;
+  using UniquePtr = std::unique_ptr<Function>;
+  using SharedPtr = std::shared_ptr<Function>;
 
   /**
    * @brief Empty constructor for the Function class
@@ -73,9 +73,9 @@ class Function {
    * @brief Returns the current value of output i
    *
    * @param i
-   * @return const MatrixType&
+   * @return const GenericMatrixData&
    */
-  const MatrixType &getOutput(int i) const { return out_[i]; }
+  const GenericMatrixData &getOutput(int i) const { return out_[i]; }
 
  protected:
   void SetNumberOfInputs(const int &n) { n_in_ = n; }
@@ -93,7 +93,7 @@ class Function {
    *
    * @return std::vector<Eigen::MatrixXd>&
    */
-  std::vector<MatrixType> &OutputVector() { return out_; }
+  std::vector<GenericMatrixData> &OutputVector() { return out_; }
 
   /**
    * @brief Assesses if all inputs provided to the function are valid, such as
@@ -123,24 +123,24 @@ class Function {
   int n_out_;
 
   // Output data vector
-  mutable std::vector<MatrixType> out_;
+  mutable std::vector<GenericMatrixData> out_;
 };
 
 /**
  * @brief Function that operates by callback
  *
  */
-template <typename MatrixType>
-class CallbackFunction : public Function<MatrixType> {
+class CallbackFunction : public Function {
  public:
-  typedef std::function<void(const InputRefVector &, std::vector<MatrixType> &)>
+  typedef std::function<void(const InputRefVector &,
+                             std::vector<GenericMatrixData> &)>
       f_callback_;
 
   CallbackFunction() = default;
   ~CallbackFunction() = default;
 
   CallbackFunction(const int n_in, const int n_out, const f_callback_ &callback)
-      : Function<MatrixType>(n_in, n_out) {
+      : Function(n_in, n_out) {
     SetCallback(callback);
   }
 
@@ -151,8 +151,9 @@ class CallbackFunction : public Function<MatrixType> {
    * @param sparsity Sparsity object detailing the structure of the matrix
    */
   void InitialiseOutput(const int i, const Sparsity &sparsity) {
-    this->OutputVector()[i] =
-        MatrixType::Zero(sparsity.rows(), sparsity.cols());
+    // TODO - Fix this up
+    // this->OutputVector()[i] =
+    //     GenericMatrixData::Zero(sparsity.rows(), sparsity.cols());
   }
 
   /**
@@ -178,15 +179,6 @@ class CallbackFunction : public Function<MatrixType> {
  private:
   f_callback_ f_ = nullptr;
 };
-
-// Template specialisations
-
-template <>
-void CallbackFunction<double>::InitialiseOutput(const int i,
-                                                const Sparsity &sparsity);
-template <>
-void CallbackFunction<Eigen::SparseMatrix<double>>::InitialiseOutput(
-    const int i, const Sparsity &sparsity);
 
 }  // namespace common
 }  // namespace damotion

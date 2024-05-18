@@ -11,51 +11,37 @@
 namespace damotion {
 namespace optimisation {
 
-template <typename MatrixType>
 class CostBase {
  public:
   CostBase() = default;
   ~CostBase() = default;
 
-  CostBase(const std::string &name, const std::string &cost_type) {
-    // Set default name for constraint
-    if (name != "") {
-      name_ = name;
-    } else {
-      name_ = cost_type + "_" + std::to_string(CreateID());
-    }
-  }
-
-  CostBase(const std::string &name, const sym::Expression &ex, bool grd = false,
-           bool hes = false)
-      : CostBase(name, "cost") {
-    // Get input sizes
-    nx_ = ex.Variables().size();
-    np_ = ex.Parameters().size();
-
+  CostBase(const std::string &name, const casadi::SX &ex,
+           const casadi::SXVector &x, const casadi::SXVector &p,
+           bool grd = false, bool hes = false)
+      : nx_(x.size()), np_(p.size()) {
+    // TODO - Set ID
     // Convert input variables to single vector
-    casadi::SX x = casadi::SX::vertcat(ex.Variables());
+    casadi::SX x = casadi::SX::vertcat(x);
 
     // Create functions to compute the constraint and derivatives given the
     // variables and parameters
 
     // Input vectors {x, p}
-    casadi::SXVector in = ex.Variables();
-    for (const casadi::SX &pi : ex.Parameters()) {
+    casadi::SXVector in = x;
+    for (const casadi::SX &pi : p) {
       in.push_back(pi);
     }
 
     // Create functions for each and wrap them
     // Constraint
-    SetObjectiveFunction(
-        std::make_shared<damotion::casadi::FunctionWrapper<double>>(
-            casadi::Function(name, in, {ex})));
+    SetObjectiveFunction(std::make_shared<damotion::casadi::FunctionWrapper>(
+        casadi::Function(name, in, {ex})));
     // Jacobian
     if (grd) {
       // Wrap the functions
-      SetGradientFunction(
-          std::make_shared<damotion::casadi::FunctionWrapper<Eigen::VectorXd>>(
-              casadi::Function(name + "_grd", in, gradient(ex, x))));
+      SetGradientFunction(std::make_shared<damotion::casadi::FunctionWrapper>(
+          casadi::Function(name + "_grd", in, gradient(ex, x))));
       grd_.resize(nx_);
     }
 
@@ -63,9 +49,8 @@ class CostBase {
     if (hes) {
       // Wrap the functions
       SetHessianFunction(
-          std::make_shared<damotion::casadi::FunctionWrapper<MatrixType>>(
-              casadi::Function(name + "_hes", in,
-                               casadi::SX::tril(hessian(ex, x)))));
+          std::make_shared<damotion::casadi::FunctionWrapper>(casadi::Function(
+              name + "_hes", in, casadi::SX::tril(hessian(ex, x)))));
       hes_.resize(nx_, nx_);
     }
   }
@@ -136,7 +121,7 @@ class CostBase {
    *
    * @return const double&
    */
-  const double &Objective() const { return obj_; }
+  const double &Objective() const { return fobj_->getOutput(0); }
   /**
    * @brief The gradient of the cost with respect to the i-th variable
    * vector
@@ -144,9 +129,9 @@ class CostBase {
    * @param i
    * @return const VectorXd&
    */
-  const Eigen::VectorXd &Gradient() const {
+  const GenericMatrixData &Gradient() const {
     assert(has_grd_ && "This cost does not have a gradient to access");
-    return grd_;
+    return fgrd_->getOutput(0);
   }
   /**
    * @brief Returns the Hessian with respect to the variables.
@@ -156,9 +141,9 @@ class CostBase {
    * @param j
    * @return const MatrixType&
    */
-  const MatrixType &Hessian() const {
+  const GenericMatrixData &Hessian() const {
     assert(has_hes_ && "This cost does not have a hessian to access");
-    return hes_;
+    return fhes_->getOutput(0);
   }
 
   /**
@@ -169,26 +154,19 @@ class CostBase {
   const int &NumberOfInputParameters() const { return np_; }
 
  protected:
-  mutable double obj_;
-  mutable Eigen::VectorXd grd_;
-  mutable MatrixType hes_;
-
   /**
    * @brief Set the Objective Function object
    *
    * @param f
    */
-  void SetObjectiveFunction(const common::Function<double>::SharedPtr &f) {
-    fobj_ = f;
-  }
+  void SetObjectiveFunction(const common::Function::SharedPtr &f) { fobj_ = f; }
 
   /**
    * @brief Set the Gradient Function object
    *
    * @param f
    */
-  void SetGradientFunction(
-      const common::Function<Eigen::VectorXd>::SharedPtr &f) {
+  void SetGradientFunction(const common::Function::SharedPtr &f) {
     fgrd_ = f;
     has_grd_ = true;
   }
@@ -198,8 +176,7 @@ class CostBase {
    *
    * @param f
    */
-  void SetHessianFunction(
-      const typename common::Function<MatrixType>::SharedPtr &f) {
+  void SetHessianFunction(const typename common::Function::SharedPtr &f) {
     fhes_ = f;
     has_hes_ = true;
   }
@@ -218,11 +195,11 @@ class CostBase {
   std::string name_;
 
   // Objective function
-  common::Function<double>::SharedPtr fobj_;
+  common::Function::SharedPtr fobj_;
   // Gradient function of the objective
-  common::Function<Eigen::VectorXd>::SharedPtr fgrd_;
+  common::Function::SharedPtr fgrd_;
   // Hessian funciton of the objective
-  typename common::Function<MatrixType>::SharedPtr fhes_;
+  common::Function::SharedPtr fhes_;
 
   /**
    * @brief Creates a unique id for each cost
@@ -236,9 +213,6 @@ class CostBase {
     return id;
   }
 };
-
-typedef CostBase<Eigen::MatrixXd> Cost;
-typedef CostBase<Eigen::SparseMatrix<double>> SparseCost;
 
 }  // namespace optimisation
 }  // namespace damotion

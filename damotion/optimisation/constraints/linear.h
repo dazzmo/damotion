@@ -45,7 +45,8 @@ class LinearConstraint : public ConstraintBase<MatrixType> {
     ConstructConstraint(Asx, bsx, {}, bounds, jac);
   }
 
-  LinearConstraint(const std::string &name, const sym::Expression &ex,
+  LinearConstraint(const std::string &name, const casadi::SX &ex,
+                   const casadi::SXVector &x, const casadi::SXVector &p,
                    const BoundsType &bounds, bool jac = true)
       : ConstraintBase<MatrixType>(name, "linear_constraint") {
     // Extract linear form

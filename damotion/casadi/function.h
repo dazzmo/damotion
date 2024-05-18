@@ -18,10 +18,9 @@ namespace casadi {
  * representation
  *
  */
-template <typename MatrixType>
-class FunctionWrapper : public common::Function<MatrixType> {
+class FunctionWrapper : public common::Function {
  public:
-  using SharedPtr = std::shared_ptr<FunctionWrapper<MatrixType>>;
+  using SharedPtr = std::shared_ptr<FunctionWrapper>;
 
   FunctionWrapper() = default;
   ~FunctionWrapper() {
@@ -32,7 +31,7 @@ class FunctionWrapper : public common::Function<MatrixType> {
   }
 
   FunctionWrapper(const ::casadi::Function &f)
-      : common::Function<MatrixType>(f.n_in(), f.n_out()) {
+      : common::Function(f.n_in(), f.n_out()) {
     *this = f;
   }
 
@@ -65,10 +64,18 @@ class FunctionWrapper : public common::Function<MatrixType> {
     // Create dense matrices for the output
     for (int i = 0; i < f_.n_out(); ++i) {
       const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
+      std::vector<casadi_int> rows = {}, cols = {};
+      sparsity.get_triplet(rows, cols);
+      // Compute sparse matrix through eigen
+      std::vector<Eigen::Triplet<int>> triplets;
+      for (int i = 0; i < sparsity.nnz(); ++i) {
+        triplets.push_back(Eigen::Triplet<int>(rows[i], cols[i], 0.0));
+      }
+      Eigen::SparseMatrix<double> M(sparsity.rows(), sparsity.columns());
+      M.setFromTriplets(triplets.begin(), triplets.end());
       // Create dense matrix for output and add data to output data
       // pointer vector
-      this->OutputVector().push_back(
-          Eigen::MatrixXd::Zero(sparsity.rows(), sparsity.columns()));
+      this->OutputVector().push_back(GenericMatrixData(M));
       this->out_data_ptr_.push_back(this->OutputVector().back().data());
 
       VLOG(10) << f.name() << " Dense Output " << i;
@@ -130,35 +137,24 @@ class FunctionWrapper : public common::Function<MatrixType> {
 /**
  * @brief Factory for generating functions based on a casadi::Function object.
  *
- * @tparam MatrixType
  * @param f
  * @param codegen
  * @param dir
- * @return common::Function<MatrixType>::SharedPtr
+ * @return common::Function::SharedPtr
  */
-template <typename MatrixType>
-typename common::Function<MatrixType>::SharedPtr FunctionFactory(
+typename common::Function::SharedPtr FunctionFactory(
     const ::casadi::Function &f, bool codegen = false,
     const std::string &dir = "./") {
   // Create new FunctionWrapper
-  typename FunctionWrapper<MatrixType>::SharedPtr fptr =
-      std::make_shared<FunctionWrapper<MatrixType>>(f);
+  typename FunctionWrapper::SharedPtr fptr =
+      std::make_shared<FunctionWrapper>(f);
   // Generate code for function, if requested
   if (codegen) {
     fptr->f() = damotion::casadi::codegen(fptr->f(), dir);
   }
-  // Return as Function<MatrixType>::SharedPtr
+  // Return as Function::SharedPtr
   return fptr;
 }
-
-// Class specialisations
-template <>
-FunctionWrapper<double> &FunctionWrapper<double>::operator=(
-    ::casadi::Function f);
-
-template <>
-FunctionWrapper<Eigen::SparseMatrix<double>> &
-FunctionWrapper<Eigen::SparseMatrix<double>>::operator=(::casadi::Function f);
 
 }  // namespace casadi
 }  // namespace damotion

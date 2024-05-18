@@ -10,16 +10,15 @@ namespace optimisation {
  * @brief A cost of the form 0.5 x^T Q x + g^T x + c
  *
  */
-template <typename MatrixType>
-class QuadraticCost : public CostBase<MatrixType> {
+class QuadraticCost : public CostBase {
  public:
-  using UniquePtr = std::unique_ptr<QuadraticCost<MatrixType>>;
-  using SharedPtr = std::shared_ptr<QuadraticCost<MatrixType>>;
+  using UniquePtr = std::unique_ptr<QuadraticCost>;
+  using SharedPtr = std::shared_ptr<QuadraticCost>;
 
   QuadraticCost(const std::string &name, const Eigen::MatrixXd &A,
                 const Eigen::VectorXd &b, const double &c, bool jac = true,
                 bool hes = true)
-      : CostBase<MatrixType>(name, "quadratic_cost") {
+      : CostBase(name, "quadratic_cost") {
     // Cost
     casadi::DM Ad, bd;
     casadi::SX csx = c;
@@ -32,13 +31,14 @@ class QuadraticCost : public CostBase<MatrixType> {
   QuadraticCost(const std::string &name, const casadi::SX &A,
                 const casadi::SX &b, const casadi::SX &c,
                 const casadi::SXVector &p, bool jac = true, bool hes = true)
-      : CostBase<MatrixType>(name, "quadratic_cost") {
+      : CostBase(name, "quadratic_cost") {
     ConstructConstraint(A, b, c, p, jac, hes);
   }
 
-  QuadraticCost(const std::string &name, const sym::Expression &ex,
+  QuadraticCost(const std::string &name, const casadi::SX &ex,
+                const casadi::SXVector &x, const casadi::SXVector &p,
                 bool jac = true, bool hes = true)
-      : CostBase<MatrixType>(name, "quadratic_cost") {
+      : CostBase(name, "quadratic_cost") {
     casadi::SXVector in = {};
     // Extract quadratic form
     casadi::SX A, b, c;
@@ -55,9 +55,9 @@ class QuadraticCost : public CostBase<MatrixType> {
    *
    * @return const MatrixType&
    */
-  const MatrixType &A() const { return fA_->getOutput(0); }
+  const GenericMatrixData &A() const { return fA_->getOutput(0); }
 
-  const Eigen::VectorXd &b() const { return fb_->getOutput(0); }
+  const GenericMatrixData &b() const { return fb_->getOutput(0); }
 
   const double &c() const { return fc_->getOutput(0); }
 
@@ -95,7 +95,7 @@ class QuadraticCost : public CostBase<MatrixType> {
   }
 
  private:
-  std::shared_ptr<common::Function<MatrixType>> fA_;
+  std::shared_ptr<common::Function> fA_;
   std::shared_ptr<common::Function<Eigen::VectorXd>> fb_;
   std::shared_ptr<common::Function<double>> fc_;
 
@@ -114,10 +114,10 @@ class QuadraticCost : public CostBase<MatrixType> {
     // Create coefficient functions
     casadi::SX A_lt = casadi::SX::tril(A);
     if (std::is_same<MatrixType, Eigen::SparseMatrix<double>>::value) {
-      fA_ = std::make_shared<damotion::casadi::FunctionWrapper<MatrixType>>(
+      fA_ = std::make_shared<damotion::casadi::FunctionWrapper>(
           casadi::Function(this->name() + "_A", in, {A_lt}));
     } else {
-      fA_ = std::make_shared<damotion::casadi::FunctionWrapper<MatrixType>>(
+      fA_ = std::make_shared<damotion::casadi::FunctionWrapper>(
           casadi::Function(this->name() + "_A", in, {densify(A_lt)}));
     }
     fb_ = std::make_shared<damotion::casadi::FunctionWrapper<Eigen::VectorXd>>(
