@@ -9,15 +9,10 @@ namespace damotion {
 namespace optimisation {
 namespace solvers {
 
-template <typename MatrixType>
 class SolverBase {
  public:
-  typedef ProgramBase<MatrixType> ProgramType;
-  typedef ConstraintBase<MatrixType> ConstraintType;
-  typedef CostBase<MatrixType> CostType;
-
-  SolverBase(ProgramType& program) : program_(program) {
-    int nx = program_.NumberOfDecisionVariables();
+  SolverBase(ProgramBase& program) : program_(program) {
+    int nx = program_.DecisionVariableManager().NumberOfVariables();
     int nc = program_.NumberOfConstraints();
     // Initialise vectors
     decision_variable_cache_ = Eigen::VectorXd::Zero(nx);
@@ -47,7 +42,7 @@ class SolverBase {
    *
    * @return Program&
    */
-  ProgramType& GetCurrentProgram() { return program_; }
+  ProgramBase& GetCurrentProgram() { return program_; }
 
   /**
    * @brief Updates the existing solver with an update program (e.g.
@@ -55,7 +50,7 @@ class SolverBase {
    *
    * @param program
    */
-  void UpdateProgram(ProgramType& program) { program_ = program; }
+  void UpdateProgram(ProgramBase& program) { program_ = program; }
 
   /**
    * @brief Return the primal solution for the associated program, if solved
@@ -78,9 +73,9 @@ class SolverBase {
    * @brief Returns a vector of bindings to CostBase<MatrixType> for each
    * binding within the program.
    *
-   * @return const std::vector<Binding<CostType>>&
+   * @return const std::vector<Binding<CostBase>>&
    */
-  const std::vector<Binding<CostType>>& GetCostBindings() const {
+  const std::vector<Binding<CostBase>>& GetCostBindings() const {
     return cost_base_bindings_;
   }
 
@@ -89,9 +84,9 @@ class SolverBase {
    * binding within the program. Useful for iterating through all constraint's
    * base classes.
    *
-   * @return const std::vector<Binding<ConstraintType>>&
+   * @return const std::vector<Binding<ConstraintBase>>&
    */
-  const std::vector<Binding<ConstraintType>>& GetConstraintBindings() const {
+  const std::vector<Binding<ConstraintBase>>& GetConstraintBindings() const {
     return constraint_base_bindings_;
   }
 
@@ -108,13 +103,15 @@ class SolverBase {
                                     bool is_continuous = false) {
     if (is_continuous) {
       return primal_solution_x_.middleRows(
-          GetCurrentProgram().GetDecisionVariableIndex(var[0]), var.size());
+          GetCurrentProgram().GetDecisionVariableManager().GetVariableIndex(
+              var[0]),
+          var.size());
     } else {
       Eigen::VectorXd vec(var.size());
       for (int i = 0; i < var.size(); ++i) {
-        vec[i] =
-            primal_solution_x_[GetCurrentProgram().GetDecisionVariableIndex(
-                var[i])];
+        vec[i] = primal_solution_x_[GetCurrentProgram()
+                                        .GetDecisionVariableManager()
+                                        .GetVariableIndex(var[i])];
       }
       return vec;
     }
@@ -123,18 +120,18 @@ class SolverBase {
   /**
    * @brief All constraints within the program
    *
-   * @return std::vector<Binding<ConstraintType>>&
+   * @return std::vector<Binding<ConstraintBase>>&
    */
-  std::vector<Binding<ConstraintType>>& GetConstraints() {
+  std::vector<Binding<ConstraintBase>>& GetConstraints() {
     return constraints_;
   }
 
   /**
    * @brief All costs within the program
    *
-   * @return std::vector<Binding<CostType>>&
+   * @return std::vector<Binding<CostBase>>&
    */
-  std::vector<Binding<CostType>>& GetCosts() { return costs_; }
+  std::vector<Binding<CostBase>>& GetCosts() { return costs_; }
 
   /**
    * @brief Updates the variables var within the vector vec with values val.
@@ -143,7 +140,7 @@ class SolverBase {
    *
    * @param binding
    */
-  void UpdateCostGradient(const Binding<CostType>& binding) {
+  void UpdateCostGradient(const Binding<CostBase>& binding) {
     VLOG(10) << "UpdateCostGradient()";
     BindingInputData& data = GetBindingInputData(binding);
     int g_idx = 0;
@@ -183,7 +180,8 @@ class SolverBase {
         for (int j = 0; j < xi.size(); ++j) {
           data.x_manual_vecs[manual_cnt][j] =
               decision_variable_cache_[GetCurrentProgram()
-                                           .GetDecisionVariableIndex(xi[j])];
+                                           .DecisionVariableManager()
+                                           .GetVariableIndex(xi[j])];
         }
         x.push_back(data.x_manual_vecs[manual_cnt++]);
       }
@@ -202,9 +200,8 @@ class SolverBase {
         VLOG(10) << data.p_manual_vecs.size();
         // Construct a vector for this input
         for (int j = 0; j < pi.size(); ++j) {
-          data.p_manual_vecs[manual_cnt][j] =
-              decision_variable_cache_[GetCurrentProgram().GetParameterIndex(
-                  pi[j])];
+          data.p_manual_vecs[manual_cnt][j] = decision_variable_cache_
+              [GetCurrentProgram().ParameterManager().GetVariableIndex(pi[j])];
         }
         p.push_back(data.p_manual_vecs[manual_cnt++]);
       }
@@ -228,9 +225,9 @@ class SolverBase {
   Eigen::VectorXd primal_solution_x_;
 
   // Vector of the constraint bindings for the program
-  std::vector<Binding<ConstraintType>> constraints_;
+  std::vector<Binding<ConstraintBase>> constraints_;
   // Vector of the cost bindings for the program
-  std::vector<Binding<CostType>> costs_;
+  std::vector<Binding<CostBase>> costs_;
 
   /**
    * @brief Binding data related to whether the inputs are continuous within
@@ -381,15 +378,15 @@ class SolverBase {
  private:
   bool is_solved_ = false;
   // Reference to current program in solver
-  ProgramType& program_;
+  ProgramBase& program_;
   // Index of the constraints within the constraint vector
   std::vector<int> constraint_idx_;
 
   // Provides data for each variable
   std::unordered_map<int, int> binding_idx_;
   std::vector<BindingInputData> data_ = {};
-  std::vector<Binding<CostType>> cost_base_bindings_ = {};
-  std::vector<Binding<ConstraintType>> constraint_base_bindings_ = {};
+  std::vector<Binding<CostBase>> cost_base_bindings_ = {};
+  std::vector<Binding<ConstraintBase>> constraint_base_bindings_ = {};
 
   /**
    * @brief Register a binding with the solver

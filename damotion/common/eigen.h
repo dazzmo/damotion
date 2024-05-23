@@ -57,6 +57,16 @@ class GenericMatrixData {
   }
 
   /**
+   * @brief Construct a new Generic Matrix Data object by copying a Eigen
+   * SparseMatrix object with its data and sparsity pattern.
+   *
+   * @param mat
+   */
+  GenericMatrixData(const Eigen::Ref<const Eigen::SparseMatrix<double>>& mat) {
+    data_ = mat;
+  }
+
+  /**
    * @brief Express the GenericMatrixData as a scalar value.
    *
    * @return double
@@ -77,7 +87,7 @@ class GenericMatrixData {
    *
    * @return Eigen::Map<const Eigen::VectorXd>
    */
-  operator Eigen::Map<const Eigen::VectorXd>() {
+  operator Eigen::Map<const Eigen::VectorXd>() const {
     return Eigen::Map<const Eigen::VectorXd>(data_.valuePtr(),
                                              data_.nonZeros());
   }
@@ -88,7 +98,7 @@ class GenericMatrixData {
    *
    * @return Eigen::VectorXd
    */
-  operator Eigen::VectorXd() {
+  operator Eigen::VectorXd() const {
     return Eigen::Map<const Eigen::VectorXd>(data_.valuePtr(),
                                              data_.nonZeros());
   }
@@ -99,7 +109,7 @@ class GenericMatrixData {
    *
    * @return Eigen::MatrixXd
    */
-  operator Eigen::MatrixXd() {
+  operator Eigen::MatrixXd() const {
     assert(data_.nonZeros() == data_.rows() * data_.cols() &&
            "Data array is not large to provide a matrix map");
     return Eigen::Map<const Eigen::MatrixXd>(data_.valuePtr(), data_.rows(),
@@ -112,7 +122,7 @@ class GenericMatrixData {
    *
    * @return Eigen::SparseMatrix<double>
    */
-  operator Eigen::SparseMatrix<double>() { return data_; }
+  operator Eigen::SparseMatrix<double>() const { return data_; }
 
   /**
    * @brief Returns a reference to the SparseMatrix class that manages the data
@@ -153,6 +163,12 @@ class GenericMatrixData {
 
   Eigen::SparseMatrix<double> data_;
 };
+
+std::ostream& operator<<(std::ostream& os, const GenericMatrixData& data) {
+  std::ostringstream oss;
+  oss << data.SparseMatrix() << '\n';
+  return os << oss.str();
+}
 
 }  // namespace damotion
 

@@ -18,11 +18,11 @@ class CostBase {
 
   CostBase(const std::string &name, const casadi::SX &ex,
            const casadi::SXVector &x, const casadi::SXVector &p,
-           bool grd = false, bool hes = false)
+           bool grd = false, bool hes = false, bool sparse = false)
       : nx_(x.size()), np_(p.size()) {
     // TODO - Set ID
     // Convert input variables to single vector
-    casadi::SX x = casadi::SX::vertcat(x);
+    casadi::SX xc = casadi::SX::vertcat(x);
 
     // Create functions to compute the constraint and derivatives given the
     // variables and parameters
@@ -33,6 +33,12 @@ class CostBase {
       in.push_back(pi);
     }
 
+    casadi::SX g = gradient(ex, xc), h = casadi::SX::tril(hessian(ex, xc));
+    if (!sparse) {
+      g = densify(g);
+      h = densify(h);
+    }
+
     // Create functions for each and wrap them
     // Constraint
     SetObjectiveFunction(std::make_shared<damotion::casadi::FunctionWrapper>(
@@ -41,17 +47,14 @@ class CostBase {
     if (grd) {
       // Wrap the functions
       SetGradientFunction(std::make_shared<damotion::casadi::FunctionWrapper>(
-          casadi::Function(name + "_grd", in, gradient(ex, x))));
-      grd_.resize(nx_);
+          casadi::Function(name + "_grd", in, {g})));
     }
 
     // Hessian
     if (hes) {
       // Wrap the functions
-      SetHessianFunction(
-          std::make_shared<damotion::casadi::FunctionWrapper>(casadi::Function(
-              name + "_hes", in, casadi::SX::tril(hessian(ex, x)))));
-      hes_.resize(nx_, nx_);
+      SetHessianFunction(std::make_shared<damotion::casadi::FunctionWrapper>(
+          casadi::Function(name + "_hes", in, {h})));
     }
   }
 
@@ -61,6 +64,19 @@ class CostBase {
    * @return const std::string&
    */
   const std::string &name() const { return name_; }
+
+  /**
+   * @brief Set the name of the constraint
+   *
+   * @param name
+   */
+  void SetName(const std::string &name) {
+    if (name == "") {
+      name_ = "cost_" + std::to_string(CreateID());
+    } else {
+      name_ = name;
+    }
+  }
 
   /**
    * @brief Whether the cost has a non-zero gradient
@@ -119,9 +135,9 @@ class CostBase {
   /**
    * @brief Returns the most recent evaluation of the cost objective
    *
-   * @return const double&
+   * @return const GenericMatrixData&
    */
-  const double &Objective() const { return fobj_->getOutput(0); }
+  const GenericMatrixData &Objective() const { return fobj_->getOutput(0); }
   /**
    * @brief The gradient of the cost with respect to the i-th variable
    * vector
@@ -176,7 +192,7 @@ class CostBase {
    *
    * @param f
    */
-  void SetHessianFunction(const typename common::Function::SharedPtr &f) {
+  void SetHessianFunction(const common::Function::SharedPtr &f) {
     fhes_ = f;
     has_hes_ = true;
   }

@@ -19,24 +19,23 @@ class CollocationConstraintBase {
   ~CollocationConstraintBase() = default;
 
   // CollocationConstraintBase(const &model)
-  template <typename MatrixType>
-  std::shared_ptr<damotion::optimisation::ConstraintBase<MatrixType>>
-  GetConstraint() {
-    auto c =
-        std::make_shared<damotion::optimisation::ConstraintBase<MatrixType>>(
-            "collocation", con_, damotion::optimisation::BoundsType::kEquality,
-            true, true);
+  std::shared_ptr<damotion::optimisation::ConstraintBase> GetConstraint() {
+    auto c = std::make_shared<damotion::optimisation::ConstraintBase>(
+        "collocation", con_, damotion::optimisation::BoundsType::kEquality,
+        true, true);
     return c;
   }
 
  protected:
-  symbolic::Expression &GetConstraintExpression() { return con_; }
+  casadi::SX &GetConstraintExpression() { return con_; }
 
  private:
   int nx_ = 0;
   int nu_ = 0;
 
-  symbolic::Expression con_;
+  casadi::SX con_;
+  casadi::SXVector x_;
+  casadi::SXVector p_;
 };
 
 class TrapezoidalCollocationConstraint : public CollocationConstraintBase {
@@ -55,7 +54,8 @@ class TrapezoidalCollocationConstraint : public CollocationConstraintBase {
 
     // Integrate over interval to provide collocation constraint
     GetConstraintExpression() = x1 - x0 - 0.5 * h * (f0 + f1);
-    GetConstraintExpression().SetInputs({x0, x1, u0, u1, h}, {});
+    this->x_ = {x0, x1, u0, u1, h};
+    this->p_ = {};
 
     VLOG(10) << "Trapezoidal Collocation Constraint:";
     VLOG(10) << GetConstraintExpression();

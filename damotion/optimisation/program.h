@@ -18,321 +18,12 @@ namespace optimisation {
 
 // Forward declaration of SolverBase
 namespace solvers {
-template <typename MatrixType>
 class SolverBase;
 }
 
-/**
- * @brief Class that maintains and adjusts decision variables organised into a
- * vector
- *
- */
-class DecisionVariableManager {
- public:
-  DecisionVariableManager() : n_decision_variables_(0) {}
-  ~DecisionVariableManager() = default;
-
-  /**
-   * @brief Number of decision variables currently in the program
-   *
-   * @return const int&
-   */
-  const int &NumberOfDecisionVariables() const { return n_decision_variables_; }
-
-  /**
-   * @brief Adds a decision variable
-   *
-   * @param var
-   */
-  void AddDecisionVariable(const sym::Variable &var);
-
-  /**
-   * @brief Add decision variables
-   *
-   * @param var
-   */
-  void AddDecisionVariables(const Eigen::Ref<const sym::VariableMatrix> &var);
-
-  /**
-   * @brief Removes variables currently considered by the program.
-   *
-   * @param var
-   */
-  void RemoveDecisionVariables(const Eigen::Ref<sym::VariableMatrix> &var);
-
-  /**
-   * @brief Whether a variable var is a decision variable within the program
-   *
-   * @param var
-   * @return true
-   * @return false
-   */
-  bool IsDecisionVariable(const sym::Variable &var);
-
-  /**
-   * @brief Returns the index of the given variable within the created
-   * optimisation vector
-   *
-   * @param v
-   * @return int
-   */
-  int GetDecisionVariableIndex(const sym::Variable &v);
-
-  /**
-   * @brief Returns a vector of indices for the position of each entry in v in
-   * the current decision variable vector.
-   *
-   * @param v
-   * @return std::vector<int>
-   */
-  std::vector<int> GetDecisionVariableIndices(const sym::VariableVector &v);
-
-  /**
-   * @brief Set the vector of decision variables to the default ordering of
-   * variables (ordered by when they were added)
-   *
-   */
-  void SetDecisionVariableVector();
-
-  /**
-   * @brief Sets the optimisation vector with the given ordering of variables
-   *
-   * @param var
-   */
-  bool SetDecisionVariableVector(const Eigen::Ref<sym::VariableVector> &var);
-
-  /**
-   * @brief Determines whether a vector of variables var is continuous within
-   * the optimisation vector of the program.
-   *
-   * @param var
-   * @return true
-   * @return false
-   */
-  bool IsContinuousInDecisionVariableVector(const sym::VariableVector &var);
-
-  /**
-   * @brief Updates the decision variable bound vectors with all the current
-   * values set for the decision variables.
-   *
-   */
-  void UpdateDecisionVariableBoundVectors() {
-    for (size_t i = 0; i < decision_variables_.size(); ++i) {
-      DecisionVariableData &data = decision_variables_data_[i];
-      if (data.bounds_updated) {
-        int idx = GetDecisionVariableIndex(decision_variables_[i]);
-        xbl_[idx] = data.bl;
-        xbu_[idx] = data.bu;
-      }
-    }
-  }
-
-  /**
-   * @brief Updates the initial value vector for the decision variables with all
-   * the current values set for the decision variables.
-   *
-   */
-  void UpdateInitialValueVector() {
-    for (size_t i = 0; i < decision_variables_.size(); ++i) {
-      DecisionVariableData &data = decision_variables_data_[i];
-      if (data.initial_value_updated) {
-        int idx = GetDecisionVariableIndex(decision_variables_[i]);
-        x0_[idx] = data.x0;
-      }
-    }
-  }
-
-  /**
-   * @brief Vector of initial values for the decision variables within the
-   * program.
-   *
-   * @return const Eigen::VectorXd&
-   */
-  const Eigen::VectorXd &DecisionVariableInitialValues() const { return x0_; }
-
-  /**
-   * @brief Upper bound for decision variables within the current program.
-   *
-   * @return const Eigen::VectorXd&
-   */
-  const Eigen::VectorXd &DecisionVariableUpperBounds() const { return xbu_; }
-
-  /**
-   * @brief Upper bound for decision variables within the current program.
-   *
-   * @return const Eigen::VectorXd&
-   */
-  const Eigen::VectorXd &DecisionVariableLowerBounds() const { return xbl_; }
-
-  void SetDecisionVariableBounds(const sym::Variable &v, const double &lb,
-                                 const double &ub);
-  void SetDecisionVariableBounds(const sym::VariableVector &v,
-                                 const Eigen::VectorXd &lb,
-                                 const Eigen::VectorXd &ub);
-
-  void SetDecisionVariableInitialvalue(const sym::Variable &v,
-                                       const double &x0);
-  void SetDecisionVariableInitialvalue(const sym::VariableVector &v,
-                                       const Eigen::VectorXd &x0);
-
-  /**
-   * @brief Prints the current set of parameters for the program to the
-   * screen
-   *
-   */
-  void ListDecisionVariables();
-
- private:
-  // Number of decision variables
-  int n_decision_variables_;
-
-  // Decision variable upper bounds
-  Eigen::VectorXd xbu_;
-  // Decision variable lower bounds
-  Eigen::VectorXd xbl_;
-  // Initial values for decision variables
-  Eigen::VectorXd x0_;
-
-  // Location of each decision variable within the optimisation vector
-  std::unordered_map<sym::Variable::Id, int> decision_variable_idx_;
-  // Index locations for data related to each variable
-  std::unordered_map<sym::Variable::Id, int> decision_variable_vec_idx_;
-  // Vector of all decision variables used
-  std::vector<sym::Variable> decision_variables_;
-
-  struct DecisionVariableData {
-    bool bounds_updated = false;
-    bool initial_value_updated = false;
-    double bl = -std::numeric_limits<double>::infinity();
-    double bu = std::numeric_limits<double>::infinity();
-    double x0 = 0.0;
-  };
-
-  std::vector<DecisionVariableData> decision_variables_data_;
-};
-
-/**
- * @brief Class that maintains and adjusts parameters organised into a
- * vector
- *
- */
-class ParameterManager {
- public:
-  ParameterManager() : n_parameters_(0) { parameter_vec_.resize(0); }
-  ~ParameterManager() = default;
-
-  /**
-   * @brief Number of parameters currently in the program
-   *
-   * @return const int&
-   */
-  const int &NumberOfParameters() const { return n_parameters_; }
-
-  /**
-   * @brief Adds a parameter
-   *
-   * @param var
-   */
-  void AddParameter(const sym::Parameter &par);
-  void AddParameters(const sym::ParameterVector &par);
-  void AddParameters(const sym::ParameterMatrix &par);
-
-  /**
-   * @brief Removes variables currently considered by the program.
-   *
-   * @param var
-   */
-  void RemoveParameters(const Eigen::Ref<sym::ParameterMatrix> &par);
-
-  /**
-   * @brief Whether a variable var is a parameter within the program
-   *
-   * @param var
-   * @return true
-   * @return false
-   */
-  bool IsParameter(const sym::Parameter &par);
-
-  /**
-   * @brief Returns the index of the given variable within the created
-   * optimisation vector
-   *
-   * @param v
-   * @return int
-   */
-  int GetParameterIndex(const sym::Parameter &v);
-
-  /**
-   * @brief Determines whether a vector of variables var is continuous within
-   * the optimisation vector of the program.
-   *
-   * @param var
-   * @return true
-   * @return false
-   */
-  bool IsContinuousInParameterVector(const sym::ParameterVector &par);
-
-  /**
-   * @brief Provides a reference to the data for the parameter vector par. This
-   * is only valid for parameters that are continuous (i.e. a single parameter
-   * vector) and will not return a valid reference if the vector is not
-   * continuous in the data vector.
-   *
-   * @param par
-   * @return Eigen::Ref<Eigen::VectorXd>
-   */
-  Eigen::Map<Eigen::VectorXd> GetParameterRef(const sym::ParameterVector &par) {
-    if (IsContinuousInParameterVector(par)) {
-      return Eigen::Map<Eigen::VectorXd>(
-          parameter_vec_.data() + GetParameterIndex(par[0]), par.size());
-    } else {
-      LOG(WARNING)
-          << "GetParameterRef(): Parameter " << par
-          << " is not continuous in parameter vector to provide reference";
-      throw std::runtime_error(
-          "Not continuous in parameter vector to provide reference");
-    }
-  }
-
-  /**
-   * @brief Provides a reference to the single parameter p within the parameter
-   * data vector.
-   *
-   * @param par
-   * @return Eigen::Map<Eigen::VectorXd>
-   */
-  Eigen::Map<Eigen::VectorXd> GetParameterRef(const sym::Parameter &p) {
-    return Eigen::Map<Eigen::VectorXd>(
-        parameter_vec_.data() + GetParameterIndex(p), 1);
-  }
-
-  /**
-   * @brief Vector that holds all parameter values.
-   *
-   * @return const Eigen::VectorXd&
-   */
-  const Eigen::VectorXd &GetParameterVector() { return parameter_vec_; }
-
-  /**
-   * @brief Prints the current set of parameters for the program to the
-   * screen
-   *
-   */
-  void ListParameters();
-
- private:
-  // Number of parameters
-  int n_parameters_;
-
-  std::unordered_map<sym::Parameter::Id, int> parameter_idx_;
-  std::vector<sym::Parameter> parameters_;
-  Eigen::VectorXd parameter_vec_;
-};
-
-template <typename MatrixType>
 class CostManager {
  public:
-  typedef CostBase<MatrixType> CostType;
+  typedef CostBase CostType;
 
   CostManager() = default;
   ~CostManager() = default;
@@ -343,7 +34,7 @@ class CostManager {
    * @param cost
    * @param x
    * @param p
-   * @return Binding<Cost<MatrixType>>
+   * @return Binding<Cost>
    */
   Binding<CostType> AddCost(const std::shared_ptr<CostType> &cost,
                             const sym::VariableRefVector &x,
@@ -353,17 +44,17 @@ class CostManager {
     return costs_.back();
   }
 
-  Binding<LinearCost<MatrixType>> AddLinearCost(
-      const std::shared_ptr<LinearCost<MatrixType>> &cost,
-      const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
-    linear_costs_.push_back(Binding<LinearCost<MatrixType>>(cost, x, p));
+  Binding<LinearCost> AddLinearCost(const std::shared_ptr<LinearCost> &cost,
+                                    const sym::VariableRefVector &x,
+                                    const sym::ParameterRefVector &p) {
+    linear_costs_.push_back(Binding<LinearCost>(cost, x, p));
     return linear_costs_.back();
   }
 
-  Binding<QuadraticCost<MatrixType>> AddQuadraticCost(
-      const std::shared_ptr<QuadraticCost<MatrixType>> &cost,
+  Binding<QuadraticCost> AddQuadraticCost(
+      const std::shared_ptr<QuadraticCost> &cost,
       const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
-    quadratic_costs_.push_back(Binding<QuadraticCost<MatrixType>>(cost, x, p));
+    quadratic_costs_.push_back(Binding<QuadraticCost>(cost, x, p));
     return quadratic_costs_.back();
   }
 
@@ -383,7 +74,7 @@ class CostManager {
    *
    * @return std::vector<Binding<LinearCost>>&
    */
-  std::vector<Binding<LinearCost<MatrixType>>> &GetLinearCostBindings() {
+  std::vector<Binding<LinearCost>> &GetLinearCostBindings() {
     // Create constraints
     return linear_costs_;
   }
@@ -394,7 +85,7 @@ class CostManager {
    *
    * @return std::vector<Binding<QuadraticCost>>&
    */
-  std::vector<Binding<QuadraticCost<MatrixType>>> &GetQuadraticCostBindings() {
+  std::vector<Binding<QuadraticCost>> &GetQuadraticCostBindings() {
     // Create constraints
     return quadratic_costs_;
   }
@@ -417,11 +108,10 @@ class CostManager {
  private:
   // Costs
   std::vector<Binding<CostType>> costs_;
-  std::vector<Binding<LinearCost<MatrixType>>> linear_costs_;
-  std::vector<Binding<QuadraticCost<MatrixType>>> quadratic_costs_;
+  std::vector<Binding<LinearCost>> linear_costs_;
+  std::vector<Binding<QuadraticCost>> quadratic_costs_;
 };
 
-template <typename MatrixType>
 class ConstraintManager {
  public:
   ConstraintManager() : n_constraints_(0) {}
@@ -443,35 +133,34 @@ class ConstraintManager {
    * @param p
    * @return Binding<ConstraintBase>
    */
-  Binding<ConstraintBase<MatrixType>> AddConstraint(
-      const std::shared_ptr<ConstraintBase<MatrixType>> &con,
+  Binding<ConstraintBase> AddConstraint(
+      const std::shared_ptr<ConstraintBase> &con,
       const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
     // Create a binding for the constraint
-    constraints_.push_back(Binding<ConstraintBase<MatrixType>>(con, x, p));
+    constraints_.push_back(Binding<ConstraintBase>(con, x, p));
     n_constraints_ += con->Dimension();
     return constraints_.back();
   }
 
-  Binding<LinearConstraint<MatrixType>> AddLinearConstraint(
-      const std::shared_ptr<LinearConstraint<MatrixType>> &con,
+  Binding<LinearConstraint> AddLinearConstraint(
+      const std::shared_ptr<LinearConstraint> &con,
       const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
-    linear_constraints_.push_back(
-        Binding<LinearConstraint<MatrixType>>(con, x, p));
+    linear_constraints_.push_back(Binding<LinearConstraint>(con, x, p));
     n_constraints_ += con->Dimension();
     return linear_constraints_.back();
   }
 
-  Binding<BoundingBoxConstraint<MatrixType>> AddBoundingBoxConstraint(
+  Binding<BoundingBoxConstraint> AddBoundingBoxConstraint(
       const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
       const sym::VariableVector &x) {
-    std::shared_ptr<BoundingBoxConstraint<MatrixType>> con =
-        std::make_shared<BoundingBoxConstraint<MatrixType>>("", lb, ub);
+    std::shared_ptr<BoundingBoxConstraint> con =
+        std::make_shared<BoundingBoxConstraint>("", lb, ub);
     bounding_box_constraints_.push_back(
-        Binding<BoundingBoxConstraint<MatrixType>>(con, {x}));
+        Binding<BoundingBoxConstraint>(con, {x}));
     return bounding_box_constraints_.back();
   }
 
-  Binding<BoundingBoxConstraint<MatrixType>> AddBoundingBoxConstraint(
+  Binding<BoundingBoxConstraint> AddBoundingBoxConstraint(
       const double &lb, const double &ub, const sym::VariableVector &x) {
     Eigen::VectorXd lbv(x.size()), ubv(x.size());
     lbv.setConstant(lb);
@@ -479,8 +168,8 @@ class ConstraintManager {
     return AddBoundingBoxConstraint(lbv, ubv, x);
   }
 
-  std::vector<Binding<ConstraintBase<MatrixType>>> GetAllConstraintBindings() {
-    std::vector<Binding<ConstraintBase<MatrixType>>> constraints;
+  std::vector<Binding<ConstraintBase>> GetAllConstraintBindings() {
+    std::vector<Binding<ConstraintBase>> constraints;
     constraints.insert(constraints.begin(), linear_constraints_.begin(),
                        linear_constraints_.end());
 
@@ -494,8 +183,7 @@ class ConstraintManager {
    *
    * @return std::vector<Binding<LinearConstraint>>&
    */
-  std::vector<Binding<LinearConstraint<MatrixType>>>
-      &GetLinearConstraintBindings() {
+  std::vector<Binding<LinearConstraint>> &GetLinearConstraintBindings() {
     // Create constraints
     return linear_constraints_;
   }
@@ -506,7 +194,7 @@ class ConstraintManager {
    *
    * @return std::vector<Binding<BoundingBoxConstraint>>&
    */
-  std::vector<Binding<BoundingBoxConstraint<MatrixType>>>
+  std::vector<Binding<BoundingBoxConstraint>>
       &GetBoundingBoxConstraintBindings() {
     // Create constraints
     return bounding_box_constraints_;
@@ -517,9 +205,9 @@ class ConstraintManager {
     std::cout << "Constraint\tSize\tLower Bound\tUpper Bound\n";
     std::cout << "----------------------\n";
     // Get all constraints
-    std::vector<Binding<ConstraintBase<MatrixType>>> constraints =
+    std::vector<Binding<ConstraintBase>> constraints =
         GetAllConstraintBindings();
-    for (Binding<ConstraintBase<MatrixType>> &b : constraints) {
+    for (Binding<ConstraintBase> &b : constraints) {
       std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
       for (int i = 0; i < b.Get().Dimension(); ++i) {
         std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
@@ -527,7 +215,7 @@ class ConstraintManager {
                   << "\n";
       }
     }
-    for (Binding<BoundingBoxConstraint<MatrixType>> &b :
+    for (Binding<BoundingBoxConstraint> &b :
          GetBoundingBoxConstraintBindings()) {
       std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
       for (int i = 0; i < b.Get().Dimension(); ++i) {
@@ -543,7 +231,7 @@ class ConstraintManager {
     ubg_.resize(n_constraints_);
     // Set first-in-first out order
     int idx = 0;
-    for (Binding<ConstraintBase<MatrixType>> &b : GetAllConstraintBindings()) {
+    for (Binding<ConstraintBase> &b : GetAllConstraintBindings()) {
       lbg_.middleRows(idx, b.Get().Dimension()) = b.Get().LowerBound();
       ubg_.middleRows(idx, b.Get().Dimension()) = b.Get().UpperBound();
       idx += b.Get().Dimension();
@@ -557,10 +245,9 @@ class ConstraintManager {
   // Number of constraints
   int n_constraints_;
 
-  std::vector<Binding<ConstraintBase<MatrixType>>> constraints_;
-  std::vector<Binding<LinearConstraint<MatrixType>>> linear_constraints_;
-  std::vector<Binding<BoundingBoxConstraint<MatrixType>>>
-      bounding_box_constraints_;
+  std::vector<Binding<ConstraintBase>> constraints_;
+  std::vector<Binding<LinearConstraint>> linear_constraints_;
+  std::vector<Binding<BoundingBoxConstraint>> bounding_box_constraints_;
 
   // Constraint vector lower bound
   Eigen::VectorXd lbg_;
@@ -575,18 +262,263 @@ class ConstraintManager {
  * unit.
  *
  */
-template <typename MatrixType>
-class ProgramBase : public DecisionVariableManager,
-                    public ParameterManager,
-                    public CostManager<MatrixType>,
-                    public ConstraintManager<MatrixType> {
+class Program : public CostManager, public ConstraintManager {
  public:
-  ProgramBase() = default;
-  ~ProgramBase() = default;
+  Program() {
+    x_manager_ = std::make_shared<sym::VariableManager>();
+    p_manager_ = std::make_shared<sym::VariableManager>();
+  }
 
-  friend class solvers::SolverBase<MatrixType>;
+  ~Program() = default;
 
-  ProgramBase(const std::string &name) : name_(name) {}
+  friend class solvers::SolverBase;
+
+  Program(const std::string &name) : name_(name) {}
+
+  /**
+   *
+   * Decision Variable Manager
+   *
+   */
+
+  /**
+   * @brief Number of decision variables currently in the program
+   *
+   * @return const int&
+   */
+  const int &NumberOfDecisionVariables() const;
+
+  /**
+   * @brief Adds a decision variable
+   *
+   * @param var
+   */
+  void AddDecisionVariable(const Variable &var);
+  /**
+   * @brief Add decision variables
+   *
+   * @param var
+   */
+  void AddDecisionVariables(const Eigen::Ref<const VariableMatrix> &var);
+
+  /**
+   * @brief Removes variables currently considered by the program.
+   *
+   * @param var
+   */
+  void RemoveDecisionVariables(const Eigen::Ref<VariableMatrix> &var);
+
+  /**
+   * @brief Whether a variable var is a decision variable within the program
+   *
+   * @param var
+   * @return true
+   * @return false
+   */
+  bool IsDecisionVariable(const Variable &var);
+
+  /**
+   * @brief Returns the index of the given variable within the created
+   * optimisation vector
+   *
+   * @param v
+   * @return int
+   */
+  int GetDecisionVariableIndex(const Variable &v);
+
+  /**
+   * @brief Returns a vector of indices for the position of each entry in v in
+   * the current decision variable vector.
+   *
+   * @param v
+   * @return std::vector<int>
+   */
+  std::vector<int> GetDecisionVariableIndices(const VariableVector &v);
+
+  /**
+   * @brief Set the vector of decision variables to the default ordering of
+   * variables (ordered by when they were added)
+   *
+   */
+  void SetDecisionVariableVector();
+
+  /**
+   * @brief Sets the optimisation vector with the given ordering of variables
+   *
+   * @param var
+   */
+  bool SetDecisionVariableVector(const Eigen::Ref<VariableVector> &var);
+
+  /**
+   * @brief Determines whether a vector of variables var is continuous within
+   * the optimisation vector of the program.
+   *
+   * @param var
+   * @return true
+   * @return false
+   */
+  bool IsContinuousInDecisionVariableVector(const VariableVector &var);
+  /**
+   * @brief Updates the decision variable bound vectors with all the current
+   * values set for the decision variables.
+   *
+   */
+  void UpdateDecisionVariableBoundVectors();
+
+  /**
+   * @brief Updates the initial value vector for the decision variables with all
+   * the current values set for the decision variables.
+   *
+   */
+  void UpdateDecisionVariableInitialValueVector();
+
+  /**
+   * @brief Vector of initial values for the decision variables within the
+   * program.
+   *
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &DecisionVariableInitialValues() const;
+
+  /**
+   * @brief Upper bound for decision variables within the current program.
+   *
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &DecisionVariableUpperBounds() const;
+
+  /**
+   * @brief Upper bound for decision variables within the current program.
+   *
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &DecisionVariableLowerBounds() const;
+
+  void SetDecisionVariableBounds(const Variable &v, const double &lb,
+                                 const double &ub);
+  void SetDecisionVariableBounds(const VariableVector &v,
+                                 const Eigen::VectorXd &lb,
+                                 const Eigen::VectorXd &ub);
+
+  void SetDecisionVariableInitialValue(const Variable &v, const double &x0);
+  void SetDecisionVariableInitialValue(const VariableVector &v,
+                                       const Eigen::VectorXd &x0);
+
+  /**
+   * @brief Prints the current set of parameters for the program to the
+   * screen
+   *
+   */
+  void ListDecisionVariables();
+
+  /**
+   *
+   * Parameters
+   *
+   */
+
+  /**
+   * @brief Number of parameters currently in the program
+   *
+   * @return const int&
+   */
+  const int &NumberOfParameters() const;
+
+  /**
+   * @brief Adds a parameter
+   *
+   * @param par
+   */
+  void AddParameter(const Variable &par);
+  /**
+   * @brief Add parameters
+   *
+   * @param par
+   */
+  void AddParameters(const Eigen::Ref<const VariableMatrix> &par);
+
+  /**
+   * @brief Removes variables currently considered by the program.
+   *
+   * @param par
+   */
+  void RemoveParameters(const Eigen::Ref<VariableMatrix> &par);
+
+  /**
+   * @brief Whether a variable var is a parameter within the program
+   *
+   * @param par
+   * @return true
+   * @return false
+   */
+  bool IsParameter(const Variable &par);
+
+  /**
+   * @brief Returns the index of the given variable within the created
+   * optimisation vector
+   *
+   * @param p
+   * @return int
+   */
+  int GetParameterIndex(const Variable &p);
+
+  /**
+   * @brief Returns a vector of indices for the position of each entry in v in
+   * the current parameter vector.
+   *
+   * @param p
+   * @return std::vector<int>
+   */
+  std::vector<int> GetParameterIndices(const VariableVector &v);
+
+  /**
+   * @brief Set the vector of parameters to the default ordering of
+   * variables (ordered by when they were added)
+   *
+   */
+  void SetParameterVector();
+
+  /**
+   * @brief Sets the optimisation vector with the given ordering of variables
+   *
+   * @param par
+   */
+  bool SetParameterVector(const Eigen::Ref<VariableVector> &par);
+
+  /**
+   * @brief Determines whether a vector of variables var is continuous within
+   * the optimisation vector of the program.
+   *
+   * @param par
+   * @return true
+   * @return false
+   */
+  bool IsContinuousInParameterVector(const VariableVector &par);
+
+  /**
+   * @brief Updates the initial value vector for the parameters with all
+   * the current values set for the parameters.
+   *
+   */
+  void UpdateParameterValueVector();
+
+  /**
+   * @brief Vector of initial values for the parameters within the
+   * program.
+   *
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &ParameterValues() const;
+
+  void SetParameterValue(const Variable &p, const double &p0);
+  void SetParameterValue(const VariableVector &p, const Eigen::VectorXd &p0);
+
+  /**
+   * @brief Prints the current set of parameters for the program to the
+   * screen
+   *
+   */
+  void ListParameters();
 
   /**
    * @brief Name of the program
@@ -611,14 +543,15 @@ class ProgramBase : public DecisionVariableManager,
     std::cout << "-----------------------\n";
     std::cout << "Program Name: " << name() << '\n';
     std::cout << "Number of Decision Variables: "
-              << this->NumberOfDecisionVariables() << '\n';
+              << this->x_manager_->NumberOfVariables() << '\n';
     std::cout << "Variables\tSize\n";
 
     std::cout << "Number of Constraints: " << this->NumberOfConstraints()
               << '\n';
     std::cout << "Constraint\tSize\n";
 
-    std::cout << "Number of Parameters: " << this->NumberOfParameters() << '\n';
+    std::cout << "Number of Parameters: "
+              << this->p_manager_->NumberOfVariables() << '\n';
     std::cout << "Parameters\tSize\n";
 
     std::cout << "-----------------------\n";
@@ -630,19 +563,10 @@ class ProgramBase : public DecisionVariableManager,
 
   // Optimisation vector
   Eigen::VectorXd x_;
+
+  sym::VariableManager::SharedPtr x_manager_;
+  sym::VariableManager::SharedPtr p_manager_;
 };
-
-/**
- * @brief Dense program representation
- *
- */
-typedef ProgramBase<Eigen::MatrixXd> Program;
-
-/**
- * @brief Sparse program representation
- *
- */
-typedef ProgramBase<Eigen::SparseMatrix<double>> SparseProgram;
 
 }  // namespace optimisation
 }  // namespace damotion

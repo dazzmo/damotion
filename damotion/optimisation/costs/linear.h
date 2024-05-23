@@ -13,19 +13,18 @@ namespace optimisation {
 class LinearCost : public CostBase {
  public:
   LinearCost(const std::string &name, const Eigen::VectorXd &c, const double &b,
-             bool jac = true)
-      : CostBase(name, "linear_cost") {
+             bool jac = true) {
     // Create Costs
     casadi::DM cd, bd = b;
     damotion::casadi::toCasadi(c, cd);
     casadi::SX cs = cd, bs = bd;
 
-    ConstructCost(cs, bs, {}, jac, true);
+    ConstructCost(name, cs, bs, {}, jac, true);
   }
 
   LinearCost(const std::string &name, const casadi::SX &c, const casadi::SX &b,
              const casadi::SXVector &p, bool jac = true) {
-    ConstructCost(c, b, p, jac, true);
+    ConstructCost(name, c, b, p, jac, true);
   }
 
   LinearCost(const std::string &name, const casadi::SX &ex,
@@ -37,31 +36,7 @@ class LinearCost : public CostBase {
     casadi::SX c, b;
     casadi::SX::linear_coeff(ex, x[0], c, b, true);
 
-    ConstructCost(c, b, p, jac, hes);
-  }
-
-  /**
-   * @brief Evaluate the constraint and gradient (optional) given input
-   * variables x and parameters p.
-   *
-   * @param x
-   * @param p
-   * @param jac Flag for computing the Jacobian
-   */
-  void eval(const common::InputRefVector &x, const common::InputRefVector &p,
-            bool grd = true) const override {
-    VLOG(10) << this->name() << " eval()";
-    // Evaluate the coefficients
-    fc_->call(p);
-    fb_->call(p);
-    // Evaluate the constraint
-    this->obj_ = c().dot(x[0]) + b();
-    this->grd_ = c();
-  }
-
-  void eval_hessian(const common::InputRefVector &x,
-                    const common::InputRefVector &p) const override {
-    // No need, as linear costs do not have a Hessian
+    ConstructCost(name, c, b, p, jac, hes);
   }
 
   /**
@@ -76,26 +51,34 @@ class LinearCost : public CostBase {
    *
    * @return const double
    */
-  const double &b() { return fb_->getOutput(0); }
+  const GenericMatrixData &b() { return fb_->getOutput(0); }
 
  private:
-  std::shared_ptr<common::Function<Eigen::VectorXd>> fc_;
-  std::shared_ptr<common::Function<double>> fb_;
+  common::Function::SharedPtr fc_;
+  common::Function::SharedPtr fb_;
 
-  void ConstructCost(const casadi::SX &c, const casadi::SX &b,
-                     const casadi::SXVector &p, bool jac = true,
-                     bool hes = true) {
+  void ConstructCost(const std::string &name, const casadi::SX &c,
+                     const casadi::SX &b, const casadi::SXVector &p,
+                     bool jac = true, bool hes = true, bool sparse = false) {
+    this->SetName(name);
+
     int nvar = 0;
     casadi::SXVector in = {};
     for (const casadi::SX &pi : p) {
       in.push_back(pi);
     }
 
+    casadi::SX c_tmp = c, b_tmp = b;
+    if (!sparse) {
+      c_tmp = densify(c_tmp);
+      b_tmp = densify(b_tmp);
+    }
+
     // Create coefficient functions
-    fc_ = std::make_shared<damotion::casadi::FunctionWrapper<Eigen::VectorXd>>(
-        casadi::Function(this->name() + "_A", in, {densify(c)}));
-    fb_ = std::make_shared<damotion::casadi::FunctionWrapper<double>>(
-        casadi::Function(this->name() + "_b", in, {densify(b)}));
+    fc_ = std::make_shared<damotion::casadi::FunctionWrapper>(
+        casadi::Function(this->name() + "_A", in, {c_tmp}));
+    fb_ = std::make_shared<damotion::casadi::FunctionWrapper>(
+        casadi::Function(this->name() + "_b", in, {b_tmp}));
 
     this->has_grd_ = true;
     // Indicate cost does not have a hessian

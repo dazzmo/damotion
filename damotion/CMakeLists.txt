@@ -11,8 +11,6 @@ option(WITH_IPOPT "Build with IPOPT functionality" ON)
 SET(${PROJECT_NAME}_SOURCES
 solvers/sparse.cc
 solvers/solver.cc
-casadi/eigen.cc
-casadi/function.cc
 casadi/codegen.cc
 casadi/pinocchio_model.cc
 optimisation/program.cc
@@ -24,7 +22,6 @@ common/math/quaternion.cc
 common/trajectory/bezier.cc
 common/trajectory/trajectory.cc
 common/sparsity.cc
-symbolic/parameter.cc
 symbolic/variable.cc
 control/osc/tasks/contact.cc
 control/osc/tasks/motion.cc
