@@ -48,18 +48,15 @@ class ConstraintBase {
     // Create concatenated vector
     casadi::SX xc = casadi::SX::vertcat(x);
 
-    casadi::SX J = jacobian(ex, xc);
-
-    if (!sparse) {
-      J = densify(J);
-    }
-
     // Constraint
     SetConstraintFunction(std::make_shared<damotion::casadi::FunctionWrapper>(
         casadi::Function(this->name(), in, {ex})));
 
     // Jacobian
     if (jac) {
+      // Compute the Jacobian of the constraint
+      casadi::SX J = jacobian(ex, xc);
+      if (!sparse) J = densify(J);
       SetJacobianFunction(std::make_shared<damotion::casadi::FunctionWrapper>(
           casadi::Function(this->name() + "_jac", in, {J})));
     }
@@ -133,24 +130,38 @@ class ConstraintBase {
 
   /**
    * @brief Evaluate the constraint with the current input variables and
-   * parameters, indicating if jacobian and hessians are required
+   * parameters
    *
    * @param x Variables for the constraint
    * @param p Parameters for the constraint
-   * @param jac Whether to also compute the Jacobian
    */
   virtual void eval(const common::InputRefVector &x,
-                    const common::InputRefVector &p, bool jac = true) const {
+                    const common::InputRefVector &p) const {
     VLOG(10) << this->name() << " eval()";
-    common::InputRefVector in = {};
-    for (const auto &xi : x) in.push_back(xi);
-    for (const auto &pi : p) in.push_back(pi);
+    int cnt = 0;
+    for (const auto &xi : x) this->con_->SetInput(cnt++, xi);
+    for (const auto &pi : p) this->con_->SetInput(cnt++, pi);
 
     // Call necessary constraint functions
-    this->con_->call(in);
-    if (jac) {
-      this->jac_->call(in);
-    }
+    this->con_->call();
+  }
+
+  /**
+   * @brief Evaluate the constraint jacobian with the current input variables
+   * and parameters
+   *
+   * @param x Variables for the constraint
+   * @param p Parameters for the constraint
+   */
+  virtual void eval_jac(const common::InputRefVector &x,
+                        const common::InputRefVector &p) const {
+    VLOG(10) << this->name() << " eval_jac()";
+    int cnt = 0;
+    for (const auto &xi : x) this->jac_->SetInput(cnt++, xi);
+    for (const auto &pi : p) this->jac_->SetInput(cnt++, pi);
+
+    // Call necessary constraint functions
+    this->jac_->call();
   }
 
   /**
@@ -165,28 +176,31 @@ class ConstraintBase {
                             const common::InputRefVector &p) const {
     // Create input for the lambda-hessian product
     common::InputRefVector in = {};
-    for (const auto &xi : x) in.push_back(xi);
-    in.push_back(l);
-    for (const auto &pi : p) in.push_back(pi);
+    int cnt = 0;
+    for (const auto &xi : x) this->hes_.SetInput(cnt++, xi);
+    this->hes_.SetInput(cnt++, l);
+    for (const auto &pi : p) this->hes_.SetInput(cnt++, pi);
 
     // Call necessary constraint functions
-    this->hes_->call(in);
+    this->hes_->call();
   }
 
   /**
    * @brief Returns the most recent evaluation of the constraint
    *
-   * @return const GenericMatrixData&
+   * @return const GenericEigenMatrix&
    */
-  virtual const GenericMatrixData &Vector() const { return con_->getOutput(0); }
+  virtual const GenericEigenMatrix &Vector() const {
+    return con_->getOutput(0);
+  }
   /**
    * @brief The Jacobian of the constraint with respect to the variables
    * vector
    *
    * @param i
-   * @return const GenericMatrixData&
+   * @return const GenericEigenMatrix&
    */
-  virtual const GenericMatrixData &Jacobian() const {
+  virtual const GenericEigenMatrix &Jacobian() const {
     return jac_->getOutput(0);
   }
   /**
@@ -194,9 +208,9 @@ class ConstraintBase {
    *
    * @param i
    * @param j
-   * @return const GenericMatrixData&
+   * @return const GenericEigenMatrix&
    */
-  virtual const GenericMatrixData &Hessian() const {
+  virtual const GenericEigenMatrix &Hessian() const {
     return hes_->getOutput(0);
   }
 

@@ -29,7 +29,7 @@ struct qpOASESSolverInfo {
   bool success;
 };
 
-class QPOASESSolverInstance : public Solver {
+class QPOASESSolverInstance : public SolverBase {
  public:
   QPOASESSolverInstance() = default;
 

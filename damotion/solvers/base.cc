@@ -1,12 +1,8 @@
-#include "damotion/solvers/solver.h"
+#include "damotion/solvers/base.h"
 
-namespace damotion {
-namespace optimisation {
-namespace solvers {
-
-void Solver::EvaluateCost(const Binding<CostType>& binding,
-                          const Eigen::VectorXd& x, bool grd, bool hes,
-                          bool update_cache) {
+void SolverBase::EvaluateCost(const Binding<CostType>& binding,
+                              const Eigen::VectorXd& x, bool grd, bool hes,
+                              bool update_cache) {
   common::InputRefVector x_in = {}, p_in = {};
   GetBindingInputs(binding, x_in, p_in);
 
@@ -22,7 +18,7 @@ void Solver::EvaluateCost(const Binding<CostType>& binding,
   if (hes) UpdateLagrangianHessian(binding);
 }
 
-void Solver::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
+void SolverBase::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
   // Reset terms
   objective_cache_ = 0.0;
   if (grad) objective_gradient_cache_.setZero();
@@ -35,10 +31,10 @@ void Solver::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
 }
 
 // Evaluates the constraint and updates the cache for the gradients
-void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
-                                const int& constraint_idx,
-                                const Eigen::VectorXd& x, bool jac,
-                                bool update_cache) {
+void SolverBase::EvaluateConstraint(const Binding<ConstraintType>& binding,
+                                    const int& constraint_idx,
+                                    const Eigen::VectorXd& x, bool jac,
+                                    bool update_cache) {
   common::InputRefVector x_in = {}, p_in = {};
   GetBindingInputs(binding, x_in, p_in);
 
@@ -58,7 +54,7 @@ void Solver::EvaluateConstraint(const Binding<ConstraintType>& binding,
   VLOG(10) << "jacobian_cache = " << constraint_jacobian_cache_;
 }
 
-void Solver::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
+void SolverBase::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
   // Reset constraint vector
   constraint_cache_.setZero();
   // Reset objective gradient
@@ -71,8 +67,8 @@ void Solver::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
   }
 }
 
-void Solver::UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
-                                      const int& constraint_idx) {
+void SolverBase::UpdateConstraintJacobian(
+    const Binding<ConstraintType>& binding, const int& constraint_idx) {
   // Get data related to the binding
   BindingInputData& data = GetBindingInputData(binding);
   // Get block rows related to the binding constraint
@@ -87,7 +83,7 @@ void Solver::UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
   }
 }
 
-void Solver::UpdateLagrangianHessian(const Binding<CostType>& binding) {
+void SolverBase::UpdateLagrangianHessian(const Binding<CostType>& binding) {
   // Get data related to the binding
   BindingInputData& data = GetBindingInputData(binding);
 
@@ -109,7 +105,3 @@ void Solver::UpdateLagrangianHessian(const Binding<CostType>& binding) {
     idx_x += xi.size();
   }
 }
-
-}  // namespace solvers
-}  // namespace optimisation
-}  // namespace damotion

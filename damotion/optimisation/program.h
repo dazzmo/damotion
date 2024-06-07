@@ -265,8 +265,8 @@ class ConstraintManager {
 class Program : public CostManager, public ConstraintManager {
  public:
   Program() {
-    x_manager_ = std::make_shared<sym::VariableManager>();
-    p_manager_ = std::make_shared<sym::VariableManager>();
+    x_manager_ = std::make_unique<sym::VariableManager>();
+    p_manager_ = std::make_unique<sym::VariableManager>();
   }
 
   ~Program() = default;
@@ -293,20 +293,20 @@ class Program : public CostManager, public ConstraintManager {
    *
    * @param var
    */
-  void AddDecisionVariable(const Variable &var);
+  void AddDecisionVariable(const sym::Variable &var);
   /**
    * @brief Add decision variables
    *
    * @param var
    */
-  void AddDecisionVariables(const Eigen::Ref<const VariableMatrix> &var);
+  void AddDecisionVariables(const Eigen::Ref<const sym::VariableMatrix> &var);
 
   /**
    * @brief Removes variables currently considered by the program.
    *
    * @param var
    */
-  void RemoveDecisionVariables(const Eigen::Ref<VariableMatrix> &var);
+  void RemoveDecisionVariables(const Eigen::Ref<sym::VariableMatrix> &var);
 
   /**
    * @brief Whether a variable var is a decision variable within the program
@@ -315,7 +315,7 @@ class Program : public CostManager, public ConstraintManager {
    * @return true
    * @return false
    */
-  bool IsDecisionVariable(const Variable &var);
+  bool IsDecisionVariable(const sym::Variable &var);
 
   /**
    * @brief Returns the index of the given variable within the created
@@ -324,7 +324,7 @@ class Program : public CostManager, public ConstraintManager {
    * @param v
    * @return int
    */
-  int GetDecisionVariableIndex(const Variable &v);
+  int GetDecisionVariableIndex(const sym::Variable &v);
 
   /**
    * @brief Returns a vector of indices for the position of each entry in v in
@@ -333,7 +333,7 @@ class Program : public CostManager, public ConstraintManager {
    * @param v
    * @return std::vector<int>
    */
-  std::vector<int> GetDecisionVariableIndices(const VariableVector &v);
+  std::vector<int> GetDecisionVariableIndices(const sym::VariableVector &v);
 
   /**
    * @brief Set the vector of decision variables to the default ordering of
@@ -347,7 +347,7 @@ class Program : public CostManager, public ConstraintManager {
    *
    * @param var
    */
-  bool SetDecisionVariableVector(const Eigen::Ref<VariableVector> &var);
+  bool SetDecisionVariableVector(const Eigen::Ref<sym::VariableVector> &var);
 
   /**
    * @brief Determines whether a vector of variables var is continuous within
@@ -357,7 +357,7 @@ class Program : public CostManager, public ConstraintManager {
    * @return true
    * @return false
    */
-  bool IsContinuousInDecisionVariableVector(const VariableVector &var);
+  bool IsContinuousInDecisionVariableVector(const sym::VariableVector &var);
   /**
    * @brief Updates the decision variable bound vectors with all the current
    * values set for the decision variables.
@@ -394,14 +394,15 @@ class Program : public CostManager, public ConstraintManager {
    */
   const Eigen::VectorXd &DecisionVariableLowerBounds() const;
 
-  void SetDecisionVariableBounds(const Variable &v, const double &lb,
+  void SetDecisionVariableBounds(const sym::Variable &v, const double &lb,
                                  const double &ub);
-  void SetDecisionVariableBounds(const VariableVector &v,
+  void SetDecisionVariableBounds(const sym::VariableVector &v,
                                  const Eigen::VectorXd &lb,
                                  const Eigen::VectorXd &ub);
 
-  void SetDecisionVariableInitialValue(const Variable &v, const double &x0);
-  void SetDecisionVariableInitialValue(const VariableVector &v,
+  void SetDecisionVariableInitialValue(const sym::Variable &v,
+                                       const double &x0);
+  void SetDecisionVariableInitialValue(const sym::VariableVector &v,
                                        const Eigen::VectorXd &x0);
 
   /**
@@ -429,20 +430,20 @@ class Program : public CostManager, public ConstraintManager {
    *
    * @param par
    */
-  void AddParameter(const Variable &par);
+  void AddParameter(const sym::Variable &par);
   /**
    * @brief Add parameters
    *
    * @param par
    */
-  void AddParameters(const Eigen::Ref<const VariableMatrix> &par);
+  void AddParameters(const Eigen::Ref<const sym::VariableMatrix> &par);
 
   /**
    * @brief Removes variables currently considered by the program.
    *
    * @param par
    */
-  void RemoveParameters(const Eigen::Ref<VariableMatrix> &par);
+  void RemoveParameters(const Eigen::Ref<sym::VariableMatrix> &par);
 
   /**
    * @brief Whether a variable var is a parameter within the program
@@ -451,7 +452,7 @@ class Program : public CostManager, public ConstraintManager {
    * @return true
    * @return false
    */
-  bool IsParameter(const Variable &par);
+  bool IsParameter(const sym::Variable &par);
 
   /**
    * @brief Returns the index of the given variable within the created
@@ -460,7 +461,7 @@ class Program : public CostManager, public ConstraintManager {
    * @param p
    * @return int
    */
-  int GetParameterIndex(const Variable &p);
+  int GetParameterIndex(const sym::Variable &p);
 
   /**
    * @brief Returns a vector of indices for the position of each entry in v in
@@ -469,7 +470,7 @@ class Program : public CostManager, public ConstraintManager {
    * @param p
    * @return std::vector<int>
    */
-  std::vector<int> GetParameterIndices(const VariableVector &v);
+  std::vector<int> GetParameterIndices(const sym::VariableVector &v);
 
   /**
    * @brief Set the vector of parameters to the default ordering of
@@ -483,7 +484,7 @@ class Program : public CostManager, public ConstraintManager {
    *
    * @param par
    */
-  bool SetParameterVector(const Eigen::Ref<VariableVector> &par);
+  bool SetParameterVector(const Eigen::Ref<sym::VariableVector> &par);
 
   /**
    * @brief Determines whether a vector of variables var is continuous within
@@ -493,7 +494,7 @@ class Program : public CostManager, public ConstraintManager {
    * @return true
    * @return false
    */
-  bool IsContinuousInParameterVector(const VariableVector &par);
+  bool IsContinuousInParameterVector(const sym::VariableVector &par);
 
   /**
    * @brief Updates the initial value vector for the parameters with all
@@ -510,8 +511,9 @@ class Program : public CostManager, public ConstraintManager {
    */
   const Eigen::VectorXd &ParameterValues() const;
 
-  void SetParameterValue(const Variable &p, const double &p0);
-  void SetParameterValue(const VariableVector &p, const Eigen::VectorXd &p0);
+  void SetParameterValue(const sym::Variable &p, const double &p0);
+  void SetParameterValue(const sym::VariableVector &p,
+                         const Eigen::VectorXd &p0);
 
   /**
    * @brief Prints the current set of parameters for the program to the
@@ -564,8 +566,8 @@ class Program : public CostManager, public ConstraintManager {
   // Optimisation vector
   Eigen::VectorXd x_;
 
-  sym::VariableManager::SharedPtr x_manager_;
-  sym::VariableManager::SharedPtr p_manager_;
+  sym::VariableManager::UniquePtr x_manager_;
+  sym::VariableManager::UniquePtr p_manager_;
 };
 
 }  // namespace optimisation

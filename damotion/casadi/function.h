@@ -55,9 +55,6 @@ class FunctionWrapper : public common::Function {
     // Checkout memory object for function
     this->mem_ = f.checkout();
 
-    // Resize work vectors
-    this->in_data_ptr_.assign(f_.sz_arg(), nullptr);
-
     this->iw_.assign(f_.sz_iw(), 0);
     this->dw_.assign(f_.sz_w(), 0.0);
 
@@ -75,7 +72,7 @@ class FunctionWrapper : public common::Function {
       M.setFromTriplets(triplets.begin(), triplets.end());
       // Create dense matrix for output and add data to output data
       // pointer vector
-      this->OutputVector().push_back(GenericMatrixData(M));
+      this->OutputVector().push_back(GenericEigenMatrix(M));
       this->out_data_ptr_.push_back(this->OutputVector().back().data());
 
       VLOG(10) << f.name() << " Dense Output " << i;
@@ -101,19 +98,12 @@ class FunctionWrapper : public common::Function {
    * @brief Calls the function with the current inputs
    *
    */
-  void callImpl(const common::InputRefVector &input) override {
-    // Set vector of inputs
-    int idx = 0;
-    for (const Eigen::Ref<const Eigen::VectorXd> &in : input) {
-      in_data_ptr_[idx++] = in.data();
-    }
-    // Call the function
-    f_(in_data_ptr_.data(), out_data_ptr_.data(), iw_.data(), dw_.data(), mem_);
+  void callImpl() override {
+    // Call the function using the currently set inputs
+    f_(in_.data(), out_data_ptr_.data(), iw_.data(), dw_.data(), mem_);
   }
 
  protected:
-  // Data input vector for casadi function
-  mutable std::vector<const double *> in_data_ptr_;
   // Data output pointers for casadi function
   mutable std::vector<double *> out_data_ptr_;
 

@@ -61,16 +61,16 @@ class LinearConstraint : public ConstraintBase {
   /**
    * @brief The coefficient matrix A for the expression A x + b.
    *
-   * @return const GenericMatrixData&
+   * @return const GenericEigenMatrix&
    */
-  const GenericMatrixData &A() const { return fA_->getOutput(0); }
+  const GenericEigenMatrix &A() const { return fA_->getOutput(0); }
 
   /**
    * @brief The constant vector for the linear constraint A x + b
    *
-   * @return const GenericMatrixData&
+   * @return const GenericEigenMatrix&
    */
-  const GenericMatrixData &b() const { return fb_->getOutput(0); }
+  const GenericEigenMatrix &b() const { return fb_->getOutput(0); }
 
  private:
   common::Function::SharedPtr fA_;

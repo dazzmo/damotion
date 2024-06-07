@@ -11,8 +11,8 @@ namespace solvers {
 
 class SolverBase {
  public:
-  SolverBase(ProgramBase& program) : program_(program) {
-    int nx = program_.DecisionVariableManager().NumberOfVariables();
+  SolverBase(Program& program) : program_(program) {
+    int nx = program_.NumberOfDecisionVariables();
     int nc = program_.NumberOfConstraints();
     // Initialise vectors
     decision_variable_cache_ = Eigen::VectorXd::Zero(nx);
@@ -42,7 +42,7 @@ class SolverBase {
    *
    * @return Program&
    */
-  ProgramBase& GetCurrentProgram() { return program_; }
+  Program& GetCurrentProgram() { return program_; }
 
   /**
    * @brief Updates the existing solver with an update program (e.g.
@@ -50,7 +50,7 @@ class SolverBase {
    *
    * @param program
    */
-  void UpdateProgram(ProgramBase& program) { program_ = program; }
+  void UpdateProgram(Program& program) { program_ = program; }
 
   /**
    * @brief Return the primal solution for the associated program, if solved
@@ -99,22 +99,11 @@ class SolverBase {
    * @param is_continuous
    * @return Eigen::VectorXd
    */
-  Eigen::VectorXd GetVariableValues(const sym::VariableVector& var,
-                                    bool is_continuous = false) {
-    if (is_continuous) {
-      return primal_solution_x_.middleRows(
-          GetCurrentProgram().GetDecisionVariableManager().GetVariableIndex(
-              var[0]),
-          var.size());
-    } else {
-      Eigen::VectorXd vec(var.size());
-      for (int i = 0; i < var.size(); ++i) {
-        vec[i] = primal_solution_x_[GetCurrentProgram()
-                                        .GetDecisionVariableManager()
-                                        .GetVariableIndex(var[i])];
-      }
-      return vec;
-    }
+  Eigen::VectorXd GetDecisionVariableValues(const sym::VariableVector& var,
+                                            bool is_continuous = false) {
+    std::vector<int> indices =
+        GetCurrentProgram().GetDecisionVariableIndices(var);
+    return decision_variable_cache_(indices);
   }
 
   /**
@@ -133,34 +122,8 @@ class SolverBase {
    */
   std::vector<Binding<CostBase>>& GetCosts() { return costs_; }
 
-  /**
-   * @brief Updates the variables var within the vector vec with values val.
-   * If the variables are within a block, indicating this with is_block can
-   * enable efficient block-insertion.
-   *
-   * @param binding
-   */
-  void UpdateCostGradient(const Binding<CostBase>& binding) {
-    VLOG(10) << "UpdateCostGradient()";
-    BindingInputData& data = GetBindingInputData(binding);
-    int g_idx = 0;
-    VLOG(10) << "Binding gradient\n" << binding.Get().Gradient();
-    for (int i = 0; i < binding.nx(); ++i) {
-      const sym::VariableVector& xi = binding.x(i);
-      // Get slice of the gradient vector
-      Eigen::Ref<const Eigen::VectorXd> gi =
-          binding.Get().Gradient().middleRows(g_idx, xi.size());
-      // Insert into the gradient cache
-      InsertVectorAtVariableLocations(objective_gradient_cache_, gi, xi,
-                                      data.x_continuous[i]);
-      // Increase binding gradient index
-      g_idx += xi.size();
-    }
-  }
-
   template <typename T>
-  void GetBindingInputs(const Binding<T>& binding, common::InputRefVector& x,
-                        common::InputRefVector& p) {
+  void SetBindingInputs(const Binding<T>& binding) {
     VLOG(10) << "GetBindingInputs()";
     // Get binding data
     BindingInputData& data = GetBindingInputData(binding);
@@ -180,8 +143,7 @@ class SolverBase {
         for (int j = 0; j < xi.size(); ++j) {
           data.x_manual_vecs[manual_cnt][j] =
               decision_variable_cache_[GetCurrentProgram()
-                                           .DecisionVariableManager()
-                                           .GetVariableIndex(xi[j])];
+                                           .GetDecisionVariableIndex(xi[j])];
         }
         x.push_back(data.x_manual_vecs[manual_cnt++]);
       }
@@ -200,14 +162,32 @@ class SolverBase {
         VLOG(10) << data.p_manual_vecs.size();
         // Construct a vector for this input
         for (int j = 0; j < pi.size(); ++j) {
-          data.p_manual_vecs[manual_cnt][j] = decision_variable_cache_
-              [GetCurrentProgram().ParameterManager().GetVariableIndex(pi[j])];
+          data.p_manual_vecs[manual_cnt][j] =
+              decision_variable_cache_[GetCurrentProgram().GetParameterIndex(
+                  pi[j])];
         }
         p.push_back(data.p_manual_vecs[manual_cnt++]);
       }
     }
     VLOG(10) << "Finished";
   }
+
+  void EvaluateCost(const Binding<CostType>& binding, const Eigen::VectorXd& x,
+                    bool grd, bool hes, bool update_cache = true);
+
+  void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes);
+
+  // Evaluates the constraint and updates the cache for the gradients
+  void EvaluateConstraint(const Binding<ConstraintType>& binding,
+                          const int& constraint_idx, const Eigen::VectorXd& x,
+                          bool jac, bool update_cache = true);
+
+  void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
+
+  void UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
+                                const int& constraint_idx);
+
+  void UpdateLagrangianHessian(const Binding<CostType>& binding);
 
  protected:
   // Cache for current values of the decision variables
@@ -219,7 +199,7 @@ class SolverBase {
   // Cache for current value of the objective gradient
   Eigen::VectorXd objective_gradient_cache_;
   // Cache for current value of the constraint vector
-  Eigen::VectorXd constraint_cache_;
+  Eigen::VectorXd constraint_vector_cache_;
 
   // Primal solution of the program
   Eigen::VectorXd primal_solution_x_;
@@ -274,111 +254,10 @@ class SolverBase {
     return data_[idx->second];
   }
 
-  /**
-   * @brief Places the vector vec within res specified at the variable
-   * locations of var
-   *
-   * @param res
-   * @param vec
-   * @param var
-   * @param is_continuous
-   */
-  void InsertVectorAtVariableLocations(Eigen::VectorXd& res,
-                                       const Eigen::VectorXd& vec,
-                                       const sym::VariableVector& var,
-                                       bool is_continuous = false) {
-    VLOG(10) << "InsertVectorAtVariableLocations()";
-    VLOG(10) << "res\n" << res;
-    VLOG(10) << "vec\n" << vec;
-    VLOG(10) << "var\n" << var;
-    if (is_continuous) {
-      // Block-insert
-      res.middleRows(program_.GetDecisionVariableIndex(var[0]), var.size()) +=
-          vec;
-    } else {
-      // Manually insert into vector
-      for (int j = 0; j < var.size(); ++j) {
-        int idx = program_.GetDecisionVariableIndex(var[j]);
-        res[idx] += vec[j];
-      }
-    }
-  }
-
-  void InsertJacobianAtVariableLocations(Eigen::MatrixXd& res,
-                                         const Eigen::MatrixXd& jac,
-                                         const sym::VariableVector& var,
-                                         const int& constraint_idx,
-                                         bool is_continuous = false) {
-    VLOG(8) << "InsertJacobianAtVariableLocations()";
-    VLOG(10) << "res\n" << res;
-    VLOG(10) << "jac\n" << jac;
-    VLOG(10) << "var\n" << var;
-    VLOG(10) << "constraint index " << constraint_idx;
-    Eigen::Ref<Eigen::MatrixXd> J = res.middleRows(constraint_idx, jac.rows());
-    if (is_continuous) {
-      J.middleCols(GetCurrentProgram().GetDecisionVariableIndex(var[0]),
-                   var.size()) += jac;
-    } else {
-      // For each variable, update the location in the Jacobian
-      for (int i = 0; i < var.size(); ++i) {
-        int idx = GetCurrentProgram().GetDecisionVariableIndex(var[i]);
-        J.col(idx) += jac.col(i);
-      }
-    }
-  }
-
-  /**
-   * @brief Inserts a Hessian matrix for the variables var_x and var_y into the
-   * Hessian matrix res where var_x and var_y are sub-vectors of the Hessian.
-   *
-   * @param res
-   * @param mat
-   * @param var_x
-   * @param var_y
-   * @param is_continuous_x
-   * @param is_continuous_y
-   */
-  void InsertHessianAtVariableLocations(Eigen::MatrixXd& res,
-                                        const Eigen::MatrixXd& mat,
-                                        const sym::VariableVector& var_x,
-                                        const sym::VariableVector& var_y,
-                                        bool is_continuous_x = false,
-                                        bool is_continuous_y = false) {
-    VLOG(10) << "InsertHessianAtVariableLocations()"
-             << "\nres" << res << "\nmat" << mat << "\nvar_x" << var_x
-             << "\nvar_y" << var_y;
-    // For each variable combination
-    if (is_continuous_x && is_continuous_y) {
-      int x_idx = program_.GetDecisionVariableIndex(var_x[0]);
-      int y_idx = program_.GetDecisionVariableIndex(var_y[0]);
-      // Create lower triangular Hessian
-      if (x_idx > y_idx) {
-        res.block(x_idx, y_idx, var_x.size(), var_y.size()) += mat;
-      } else {
-        res.block(y_idx, x_idx, var_y.size(), var_x.size()) += mat.transpose();
-      }
-
-    } else {
-      // For each variable pair, populate the Hessian
-      for (int i = 0; i < var_x.size(); ++i) {
-        int x_idx = program_.GetDecisionVariableIndex(var_x[i]);
-        for (int j = 0; j < var_y.size(); ++j) {
-          int y_idx = program_.GetDecisionVariableIndex(var_y[j]);
-          // Create lower triangular matrix
-          if (x_idx > y_idx) {
-            res(x_idx, y_idx) += mat(i, j);
-          } else {
-            res(y_idx, x_idx) += mat(i, j);
-          }
-        }
-      }
-    }
-  }
-
  private:
   bool is_solved_ = false;
   // Reference to current program in solver
-  ProgramBase& program_;
+  Program& program_;
   // Index of the constraints within the constraint vector
   std::vector<int> constraint_idx_;
 

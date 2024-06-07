@@ -36,7 +36,7 @@ LinearisedFrictionConstraint();
  * motion tasks.
  *
  */
-class OSC : public opt::ProgramBase<Eigen::MatrixXd> {
+class OSC : public opt::Program<Eigen::MatrixXd> {
  public:
   OSC() = default;
   ~OSC() = default;

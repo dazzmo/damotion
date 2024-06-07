@@ -28,7 +28,7 @@ LinearisedFrictionConstraint() {
 }
 
 OSC::OSC(int nq, int nv, int nu)
-    : opt::ProgramBase<Eigen::MatrixXd>("osc"), nq_(nq), nv_(nv), nu_(nu) {
+    : opt::Program<Eigen::MatrixXd>("osc"), nq_(nq), nv_(nv), nu_(nu) {
   // Create friction cone constraint to be bounded to by contact tasks
   friction_cone_con_ = LinearisedFrictionConstraint();
 }

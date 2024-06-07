@@ -9,8 +9,7 @@ option(WITH_IPOPT "Build with IPOPT functionality" ON)
 
 # Collect source files
 SET(${PROJECT_NAME}_SOURCES
-solvers/sparse.cc
-solvers/solver.cc
+solvers/base.cc
 casadi/codegen.cc
 casadi/pinocchio_model.cc
 optimisation/program.cc

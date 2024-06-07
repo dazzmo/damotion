@@ -19,19 +19,19 @@ namespace damotion {
  * large enough to represent the desired view.
  *
  */
-class GenericMatrixData {
+class GenericEigenMatrix {
  public:
-  using SharedPtr = std::shared_ptr<GenericMatrixData>;
-  using UniquePtr = std::unique_ptr<GenericMatrixData>;
+  using SharedPtr = std::shared_ptr<GenericEigenMatrix>;
+  using UniquePtr = std::unique_ptr<GenericEigenMatrix>;
 
-  GenericMatrixData() = default;
-  ~GenericMatrixData() = default;
+  GenericEigenMatrix() = default;
+  ~GenericEigenMatrix() = default;
 
   /**
-   * @brief Construct a new GenericMatrixData object for the 1x1 matrix class.
+   * @brief Construct a new GenericEigenMatrix object for the 1x1 matrix class.
    *
    */
-  GenericMatrixData(const double& val) {
+  GenericEigenMatrix(const double& val) {
     data_.reserve(1);
     data_.coeffRef(0, 0) = val;
     // Convert matrix to compressed form
@@ -39,13 +39,13 @@ class GenericMatrixData {
   }
 
   /**
-   * @brief Construct a new GenericMatrixData object for a dense matrix with
-   * structure given by mat. Copies the data of mat to the GenericMatrixData
+   * @brief Construct a new GenericEigenMatrix object for a dense matrix with
+   * structure given by mat. Copies the data of mat to the GenericEigenMatrix
    * object.
    *
    * @param mat
    */
-  GenericMatrixData(const Eigen::Ref<const Eigen::MatrixXd>& mat) {
+  GenericEigenMatrix(const Eigen::Ref<const Eigen::MatrixXd>& mat) {
     data_.reserve(mat.rows() * mat.cols());
     for (int i = 0; i < mat.rows(); ++i) {
       for (int j = 0; j < mat.cols(); ++j) {
@@ -62,12 +62,12 @@ class GenericMatrixData {
    *
    * @param mat
    */
-  GenericMatrixData(const Eigen::Ref<const Eigen::SparseMatrix<double>>& mat) {
+  GenericEigenMatrix(const Eigen::Ref<const Eigen::SparseMatrix<double>>& mat) {
     data_ = mat;
   }
 
   /**
-   * @brief Express the GenericMatrixData as a scalar value.
+   * @brief Express the GenericEigenMatrix as a scalar value.
    *
    * @return double
    */
@@ -83,7 +83,7 @@ class GenericMatrixData {
 
   /**
    * @brief Returns a mapped vector object representing the underlying data
-   * array of the GenericMatrixData class.
+   * array of the GenericEigenMatrix class.
    *
    * @return Eigen::Map<const Eigen::VectorXd>
    */
@@ -93,8 +93,8 @@ class GenericMatrixData {
   }
 
   /**
-   * @brief Returns a mapped vector object representing the underlying data
-   * array of the GenericMatrixData class.
+   * @brief Returns a vector object representing the underlying data
+   * array of the GenericEigenMatrix class.
    *
    * @return Eigen::VectorXd
    */
@@ -105,7 +105,20 @@ class GenericMatrixData {
 
   /**
    * @brief Returns a mapped matrix object representing the underlying data
-   * array of the GenericMatrixData class.
+   * array of the GenericEigenMatrix class.
+   *
+   * @return Eigen::MatrixXd
+   */
+  operator Eigen::Map<const Eigen::MatrixXd>() const {
+    assert(data_.nonZeros() == data_.rows() * data_.cols() &&
+           "Data array is not large to provide a matrix map");
+    return Eigen::Map<const Eigen::MatrixXd>(data_.valuePtr(), data_.rows(),
+                                             data_.cols());
+  }
+
+  /**
+   * @brief Returns a matrix object representing the underlying data
+   * array of the GenericEigenMatrix class.
    *
    * @return Eigen::MatrixXd
    */
@@ -118,7 +131,7 @@ class GenericMatrixData {
 
   /**
    * @brief Returns a copy of the SparseMatrix class that manages the data array
-   * for the GenericMatrixData class.
+   * for the GenericEigenMatrix class.
    *
    * @return Eigen::SparseMatrix<double>
    */
@@ -126,7 +139,7 @@ class GenericMatrixData {
 
   /**
    * @brief Returns a reference to the SparseMatrix class that manages the data
-   * array for the GenericMatrixData class.
+   * array for the GenericEigenMatrix class.
    *
    * @return Eigen::SparseMatrix<double>&
    */
@@ -134,14 +147,14 @@ class GenericMatrixData {
 
   /**
    * @brief Returns a constant reference to the SparseMatrix data class that
-   * manages the data array for the GenericMatrixData.
+   * manages the data array for the GenericEigenMatrix.
    *
    * @return const Eigen::SparseMatrix<double>&
    */
   const Eigen::SparseMatrix<double>& SparseMatrix() const { return data_; }
 
   /**
-   * @brief Returns the pointer to the data array for the GenericMatrixData
+   * @brief Returns the pointer to the data array for the GenericEigenMatrix
    * object. This can be used to modify and insert values directly into the data
    * array.
    *
@@ -151,7 +164,7 @@ class GenericMatrixData {
 
   /**
    * @brief The number of non-zero elements in the data array for the
-   * GenericMatrixData class.
+   * GenericEigenMatrix class.
    *
    * @return const Eigen::Index&
    */
@@ -164,7 +177,7 @@ class GenericMatrixData {
   Eigen::SparseMatrix<double> data_;
 };
 
-std::ostream& operator<<(std::ostream& os, const GenericMatrixData& data) {
+std::ostream& operator<<(std::ostream& os, const GenericEigenMatrix& data) {
   std::ostringstream oss;
   oss << data.SparseMatrix() << '\n';
   return os << oss.str();

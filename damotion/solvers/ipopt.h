@@ -15,7 +15,7 @@ namespace solvers {
 
 using namespace Ipopt;
 
-class IpoptSolverInstance : public Ipopt::TNLP, public SparseSolver {
+class IpoptSolverInstance : public Ipopt::TNLP, public SolverBase {
  public:
   IpoptSolverInstance(SparseProgram& prog);
 

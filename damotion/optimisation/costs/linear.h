@@ -44,14 +44,14 @@ class LinearCost : public CostBase {
    *
    * @return Eigen::VectorXd
    */
-  const GenericMatrixData &c() { return fc_->getOutput(0); }
+  const GenericEigenMatrix &c() { return fc_->getOutput(0); }
 
   /**
    * @brief Returns the constant term b in the cost expression.
    *
    * @return const double
    */
-  const GenericMatrixData &b() { return fb_->getOutput(0); }
+  const GenericEigenMatrix &b() { return fb_->getOutput(0); }
 
  private:
   common::Function::SharedPtr fc_;

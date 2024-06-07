@@ -3,6 +3,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/Sparse>
+#include <cassert>
 #include <functional>
 #include <iostream>
 
@@ -28,7 +29,10 @@ class Function {
    * @brief Empty constructor for the Function class
    *
    */
-  Function() : n_in_(0), n_out_(0) {}
+  Function() {
+    SetNumberOfInputs(0);
+    SetNumberOfOutputs(0);
+  }
 
   /**
    * @brief Construct a new Function object with number of inputs n_in and
@@ -37,8 +41,9 @@ class Function {
    * @param n_in Number of inputs
    * @param n_out Number of outputs
    */
-  Function(const int n_in, const int n_out) : n_in_(n_in), n_out_(n_out) {
-    out_.resize(n_out);
+  Function(const int n_in, const int n_out) {
+    SetNumberOfInputs(n_in);
+    SetNumberOfOutputs(n_out);
   }
 
   ~Function() = default;
@@ -58,72 +63,111 @@ class Function {
   const int &n_out() const { return n_out_; }
 
   /**
-   * @brief Update the function based on its inputs
+   * @brief Call the function based on the current inputs set by SetInput()
    *
-   * @param input List of input vectors for the function
-   * @param check Perform checks on the input to ensure correct size and good
-   * data
    */
-  void call(const InputRefVector &input, bool check = false) {
-    if (check) CheckInputRefVector(input);
-    callImpl(input);
-  }
+  void call() { callImpl(); }
+
+  /**
+   * @brief Set the i-th input for the function using the vector input.
+   * Optionally can perform a check on the input to assess if it is valid.
+   *
+   * @param i
+   * @param input
+   * @param check
+   */
+  void SetInput(const int &i, const Eigen::Ref<const Eigen::VectorXd> &input,
+                bool check = false);
+
+  /**
+   * @brief Sets a collection of inputs to the function using the vector of
+   * vector references input. Optionally can perform a check on the input to
+   * assess if it is valid.
+   *
+   * @param indices
+   * @param input
+   * @param check
+   */
+  void SetInput(const std::vector<int> &indices,
+                const std::vector<Eigen::Ref<const Eigen::VectorXd>> &input,
+                bool check = false);
+
+  /**
+   * @brief Set the i-th input for the function using the data array input.
+   * Optionally can perform a check on the input to assess if it is valid.
+   *
+   * @param i
+   * @param input
+   * @param check
+   */
+  void SetInput(const int &i, const double *input, bool check = false);
+
+  /**
+   * @brief Sets a collection of inputs to the function using the vector of data
+   * pointers input. Optionally can perform a check on the input to assess if it
+   * is valid.
+   *
+   * @param indices
+   * @param input
+   * @param check
+   */
+  void SetInput(const std::vector<int> &indices,
+                const std::vector<const double *> input, bool check = false);
 
   /**
    * @brief Returns the current value of output i
    *
    * @param i
-   * @return const GenericMatrixData&
+   * @return const GenericEigenMatrix&
    */
-  const GenericMatrixData &getOutput(int i) const { return out_[i]; }
+  const GenericEigenMatrix &getOutput(const int &i) const { return out_[i]; }
 
  protected:
-  void SetNumberOfInputs(const int &n) { n_in_ = n; }
-  void SetNumberOfOutputs(const int &n) { n_out_ = n; }
+  /**
+   * @brief Set the number of inputs the function has.
+   *
+   * @param n
+   */
+  void SetNumberOfInputs(const int &n) {
+    assert(n > 0 && "A positive integer amount of inputs are required");
+    n_in_ = n;
+    in_.assign(n_in_, nullptr);
+  }
+
+  /**
+   * @brief Set the number of outputs the function has
+   *
+   * @param n
+   */
+  void SetNumberOfOutputs(const int &n) {
+    assert(n > 0 && "A positive integer amount of outputs are required");
+    n_out_ = n;
+    out_.resize(n_out_);
+  }
 
   /**
    * @brief Virtual method for derived class to override
    *
    * @param input
    */
-  virtual void callImpl(const InputRefVector &input) = 0;
+  virtual void callImpl() = 0;
+
+  // Input data pointers that are stored for evaluation
+  std::vector<const double *> in_;
 
   /**
    * @brief Vector of output matrices
    *
    * @return std::vector<Eigen::MatrixXd>&
    */
-  std::vector<GenericMatrixData> &OutputVector() { return out_; }
-
-  /**
-   * @brief Assesses if all inputs provided to the function are valid, such as
-   * not including infinite values, NaNs...
-   *
-   * @param input
-   * @return true
-   * @return false
-   */
-  bool CheckInputRefVector(const InputRefVector &input) const {
-    int idx = 0;
-    for (const Eigen::Ref<const Eigen::VectorXd> &x : input) {
-      if (x.hasNaN() || !x.allFinite()) {
-        std::ostringstream ss;
-        ss << "Input " << idx << " has invalid values:\n"
-           << x.transpose().format(3);
-        throw std::runtime_error(ss.str());
-      }
-      idx++;
-    }
-
-    return true;
-  }
+  std::vector<GenericEigenMatrix> &OutputVector() { return out_; }
 
  private:
   int n_in_;
   int n_out_;
 
-  // Output data vector
-  mutable std::vector<GenericMatrixData> out_;
+  // Output data vector of GenericEigenMatrix objects
+  mutable std::vector<GenericEigenMatrix> out_;
 };
 
 /**
@@ -132,8 +176,8 @@ class Function {
  */
 class CallbackFunction : public Function {
  public:
-  typedef std::function<void(const InputRefVector &,
-                             std::vector<GenericMatrixData> &)>
+  typedef std::function<void(const std::vector<const double *> &,
+                             std::vector<GenericEigenMatrix> &)>
       f_callback_;
 
   CallbackFunction() = default;
@@ -153,7 +197,7 @@ class CallbackFunction : public Function {
   void InitialiseOutput(const int i, const Sparsity &sparsity) {
     // TODO - Fix this up
     // this->OutputVector()[i] =
-    //     GenericMatrixData::Zero(sparsity.rows(), sparsity.cols());
+    //     GenericEigenMatrix::Zero(sparsity.rows(), sparsity.cols());
   }
 
   /**
@@ -168,12 +212,12 @@ class CallbackFunction : public Function {
    *
    * @param input
    */
-  void callImpl(const InputRefVector &input) override {
+  void callImpl() override {
     if (f_ == nullptr) {
       throw std::runtime_error(
           "Function callback not provided to CallbackFunction!");
     }
-    f_(input, this->OutputVector());
+    f_(in_, this->OutputVector());
   }
 
  private:

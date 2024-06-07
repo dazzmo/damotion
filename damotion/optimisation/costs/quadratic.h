@@ -52,11 +52,11 @@ class QuadraticCost : public CostBase {
    *
    * @return const MatrixType&
    */
-  const GenericMatrixData &A() const { return fA_->getOutput(0); }
+  const GenericEigenMatrix &A() const { return fA_->getOutput(0); }
 
-  const GenericMatrixData &b() const { return fb_->getOutput(0); }
+  const GenericEigenMatrix &b() const { return fb_->getOutput(0); }
 
-  const GenericMatrixData &c() const { return fc_->getOutput(0); }
+  const GenericEigenMatrix &c() const { return fc_->getOutput(0); }
 
  private:
   common::Function::SharedPtr fA_;

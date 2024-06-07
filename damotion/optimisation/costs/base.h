@@ -135,9 +135,9 @@ class CostBase {
   /**
    * @brief Returns the most recent evaluation of the cost objective
    *
-   * @return const GenericMatrixData&
+   * @return const GenericEigenMatrix&
    */
-  const GenericMatrixData &Objective() const { return fobj_->getOutput(0); }
+  const GenericEigenMatrix &Objective() const { return fobj_->getOutput(0); }
   /**
    * @brief The gradient of the cost with respect to the i-th variable
    * vector
@@ -145,7 +145,7 @@ class CostBase {
    * @param i
    * @return const VectorXd&
    */
-  const GenericMatrixData &Gradient() const {
+  const GenericEigenMatrix &Gradient() const {
     assert(has_grd_ && "This cost does not have a gradient to access");
     return fgrd_->getOutput(0);
   }
@@ -157,7 +157,7 @@ class CostBase {
    * @param j
    * @return const MatrixType&
    */
-  const GenericMatrixData &Hessian() const {
+  const GenericEigenMatrix &Hessian() const {
     assert(has_hes_ && "This cost does not have a hessian to access");
     return fhes_->getOutput(0);
   }
