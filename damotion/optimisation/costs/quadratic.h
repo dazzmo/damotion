@@ -10,7 +10,7 @@ namespace optimisation {
  * @brief A cost of the form 0.5 x^T Q x + g^T x + c
  *
  */
-class QuadraticCost : public CostBase {
+class QuadraticCost : public Cost {
  public:
   using UniquePtr = std::unique_ptr<QuadraticCost>;
   using SharedPtr = std::shared_ptr<QuadraticCost>;
@@ -19,12 +19,10 @@ class QuadraticCost : public CostBase {
                 const Eigen::VectorXd &b, const double &c, bool jac = true,
                 bool hes = true) {
     // Cost
-    casadi::DM Ad, bd;
-    casadi::SX csx = c;
+    casadi::DM Ad, bd, cd = c;
     damotion::casadi::toCasadi(A, Ad);
     damotion::casadi::toCasadi(b, bd);
-    casadi::SX Asx = Ad, bsx = bd;
-    ConstructConstraint(name, Asx, bsx, csx, {}, jac, hes);
+    ConstructConstraint(name, Ad, bd, cd, {}, jac, hes);
   }
 
   QuadraticCost(const std::string &name, const casadi::SX &A,
@@ -34,16 +32,13 @@ class QuadraticCost : public CostBase {
   }
 
   QuadraticCost(const std::string &name, const casadi::SX &ex,
-                const casadi::SXVector &x, const casadi::SXVector &p,
-                bool jac = true, bool hes = true) {
-    casadi::SXVector in = {};
+                const casadi::SX &x, const casadi::SXVector &p, bool jac = true,
+                bool hes = true) {
     // Extract quadratic form
     casadi::SX A, b, c;
-    casadi::SX::quadratic_coeff(ex, x[0], A, b, c, true);
-
+    casadi::SX::quadratic_coeff(ex, x, A, b, c, true);
     // Remove factor of two from hessian
     A *= 0.5;
-
     ConstructConstraint(name, A, b, c, p, jac, hes);
   }
 
@@ -52,16 +47,25 @@ class QuadraticCost : public CostBase {
    *
    * @return const MatrixType&
    */
-  const GenericEigenMatrix &A() const { return fA_->getOutput(0); }
+  const GenericEigenMatrix &A() const {
+    fA_->call();
+    return fA_->GetOutput(0);
+  }
 
-  const GenericEigenMatrix &b() const { return fb_->getOutput(0); }
+  const GenericEigenMatrix &b() const {
+    fb_->call();
+    return fb_->GetOutput(0);
+  }
 
-  const GenericEigenMatrix &c() const { return fc_->getOutput(0); }
+  const GenericEigenMatrix &c() const {
+    fc_->call();
+    return fc_->GetOutput(0);
+  }
 
  private:
-  common::Function::SharedPtr fA_;
-  common::Function::SharedPtr fb_;
-  common::Function::SharedPtr fc_;
+  common::Function::UniquePtr fA_;
+  common::Function::UniquePtr fb_;
+  common::Function::UniquePtr fc_;
 
   void ConstructConstraint(const std::string &name, const casadi::SX &A,
                            const casadi::SX &b, const casadi::SX &c,
@@ -69,34 +73,22 @@ class QuadraticCost : public CostBase {
                            bool hes = true, bool sparse = false) {
     this->SetName(name);
 
-    casadi::SXVector in = {};
-    // Linear cost
-    casadi::SX x = casadi::SX::sym("x", A.rows());
-    casadi::SX cost = mtimes(x.T(), mtimes(A, x)) + mtimes(b.T(), x) + c;
-    in.push_back(x);
-    for (const casadi::SX &pi : p) {
-      in.push_back(pi);
-    }
+    // Create expression
+    int nx = A.columns();
 
-    // Create coefficient functions
-    casadi::SX Atmp = casadi::SX::tril(A), btmp = b, ctmp = c;
-    if (!sparse) {
-      Atmp = densify(Atmp);
-      btmp = densify(btmp);
-      ctmp = densify(ctmp);
-    }
-    // Create functions
-    fA_ = std::make_shared<damotion::casadi::FunctionWrapper>(
-        casadi::Function(this->name() + "_A", in, {Atmp}));
-    fb_ = std::make_shared<damotion::casadi::FunctionWrapper>(
-        casadi::Function(this->name() + "_b", in, {btmp}));
-    fc_ = std::make_shared<damotion::casadi::FunctionWrapper>(
-        casadi::Function(this->name() + "_c", in, {ctmp}));
+    // Quadratic cost
+    casadi::SX x = casadi::SX::sym("x", nx);
+    casadi::SX ex = mtimes(x.T(), mtimes(A, x)) + mtimes(b.T(), x) + c;
 
-    // TODO
+    GenerateFunction({ex}, {x}, p, jac, hes, sparse);
 
-    this->has_grd_ = true;
-    this->has_hes_ = true;
+    // Create specialised functions for A, b and c
+    fA_ = std::make_unique<damotion::casadi::CasadiFunction>(
+        ::casadi::SXVector({A}), ::casadi::SXVector(), p, false, false, sparse);
+    fb_ = std::make_unique<damotion::casadi::CasadiFunction>(
+        ::casadi::SXVector({b}), ::casadi::SXVector(), p, false, false, sparse);
+    fc_ = std::make_unique<damotion::casadi::CasadiFunction>(
+        ::casadi::SXVector({c}), ::casadi::SXVector(), p, false, false, sparse);
   }
 };
 

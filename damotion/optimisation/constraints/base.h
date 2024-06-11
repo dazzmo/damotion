@@ -54,6 +54,15 @@ class Constraint : public damotion::casadi::CasadiFunction {
   const std::string name() const { return name_; }
 
   /**
+   * @brief Dimension of the constraint
+   *
+   */
+  const int Dimension() const {
+    // TODO - Fix this
+    return this->ny();
+  }
+
+  /**
    * @brief Set the name of the constraint
    *
    * @param name

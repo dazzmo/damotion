@@ -51,23 +51,23 @@ class Function {
   /**
    * @brief Number of inputs for the function
    *
-   * @return const int&
+   * @return int
    */
-  const int& nx() const { return nx_; }
+  int nx() const { return nx_; }
 
   /**
    * @brief Number of parameters for the function
    *
-   * @return const int&
+   * @return int
    */
-  const int& np() const { return np_; }
+  int np() const { return np_; }
 
   /**
    * @brief Number of outputs for the function
    *
-   * @return const int&
+   * @return int
    */
-  const int& ny() const { return ny_; }
+  int ny() const { return ny_; }
 
   /**
    * @brief Resize the function to the appropriate outputs

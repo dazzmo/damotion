@@ -53,7 +53,34 @@ class CasadiFunction : public common::Function {
   CasadiFunction(const ::casadi::SXVector &f, const ::casadi::SXVector &x,
                  const ::casadi::SXVector &p, bool derivative = false,
                  bool hessian = false, bool sparse = false)
-      : common::Function(x.size(), p.size(), f.size()) {
+      : common::Function() {
+    GenerateFunction(f, x, p, derivative, hessian, sparse);
+  }
+
+  ~CasadiFunction() {
+    // Release memory for casadi functions
+    if (!f_.is_null()) f_.release(f_data_.mem_);
+    if (!d_.is_null()) d_.release(d_data_.mem_);
+    if (!h_.is_null()) h_.release(h_data_.mem_);
+  }
+
+  /**
+   * @brief Generates the function based on the provided output expression f,
+   * variables x and parameters p.
+   *
+   * @param f
+   * @param x
+   * @param p
+   * @param derivative
+   * @param hessian
+   * @param sparse
+   */
+  void GenerateFunction(const ::casadi::SXVector &f,
+                        const ::casadi::SXVector &x,
+                        const ::casadi::SXVector &p, bool derivative = false,
+                        bool hessian = false, bool sparse = false) {
+    // Resize the function
+    Resize(x.size(), f.size(), p.size());
     // Create functions to compute the function, derivative and hessian
     // Concatenate x and p
     ::casadi::SXVector in;
@@ -98,13 +125,6 @@ class CasadiFunction : public common::Function {
       }
       ::casadi::Function d("name_d", in, {hf});
     }
-  }
-
-  ~CasadiFunction() {
-    // Release memory for casadi functions
-    if (!f_.is_null()) f_.release(f_data_.mem_);
-    if (!d_.is_null()) d_.release(d_data_.mem_);
-    if (!h_.is_null()) h_.release(h_data_.mem_);
   }
 
   /**

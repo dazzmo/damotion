@@ -23,8 +23,6 @@ class SolverBase;
 
 class CostManager {
  public:
-  typedef CostBase CostType;
-
   CostManager() = default;
   ~CostManager() = default;
 
@@ -36,30 +34,30 @@ class CostManager {
    * @param p
    * @return Binding<Cost>
    */
-  Binding<CostType> AddCost(const std::shared_ptr<CostType> &cost,
-                            const sym::VariableRefVector &x,
-                            const sym::ParameterRefVector &p) {
-    Binding<CostType> binding(cost, x, p);
+  Binding<Cost> AddCost(const std::shared_ptr<Cost> &cost,
+                        const sym::VariableRefVector &x,
+                        const sym::VariableRefVector &p) {
+    Binding<Cost> binding(cost, x, p);
     costs_.push_back(binding);
     return costs_.back();
   }
 
   Binding<LinearCost> AddLinearCost(const std::shared_ptr<LinearCost> &cost,
                                     const sym::VariableRefVector &x,
-                                    const sym::ParameterRefVector &p) {
+                                    const sym::VariableRefVector &p) {
     linear_costs_.push_back(Binding<LinearCost>(cost, x, p));
     return linear_costs_.back();
   }
 
   Binding<QuadraticCost> AddQuadraticCost(
       const std::shared_ptr<QuadraticCost> &cost,
-      const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
+      const sym::VariableRefVector &x, const sym::VariableRefVector &p) {
     quadratic_costs_.push_back(Binding<QuadraticCost>(cost, x, p));
     return quadratic_costs_.back();
   }
 
-  std::vector<Binding<CostType>> GetAllCostBindings() {
-    std::vector<Binding<CostType>> costs;
+  std::vector<Binding<Cost>> GetAllCostBindings() {
+    std::vector<Binding<Cost>> costs;
     costs.insert(costs.begin(), linear_costs_.begin(), linear_costs_.end());
     costs.insert(costs.begin(), quadratic_costs_.begin(),
                  quadratic_costs_.end());
@@ -99,15 +97,15 @@ class CostManager {
     std::cout << "----------------------\n";
     std::cout << "Cost\n";
     std::cout << "----------------------\n";
-    std::vector<Binding<CostType>> costs = GetAllCostBindings();
-    for (Binding<CostType> &b : costs) {
+    std::vector<Binding<Cost>> costs = GetAllCostBindings();
+    for (Binding<Cost> &b : costs) {
       std::cout << b.Get().name() << '\n';
     }
   }
 
  private:
   // Costs
-  std::vector<Binding<CostType>> costs_;
+  std::vector<Binding<Cost>> costs_;
   std::vector<Binding<LinearCost>> linear_costs_;
   std::vector<Binding<QuadraticCost>> quadratic_costs_;
 };
@@ -131,20 +129,20 @@ class ConstraintManager {
    * @param c
    * @param x
    * @param p
-   * @return Binding<ConstraintBase>
+   * @return Binding<Constraint>
    */
-  Binding<ConstraintBase> AddConstraint(
-      const std::shared_ptr<ConstraintBase> &con,
-      const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
+  Binding<Constraint> AddConstraint(const std::shared_ptr<Constraint> &con,
+                                    const sym::VariableRefVector &x,
+                                    const sym::VariableRefVector &p) {
     // Create a binding for the constraint
-    constraints_.push_back(Binding<ConstraintBase>(con, x, p));
+    constraints_.push_back(Binding<Constraint>(con, x, p));
     n_constraints_ += con->Dimension();
     return constraints_.back();
   }
 
   Binding<LinearConstraint> AddLinearConstraint(
       const std::shared_ptr<LinearConstraint> &con,
-      const sym::VariableRefVector &x, const sym::ParameterRefVector &p) {
+      const sym::VariableRefVector &x, const sym::VariableRefVector &p) {
     linear_constraints_.push_back(Binding<LinearConstraint>(con, x, p));
     n_constraints_ += con->Dimension();
     return linear_constraints_.back();
@@ -168,8 +166,8 @@ class ConstraintManager {
     return AddBoundingBoxConstraint(lbv, ubv, x);
   }
 
-  std::vector<Binding<ConstraintBase>> GetAllConstraintBindings() {
-    std::vector<Binding<ConstraintBase>> constraints;
+  std::vector<Binding<Constraint>> GetAllConstraintBindings() {
+    std::vector<Binding<Constraint>> constraints;
     constraints.insert(constraints.begin(), linear_constraints_.begin(),
                        linear_constraints_.end());
 
@@ -194,8 +192,8 @@ class ConstraintManager {
    *
    * @return std::vector<Binding<BoundingBoxConstraint>>&
    */
-  std::vector<Binding<BoundingBoxConstraint>>
-      &GetBoundingBoxConstraintBindings() {
+  std::vector<Binding<BoundingBoxConstraint>> &
+  GetBoundingBoxConstraintBindings() {
     // Create constraints
     return bounding_box_constraints_;
   }
@@ -205,9 +203,8 @@ class ConstraintManager {
     std::cout << "Constraint\tSize\tLower Bound\tUpper Bound\n";
     std::cout << "----------------------\n";
     // Get all constraints
-    std::vector<Binding<ConstraintBase>> constraints =
-        GetAllConstraintBindings();
-    for (Binding<ConstraintBase> &b : constraints) {
+    std::vector<Binding<Constraint>> constraints = GetAllConstraintBindings();
+    for (Binding<Constraint> &b : constraints) {
       std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
       for (int i = 0; i < b.Get().Dimension(); ++i) {
         std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
@@ -231,7 +228,7 @@ class ConstraintManager {
     ubg_.resize(n_constraints_);
     // Set first-in-first out order
     int idx = 0;
-    for (Binding<ConstraintBase> &b : GetAllConstraintBindings()) {
+    for (Binding<Constraint> &b : GetAllConstraintBindings()) {
       lbg_.middleRows(idx, b.Get().Dimension()) = b.Get().LowerBound();
       ubg_.middleRows(idx, b.Get().Dimension()) = b.Get().UpperBound();
       idx += b.Get().Dimension();
@@ -245,7 +242,7 @@ class ConstraintManager {
   // Number of constraints
   int n_constraints_;
 
-  std::vector<Binding<ConstraintBase>> constraints_;
+  std::vector<Binding<Constraint>> constraints_;
   std::vector<Binding<LinearConstraint>> linear_constraints_;
   std::vector<Binding<BoundingBoxConstraint>> bounding_box_constraints_;
 
@@ -265,8 +262,8 @@ class ConstraintManager {
 class Program : public CostManager, public ConstraintManager {
  public:
   Program() {
-    x_manager_ = std::make_unique<sym::VariableManager>();
-    p_manager_ = std::make_unique<sym::VariableManager>();
+    x_manager_ = std::make_shared<sym::VariableManager>();
+    p_manager_ = std::make_shared<sym::VariableManager>();
   }
 
   ~Program() = default;
@@ -566,8 +563,8 @@ class Program : public CostManager, public ConstraintManager {
   // Optimisation vector
   Eigen::VectorXd x_;
 
-  sym::VariableManager::UniquePtr x_manager_;
-  sym::VariableManager::UniquePtr p_manager_;
+  sym::VariableManager::SharedPtr x_manager_;
+  sym::VariableManager::SharedPtr p_manager_;
 };
 
 }  // namespace optimisation

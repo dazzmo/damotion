@@ -72,8 +72,8 @@ class LinearConstraint : public Constraint {
   }
 
  private:
-  mutable CasadiFunction::UniquePtr fA_;
-  mutable CasadiFunction::UniquePtr fb_;
+  mutable common::Function::UniquePtr fA_;
+  mutable common::Function::UniquePtr fb_;
 
   void ConstructConstraint(const std::string &name, const casadi::SX &A,
                            const casadi::SX &b, const casadi::SXVector &p,
@@ -82,13 +82,20 @@ class LinearConstraint : public Constraint {
     assert(A.rows() == b.rows() && "A and b must be same dimension!");
     this->SetName(name);
 
-    casadi::SXVector in = {};
-
     VLOG(10) << this->name() << " ConstructConstraint()";
     VLOG(10) << "A = " << A;
     VLOG(10) << "b = " << b;
 
+    // Create expression
+    int nx = A.columns();
+
+    ::casadi::SX x = ::casadi::SX::sym("x", nx);
+    ::casadi::SX ex = mtimes(A, x) + b;
+
+    GenerateFunction({ex}, {x}, p, jac, false, sparse);
+
     this->SetBounds(bounds);
+
     // Create specialised functions for A and b
     fA_ = std::make_unique<damotion::casadi::CasadiFunction>(
         ::casadi::SXVector({A}), ::casadi::SXVector(), p, false, false, sparse);

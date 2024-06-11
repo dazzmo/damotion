@@ -18,7 +18,7 @@ class SolverBase {
     decision_variable_cache_ = Eigen::VectorXd::Zero(nx);
     primal_solution_x_ = Eigen::VectorXd::Zero(nx);
     objective_gradient_cache_ = Eigen::VectorXd::Zero(nx);
-    constraint_cache_ = Eigen::VectorXd::Zero(nc);
+    constraint_vector_cache_ = Eigen::VectorXd::Zero(nc);
     dual_variable_cache_ = Eigen::VectorXd::Zero(nc);
 
     // Register all bindings
@@ -70,23 +70,23 @@ class SolverBase {
   bool IsSolved() const { return is_solved_; }
 
   /**
-   * @brief Returns a vector of bindings to CostBase<MatrixType> for each
+   * @brief Returns a vector of bindings to Cost<MatrixType> for each
    * binding within the program.
    *
-   * @return const std::vector<Binding<CostBase>>&
+   * @return const std::vector<Binding<Cost>>&
    */
-  const std::vector<Binding<CostBase>>& GetCostBindings() const {
+  const std::vector<Binding<Cost>>& GetCostBindings() const {
     return cost_base_bindings_;
   }
 
   /**
-   * @brief Returns a vector of bindings to ConstraintBase<MatrixType> for each
+   * @brief Returns a vector of bindings to Constraint<MatrixType> for each
    * binding within the program. Useful for iterating through all constraint's
    * base classes.
    *
-   * @return const std::vector<Binding<ConstraintBase>>&
+   * @return const std::vector<Binding<Constraint>>&
    */
-  const std::vector<Binding<ConstraintBase>>& GetConstraintBindings() const {
+  const std::vector<Binding<Constraint>>& GetConstraintBindings() const {
     return constraint_base_bindings_;
   }
 
@@ -109,18 +109,16 @@ class SolverBase {
   /**
    * @brief All constraints within the program
    *
-   * @return std::vector<Binding<ConstraintBase>>&
+   * @return std::vector<Binding<Constraint>>&
    */
-  std::vector<Binding<ConstraintBase>>& GetConstraints() {
-    return constraints_;
-  }
+  std::vector<Binding<Constraint>>& GetConstraints() { return constraints_; }
 
   /**
    * @brief All costs within the program
    *
-   * @return std::vector<Binding<CostBase>>&
+   * @return std::vector<Binding<Cost>>&
    */
-  std::vector<Binding<CostBase>>& GetCosts() { return costs_; }
+  std::vector<Binding<Cost>>& GetCosts() { return costs_; }
 
   template <typename T>
   void SetBindingInputs(const Binding<T>& binding) {
@@ -172,22 +170,22 @@ class SolverBase {
     VLOG(10) << "Finished";
   }
 
-  void EvaluateCost(const Binding<CostType>& binding, const Eigen::VectorXd& x,
+  void EvaluateCost(const Binding<Cost>& binding, const Eigen::VectorXd& x,
                     bool grd, bool hes, bool update_cache = true);
 
   void EvaluateCosts(const Eigen::VectorXd& x, bool grd, bool hes);
 
   // Evaluates the constraint and updates the cache for the gradients
-  void EvaluateConstraint(const Binding<ConstraintType>& binding,
+  void EvaluateConstraint(const Binding<Constraint>& binding,
                           const int& constraint_idx, const Eigen::VectorXd& x,
                           bool jac, bool update_cache = true);
 
   void EvaluateConstraints(const Eigen::VectorXd& x, bool jac);
 
-  void UpdateConstraintJacobian(const Binding<ConstraintType>& binding,
+  void UpdateConstraintJacobian(const Binding<Constraint>& binding,
                                 const int& constraint_idx);
 
-  void UpdateLagrangianHessian(const Binding<CostType>& binding);
+  void UpdateLagrangianHessian(const Binding<Cost>& binding);
 
  protected:
   // Cache for current values of the decision variables
@@ -205,9 +203,9 @@ class SolverBase {
   Eigen::VectorXd primal_solution_x_;
 
   // Vector of the constraint bindings for the program
-  std::vector<Binding<ConstraintBase>> constraints_;
+  std::vector<Binding<Constraint>> constraints_;
   // Vector of the cost bindings for the program
-  std::vector<Binding<CostBase>> costs_;
+  std::vector<Binding<Cost>> costs_;
 
   /**
    * @brief Binding data related to whether the inputs are continuous within
@@ -264,8 +262,8 @@ class SolverBase {
   // Provides data for each variable
   std::unordered_map<int, int> binding_idx_;
   std::vector<BindingInputData> data_ = {};
-  std::vector<Binding<CostBase>> cost_base_bindings_ = {};
-  std::vector<Binding<ConstraintBase>> constraint_base_bindings_ = {};
+  std::vector<Binding<Cost>> cost_base_bindings_ = {};
+  std::vector<Binding<Constraint>> constraint_base_bindings_ = {};
 
   /**
    * @brief Register a binding with the solver

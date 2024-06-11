@@ -10,16 +10,14 @@ namespace optimisation {
  * @brief Cost of the form \f$ c^T x + b \f$
  *
  */
-class LinearCost : public CostBase {
+class LinearCost : public Cost {
  public:
   LinearCost(const std::string &name, const Eigen::VectorXd &c, const double &b,
              bool jac = true) {
     // Create Costs
     casadi::DM cd, bd = b;
     damotion::casadi::toCasadi(c, cd);
-    casadi::SX cs = cd, bs = bd;
-
-    ConstructCost(name, cs, bs, {}, jac, true);
+    ConstructCost(name, cd, bd, {}, jac, true);
   }
 
   LinearCost(const std::string &name, const casadi::SX &c, const casadi::SX &b,
@@ -27,15 +25,11 @@ class LinearCost : public CostBase {
     ConstructCost(name, c, b, p, jac, true);
   }
 
-  LinearCost(const std::string &name, const casadi::SX &ex,
-             const casadi::SXVector &x, const casadi::SXVector &p,
-             bool jac = true, bool hes = true) {
-    int nvar = 0;
-    casadi::SXVector in = {};
+  LinearCost(const std::string &name, const casadi::SX &ex, const casadi::SX &x,
+             const casadi::SXVector &p, bool jac = true, bool hes = true) {
     // Extract quadratic form
     casadi::SX c, b;
-    casadi::SX::linear_coeff(ex, x[0], c, b, true);
-
+    casadi::SX::linear_coeff(ex, x, c, b, true);
     ConstructCost(name, c, b, p, jac, hes);
   }
 
@@ -44,45 +38,45 @@ class LinearCost : public CostBase {
    *
    * @return Eigen::VectorXd
    */
-  const GenericEigenMatrix &c() { return fc_->getOutput(0); }
+  const GenericEigenMatrix &c() {
+    fc_->call();
+    return fc_->GetOutput(0);
+  }
 
   /**
    * @brief Returns the constant term b in the cost expression.
    *
    * @return const double
    */
-  const GenericEigenMatrix &b() { return fb_->getOutput(0); }
+  const GenericEigenMatrix &b() {
+    fb_->call();
+    return fb_->GetOutput(0);
+  }
 
  private:
-  common::Function::SharedPtr fc_;
-  common::Function::SharedPtr fb_;
+  common::Function::UniquePtr fc_;
+  common::Function::UniquePtr fb_;
 
   void ConstructCost(const std::string &name, const casadi::SX &c,
                      const casadi::SX &b, const casadi::SXVector &p,
                      bool jac = true, bool hes = true, bool sparse = false) {
+    assert(b.rows() == 1 && "b must be scalar!");
+
     this->SetName(name);
 
-    int nvar = 0;
-    casadi::SXVector in = {};
-    for (const casadi::SX &pi : p) {
-      in.push_back(pi);
-    }
+    // Create expression
+    int nx = c.rows();
 
-    casadi::SX c_tmp = c, b_tmp = b;
-    if (!sparse) {
-      c_tmp = densify(c_tmp);
-      b_tmp = densify(b_tmp);
-    }
+    ::casadi::SX x = ::casadi::SX::sym("x", nx);
+    ::casadi::SX ex = mtimes(c.T(), x) + b;
+
+    GenerateFunction({ex}, {x}, p, jac, false, sparse);
 
     // Create coefficient functions
-    fc_ = std::make_shared<damotion::casadi::FunctionWrapper>(
-        casadi::Function(this->name() + "_A", in, {c_tmp}));
-    fb_ = std::make_shared<damotion::casadi::FunctionWrapper>(
-        casadi::Function(this->name() + "_b", in, {b_tmp}));
-
-    this->has_grd_ = true;
-    // Indicate cost does not have a hessian
-    this->has_hes_ = false;
+    fc_ = std::make_unique<damotion::casadi::CasadiFunction>(
+        ::casadi::SXVector({c}), ::casadi::SXVector(), p, false, false, sparse);
+    fb_ = std::make_unique<damotion::casadi::CasadiFunction>(
+        ::casadi::SXVector({b}), ::casadi::SXVector(), p, false, false, sparse);
   }
 };
 

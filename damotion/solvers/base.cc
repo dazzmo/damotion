@@ -1,8 +1,8 @@
 #include "damotion/solvers/base.h"
 
 void SolverBase::EvaluateCost(const Binding<CostType>& binding,
-  const Eigen::VectorXd& x, bool grd, bool hes,
-  bool update_cache) {
+                              const Eigen::VectorXd& x, bool grd, bool hes,
+                              bool update_cache) {
   common::InputRefVector x_in = {}, p_in = {};
   GetBindingInputs(binding, x_in, p_in);
 
@@ -32,9 +32,9 @@ void SolverBase::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
 
 // Evaluates the constraint and updates the cache for the gradients
 void SolverBase::EvaluateConstraint(const Binding<ConstraintType>& binding,
-  const int& constraint_idx,
-  const Eigen::VectorXd& x, bool jac,
-  bool update_cache) {
+                                    const int& constraint_idx,
+                                    const Eigen::VectorXd& x, bool jac,
+                                    bool update_cache) {
   common::InputRefVector x_in = {}, p_in = {};
   GetBindingInputs(binding, x_in, p_in);
 
@@ -46,9 +46,9 @@ void SolverBase::EvaluateConstraint(const Binding<ConstraintType>& binding,
   // Update the caches if required, otherwise break early
   if (update_cache == false) return;
 
-  constraint_cache_.middleRows(constraint_idx, constraint.Dimension()) =
-    constraint.Vector();
-  VLOG(10) << "constraint_cache = " << constraint_cache_;
+  constraint_vector_cache_.middleRows(constraint_idx, constraint.Dimension()) =
+      constraint.Vector();
+  VLOG(10) << "constraint_cache = " << constraint_vector_cache_;
 
   UpdateConstraintJacobian(binding, constraint_idx);
   VLOG(10) << "jacobian_cache = " << constraint_jacobian_cache_;
@@ -56,7 +56,7 @@ void SolverBase::EvaluateConstraint(const Binding<ConstraintType>& binding,
 
 void SolverBase::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
   // Reset constraint vector
-  constraint_cache_.setZero();
+  constraint_vector_cache_.setZero();
   // Reset objective gradient
   if (jac) {
     constraint_jacobian_cache_.setZero();
@@ -68,7 +68,7 @@ void SolverBase::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
 }
 
 void SolverBase::UpdateConstraintJacobian(
-  const Binding<ConstraintType>& binding, const int& constraint_idx) {
+    const Binding<ConstraintType>& binding, const int& constraint_idx) {
   // Get data related to the binding
   BindingInputData& data = GetBindingInputData(binding);
   // Get block rows related to the binding constraint
@@ -76,9 +76,9 @@ void SolverBase::UpdateConstraintJacobian(
   for (int i = 0; i < binding.nx(); ++i) {
     const sym::VariableVector& xi = binding.x(i);
     Eigen::Ref<const Eigen::MatrixXd> Ji =
-      binding.Get().Jacobian().middleCols(idx, xi.size());
+        binding.Get().Jacobian().middleCols(idx, xi.size());
     InsertJacobianAtVariableLocations(constraint_jacobian_cache_, Ji, xi,
-      constraint_idx, data.x_continuous[i]);
+                                      constraint_idx, data.x_continuous[i]);
     idx += xi.size();
   }
 }
@@ -95,10 +95,10 @@ void SolverBase::UpdateLagrangianHessian(const Binding<CostType>& binding) {
       const sym::VariableVector& xj = binding.x(j);
       // Get Hessian block
       Eigen::Ref<const Eigen::MatrixXd> Hij =
-        binding.Get().Hessian().block(idx_x, idx_y, xi.size(), xj.size());
+          binding.Get().Hessian().block(idx_x, idx_y, xi.size(), xj.size());
       InsertHessianAtVariableLocations(lagrangian_hes_cache_, Hij, xi, xj,
-        data.x_continuous[i],
-        data.x_continuous[j]);
+                                       data.x_continuous[i],
+                                       data.x_continuous[j]);
 
       idx_y += xj.size();
     }
