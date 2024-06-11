@@ -25,17 +25,17 @@ class BindingBase {
    * @param p
    */
   BindingBase(const sym::VariableRefVector &x,
-              const sym::ParameterRefVector &p = {}) {
+              const sym::VariableRefVector &p = {}) {
     // Set variable vector
     x_.reserve(x.size());
     for (auto xi : x) {
       x_.push_back(std::make_shared<sym::VariableVector>(xi));
     }
 
-    // Create vector of parameters
+    // Create vector of Variables
     p_.reserve(p.size());
     for (auto pi : p) {
-      p_.push_back(std::make_shared<sym::ParameterVector>(pi));
+      p_.push_back(std::make_shared<sym::VariableVector>(pi));
     }
 
     // Create a concatenated variable vector
@@ -58,7 +58,7 @@ class BindingBase {
   const int &nx() const { return nx_; }
 
   /**
-   * @brief Number of parameters p for the binding
+   * @brief Number of Variables p for the binding
    *
    * @return const int&
    */
@@ -85,13 +85,13 @@ class BindingBase {
   }
 
   /**
-   * @brief The i-th parameter p_i for the binding
+   * @brief The i-th Variable p_i for the binding
    *
    * @param i
-   * @return const sym::ParameterVector&
+   * @return const sym::VariableVector&
    */
-  const sym::ParameterVector &p(const int &i) const {
-    assert(i < 0 && i >= np() && "Out of range for binding parameters");
+  const sym::VariableVector &p(const int &i) const {
+    assert(i < 0 && i >= np() && "Out of range for binding Variables");
     return *p_[i];
   }
 
@@ -103,7 +103,7 @@ class BindingBase {
 
   // Vector of variables bound to the constraint
   std::vector<std::shared_ptr<sym::VariableVector>> x_ = {};
-  std::vector<std::shared_ptr<sym::ParameterVector>> p_ = {};
+  std::vector<std::shared_ptr<sym::VariableVector>> p_ = {};
   std::shared_ptr<sym::VariableVector> xc_ = nullptr;
 };
 
@@ -124,7 +124,7 @@ class Binding : public BindingBase {
    * @param p
    */
   Binding(const std::shared_ptr<T> &c, const sym::VariableRefVector &x,
-          const sym::ParameterRefVector &p = {})
+          const sym::VariableRefVector &p = {})
       : BindingBase(x, p) {
     c_ = c;
   }

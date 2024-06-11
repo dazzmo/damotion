@@ -20,6 +20,11 @@ namespace common {
  */
 typedef std::vector<Eigen::Ref<const Eigen::VectorXd>> InputRefVector;
 
+/**
+ * @brief Base class for a function \f$ y = f(x, p) \f$ that takes independent
+ * variables x and parameters p and returns the outputs y.
+ *
+ */
 class Function {
  public:
   using UniquePtr = std::unique_ptr<Function>;
@@ -35,15 +40,16 @@ class Function {
   }
 
   /**
-   * @brief Construct a new Function object with number of inputs n_in and
-   * number of outputs n_out.
+   * @brief Construct a new Function object with number of inputs n_x and
+   * number of outputs n_y.
    *
-   * @param n_in Number of inputs
-   * @param n_out Number of outputs
+   * @param n_x Number of inputs
+   * @param n_y Number of outputs
    */
-  Function(const int n_in, const int n_out) {
-    SetNumberOfInputs(n_in);
-    SetNumberOfOutputs(n_out);
+  Function(const int n_x, const int n_y, const int& n_p = 0) {
+    SetNumberOfInputs(n_x);
+    SetNumberOfInputs(n_p);
+    SetNumberOfOutputs(n_y);
   }
 
   ~Function() = default;
@@ -53,20 +59,35 @@ class Function {
    *
    * @return const int&
    */
-  const int &n_in() const { return n_in_; }
+  const int& n_x() const { return n_x_; }
+
+  /**
+   * @brief Number of parameters for the function
+   *
+   * @return const int&
+   */
+  const int& n_p() const { return n_p_; }
 
   /**
    * @brief Number of outputs for the function
    *
    * @return const int&
    */
-  const int &n_out() const { return n_out_; }
+  const int& n_y() const { return n_y_; }
 
   /**
-   * @brief Call the function based on the current inputs set by SetInput()
+   * @brief Calls the function, with options to compute the derivative and
+   * hessian of the function if implemented.
    *
+   * @param derivative
+   * @param hessian
+   * @return * void
    */
-  void call() { callImpl(); }
+  void call(const bool derivative = false, const bool hessian = false) {
+    EvalImpl();
+    if (derivative) DerivativeImpl();
+    if (hessian) HessianImpl();
+  }
 
   /**
    * @brief Set the i-th input for the function using the vector input.
@@ -76,7 +97,7 @@ class Function {
    * @param input
    * @param check
    */
-  void SetInput(const int &i, const Eigen::Ref<const Eigen::VectorXd> &input,
+  void SetInput(const int& i, const Eigen::Ref<const Eigen::VectorXd>& input,
                 bool check = false);
 
   /**
@@ -88,8 +109,8 @@ class Function {
    * @param input
    * @param check
    */
-  void SetInput(const std::vector<int> &indices,
-                const std::vector<Eigen::Ref<const Eigen::VectorXd>> &input,
+  void SetInput(const std::vector<int>& indices,
+                const std::vector<Eigen::Ref<const Eigen::VectorXd>>& input,
                 bool check = false);
 
   /**
@@ -100,7 +121,7 @@ class Function {
    * @param input
    * @param check
    */
-  void SetInput(const int &i, const double *input, bool check = false);
+  void SetInput(const int& i, const double* input, bool check = false);
 
   /**
    * @brief Sets a collection of inputs to the function using the vector of data
@@ -111,16 +132,106 @@ class Function {
    * @param input
    * @param check
    */
-  void SetInput(const std::vector<int> &indices,
-                const std::vector<const double *> input, bool check = false);
+  void SetInput(const std::vector<int>& indices,
+                const std::vector<const double*> input, bool check = false);
 
   /**
-   * @brief Returns the current value of output i
+   * @brief Set the i-th paramter for the function using the vector paramter.
+   * Optionally can perform a check on the paramter to assess if it is valid.
+   *
+   * @param i
+   * @param paramter
+   * @param check
+   */
+  void SetParameter(const int& i,
+                    const Eigen::Ref<const Eigen::VectorXd>& paramter,
+                    bool check = false);
+
+  /**
+   * @brief Sets a collection of paramters to the function using the vector of
+   * vector references paramter. Optionally can perform a check on the paramter
+   * to assess if it is valid.
+   *
+   * @param indices
+   * @param paramter
+   * @param check
+   */
+  void SetParameter(
+      const std::vector<int>& indices,
+      const std::vector<Eigen::Ref<const Eigen::VectorXd>>& paramter,
+      bool check = false);
+
+  /**
+   * @brief Set the i-th paramter for the function using the data array
+   * paramter. Optionally can perform a check on the paramter to assess if it is
+   * valid.
+   *
+   * @param i
+   * @param paramter
+   * @param check
+   */
+  void SetParameter(const int& i, const double* paramter, bool check = false);
+
+  /**
+   * @brief Sets a collection of inputs to the function using the vector of data
+   * pointers input. Optionally can perform a check on the input to assess if it
+   * is valid.
+   *
+   * @param indices
+   * @param input
+   * @param check
+   */
+  void SetParameter(const std::vector<int>& indices,
+                    const std::vector<const double*> input, bool check = false);
+
+  /**
+   * @brief Returns the i-th output as a GenericEigenMatrix object.
    *
    * @param i
    * @return const GenericEigenMatrix&
    */
-  const GenericEigenMatrix &getOutput(const int &i) const { return out_[i]; }
+  virtual const GenericEigenMatrix& GetOutput(const int& i) const = 0;
+
+  /**
+   * @brief Whether the function has the ability to provide its first
+   * derivative, accessed by GetDerivative()
+   *
+   * @return true
+   * @return false
+   */
+  bool HasDerivative() const { return has_derivative_; }
+
+  /**
+   * @brief Whether the function has the ability to provide its second
+   * derivative (hessian), accessed by GetDerivative()
+   *
+   * @return true
+   * @return false
+   */
+  bool HasHessian() const { return has_hessian_; }
+
+  /**
+   * @brief The derivative of the function with respect the inputs of the system
+   * (concatenated as a single vector in the order of their inputs)
+   *
+   * @param i
+   * @return const GenericEigenMatrix&
+   */
+  virtual const GenericEigenMatrix& GetDerivative() const {
+    throw std::runtime_error("Function " + this->name() +
+                             " does not have derivative information");
+  }
+
+  /**
+   * @brief The hessian of the function with respect the inputs of the system
+   * (concatenated as a single vector in the order of their inputs)
+   *
+   * @return const GenericEigenMatrix&
+   */
+  virtual const GenericEigenMatrix& GetHessian() const {
+    throw std::runtime_error("Function " + this->name() +
+                             " does not have hessian information");
+  }
 
  protected:
   /**
@@ -128,10 +239,21 @@ class Function {
    *
    * @param n
    */
-  void SetNumberOfInputs(const int &n) {
+  void SetNumberOfInputs(const int& n) {
     assert(n > 0 && "A positive integer amount of inputs are required");
-    n_in_ = n;
-    in_.assign(n_in_, nullptr);
+    n_x_ = n;
+    in_.assign(n_x_, nullptr);
+  }
+
+  /**
+   * @brief Set the number of parameters the function has.
+   *
+   * @param n
+   */
+  void SetNumberOfParameters(const int& n) {
+    assert(n > 0 && "A non-negative integer amount of parameters are required");
+    n_p_ = n;
+    in_.assign(n_p_, nullptr);
   }
 
   /**
@@ -139,10 +261,9 @@ class Function {
    *
    * @param n
    */
-  void SetNumberOfOutputs(const int &n) {
+  void SetNumberOfOutputs(const int& n) {
     assert(n > 0 && "A positive integer amount of outputs are required");
-    n_out_ = n;
-    out_.resize(n_out_);
+    n_y_ = n;
   }
 
   /**
@@ -150,78 +271,35 @@ class Function {
    *
    * @param input
    */
-  virtual void callImpl() = 0;
+  virtual void EvalImpl() = 0;
+
+  /**
+   * @brief Virtual method for derivative information to be taken from for the
+   * function.
+   *
+   */
+  virtual void DerivativeImpl() = 0;
+
+  /**
+   * @brief Virtual method for hessian information to be taken from for the
+   * function.
+   *
+   */
+  virtual void HessianImpl() = 0;
 
   // Input data pointers that are stored for evaluation
-  std::vector<const double *> in_;
-
-  /**
-   * @brief Vector of output matrices
-   *
-   * @return std::vector<Eigen::MatrixXd>&
-   */
-  std::vector<GenericEigenMatrix> &OutputVector() { return out_; }
+  std::vector<const double*> in_;
 
  private:
-  int n_in_;
-  int n_out_;
+  // Number of inputs
+  int n_x_;
+  // Number of parameters
+  int n_p_;
+  // Number of outputs
+  int n_y_;
 
-  // Output data vector of GenericEigenMatrix objects
-  mutable std::vector<GenericEigenMatrix> out_;
-};
-
-/**
- * @brief Function that operates by callback
- *
- */
-class CallbackFunction : public Function {
- public:
-  typedef std::function<void(const std::vector<const double *> &,
-                             std::vector<GenericEigenMatrix> &)>
-      f_callback_;
-
-  CallbackFunction() = default;
-  ~CallbackFunction() = default;
-
-  CallbackFunction(const int n_in, const int n_out, const f_callback_ &callback)
-      : Function(n_in, n_out) {
-    SetCallback(callback);
-  }
-
-  /**
-   * @brief Initialise the output i provided its sparsity pattern
-   *
-   * @param i The index of the output to initialise
-   * @param sparsity Sparsity object detailing the structure of the matrix
-   */
-  void InitialiseOutput(const int i, const Sparsity &sparsity) {
-    // TODO - Fix this up
-    // this->OutputVector()[i] =
-    //     GenericEigenMatrix::Zero(sparsity.rows(), sparsity.cols());
-  }
-
-  /**
-   * @brief Set the callback to be used when call() is used for the function.
-   *
-   * @param callback
-   */
-  void SetCallback(const f_callback_ &callback) { f_ = callback; }
-
-  /**
-   * @brief Calls the callback function provided to it
-   *
-   * @param input
-   */
-  void callImpl() override {
-    if (f_ == nullptr) {
-      throw std::runtime_error(
-          "Function callback not provided to CallbackFunction!");
-    }
-    f_(in_, this->OutputVector());
-  }
-
- private:
-  f_callback_ f_ = nullptr;
+  bool has_derivative_;
+  bool has_hessian_;
 };
 
 }  // namespace common

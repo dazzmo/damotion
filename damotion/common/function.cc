@@ -45,17 +45,47 @@ void Function::SetInput(const std::vector<int> &indices,
   }
 }
 
-template <>
-void CallbackFunction<double>::InitialiseOutput(const int i,
-                                                const Sparsity &sparsity) {
-  this->OutputVector()[i] = 0.0;
+void Function::SetParameter(const int &i,
+                            const Eigen::Ref<const Eigen::VectorXd> &parameter,
+                            bool check) {
+  assert(i < n_in_ && "Index out of bounds");
+  if (check) {
+    if (parameter.hasNaN() || !parameter.allFinite()) {
+      std::ostringstream ss;
+      ss << "Parameter " << i << " has invalid values:\n"
+         << parameter.transpose().format(3);
+      throw std::runtime_error(ss.str());
+    }
+  }
+  in_[i] = parameter.data();
 }
 
-template <>
-void CallbackFunction<Eigen::SparseMatrix<double>>::InitialiseOutput(
-    const int i, const Sparsity &sparsity) {
-  this->OutputVector()[i] =
-      common::CreateSparseEigenMatrix(const_cast<Sparsity &>(sparsity));
+void Function::SetParameter(
+    const std::vector<int> &indices,
+    const std::vector<Eigen::Ref<const Eigen::VectorXd>> &parameter,
+    bool check) {
+  for (size_t i = 0; i < indices.size(); ++i) {
+    SetParameter(indices[i], parameter[i], check);
+  }
+}
+
+void Function::SetParameter(const int &i, const double *parameter, bool check) {
+  assert(i < n_in_ && "Index out of bounds");
+  if (check) {
+    if (parameter == NULL) {
+      throw std::runtime_error("Parameter " + std::to_string(i) +
+                               "is invalid memory");
+    }
+  }
+  in_[i] = parameter;
+}
+
+void Function::SetParameter(const std::vector<int> &indices,
+                            const std::vector<const double *> parameter,
+                            bool check = false) {
+  for (size_t i = 0; i < indices.size(); ++i) {
+    SetParameter(indices[i], parameter[i], check);
+  }
 }
 
 }  // namespace common

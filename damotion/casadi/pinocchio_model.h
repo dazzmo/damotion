@@ -27,7 +27,6 @@
 #include <pinocchio/algorithm/centroidal.hpp>
 
 #include "damotion/casadi/eigen.h"
-#include "damotion/casadi/function.h"
 #include "damotion/common/math/log.h"
 
 namespace damotion {

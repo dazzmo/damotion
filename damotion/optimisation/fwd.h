@@ -10,8 +10,6 @@
 #ifndef OPTIMISATION_FWD_H
 #define OPTIMISATION_FWD_H
 
-#include "damotion/symbolic/expression.h"
-#include "damotion/symbolic/parameter.h"
 #include "damotion/symbolic/variable.h"
 
 namespace damotion {

@@ -8,7 +8,6 @@
 
 #include "damotion/casadi/codegen.h"
 #include "damotion/common/function.h"
-#include "damotion/common/sparsity.h"
 
 namespace damotion {
 namespace casadi {
@@ -49,7 +48,7 @@ class FunctionWrapper : public common::Function {
     this->SetNumberOfOutputs(f.n_out());
 
     // Initialise output data
-    this->OutputVector() = {};
+    out_ = {};
     this->out_data_ptr_ = {};
 
     // Checkout memory object for function
@@ -70,13 +69,12 @@ class FunctionWrapper : public common::Function {
       }
       Eigen::SparseMatrix<double> M(sparsity.rows(), sparsity.columns());
       M.setFromTriplets(triplets.begin(), triplets.end());
-      // Create dense matrix for output and add data to output data
-      // pointer vector
-      this->OutputVector().push_back(GenericEigenMatrix(M));
-      this->out_data_ptr_.push_back(this->OutputVector().back().data());
+      // Create generic matrix data
+      out_.push_back(GenericEigenMatrix(M));
+      this->out_data_ptr_.push_back(out_.back().data());
 
       VLOG(10) << f.name() << " Dense Output " << i;
-      VLOG(10) << this->OutputVector().back();
+      VLOG(10) << out_.back();
     }
 
     return *this;
@@ -103,6 +101,16 @@ class FunctionWrapper : public common::Function {
     f_(in_.data(), out_data_ptr_.data(), iw_.data(), dw_.data(), mem_);
   }
 
+  /**
+   * @copydoc GenericEigenMatrix::getOutput()
+   *
+   * @param i
+   * @return const GenericEigenMatrix&
+   */
+  const GenericEigenMatrix &getOutput(const int &i) const override {
+    return out_[i];
+  }
+
  protected:
   // Data output pointers for casadi function
   mutable std::vector<double *> out_data_ptr_;
@@ -122,6 +130,10 @@ class FunctionWrapper : public common::Function {
 
   // Underlying function
   mutable ::casadi::Function f_;
+
+ private:
+  // Output matrix data
+  std::vector<GenericEigenMatrix> out_;
 };
 
 /**

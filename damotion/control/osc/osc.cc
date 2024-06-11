@@ -15,12 +15,12 @@ LinearisedFrictionConstraint() {
   casadi::SX n_x = normal(0), n_y = normal(1), n_z = normal(2);
 
   // Friction cone constraint with square pyramid approximation
-  sym::Expression cone;
-  cone = casadi::SX(4, 1);
+  casadi::SX cone = casadi::SX(4, 1);
   cone(0) = sqrt(2.0) * l_x + mu * l_z;
   cone(1) = -sqrt(2.0) * l_x + mu * l_z;
   cone(2) = sqrt(2.0) * l_y + mu * l_z;
   cone(3) = -sqrt(2.0) * l_y + mu * l_z;
+
   cone.SetInputs({lambda}, {normal, mu});
 
   return std::make_shared<opt::LinearConstraint<Eigen::MatrixXd>>(

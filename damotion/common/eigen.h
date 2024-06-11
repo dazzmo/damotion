@@ -71,45 +71,32 @@ class GenericEigenMatrix {
    *
    * @return double
    */
-  operator double() {
+  double toDouble() {
     assert(data_.nonZeros() == 1 && "Data array has more than one value");
     return data_.valuePtr()[0];
   }
 
-  operator double&() {
+  const double& toConstDoubleRef() const {
     assert(data_.nonZeros() == 1 && "Data array has more than one value");
     return data_.valuePtr()[0];
   }
 
-  /**
-   * @brief Returns a mapped vector object representing the underlying data
-   * array of the GenericEigenMatrix class.
-   *
-   * @return Eigen::Map<const Eigen::VectorXd>
-   */
-  operator Eigen::Map<const Eigen::VectorXd>() const {
+  Eigen::Map<const Eigen::VectorXd> toConstVectorRef() const {
     return Eigen::Map<const Eigen::VectorXd>(data_.valuePtr(),
                                              data_.nonZeros());
   }
 
-  /**
-   * @brief Returns a vector object representing the underlying data
-   * array of the GenericEigenMatrix class.
-   *
-   * @return Eigen::VectorXd
-   */
-  operator Eigen::VectorXd() const {
-    return Eigen::Map<const Eigen::VectorXd>(data_.valuePtr(),
-                                             data_.nonZeros());
+  Eigen::VectorXd toVectorXd() {
+    return Eigen::Map<Eigen::VectorXd>(data_.valuePtr(), data_.nonZeros());
   }
 
   /**
-   * @brief Returns a mapped matrix object representing the underlying data
-   * array of the GenericEigenMatrix class.
+   * @brief Returns a constant reference to a mapped Eigen::MatrixXd object
+   * based on the data of the GenericMatrixData
    *
-   * @return Eigen::MatrixXd
+   * @return Eigen::Map<const Eigen::MatrixXd>
    */
-  operator Eigen::Map<const Eigen::MatrixXd>() const {
+  Eigen::Map<const Eigen::MatrixXd> toConstMatrixXdRef() const {
     assert(data_.nonZeros() == data_.rows() * data_.cols() &&
            "Data array is not large to provide a matrix map");
     return Eigen::Map<const Eigen::MatrixXd>(data_.valuePtr(), data_.rows(),
@@ -117,12 +104,11 @@ class GenericEigenMatrix {
   }
 
   /**
-   * @brief Returns a matrix object representing the underlying data
-   * array of the GenericEigenMatrix class.
+   * @brief Create an Eigen::MatrixXd object from the GenericMatrixData object.
    *
    * @return Eigen::MatrixXd
    */
-  operator Eigen::MatrixXd() const {
+  Eigen::MatrixXd toMatrixXd() {
     assert(data_.nonZeros() == data_.rows() * data_.cols() &&
            "Data array is not large to provide a matrix map");
     return Eigen::Map<const Eigen::MatrixXd>(data_.valuePtr(), data_.rows(),
@@ -135,7 +121,7 @@ class GenericEigenMatrix {
    *
    * @return Eigen::SparseMatrix<double>
    */
-  operator Eigen::SparseMatrix<double>() const { return data_; }
+  Eigen::SparseMatrix<double> toSparseMatrix() const { return data_; }
 
   /**
    * @brief Returns a reference to the SparseMatrix class that manages the data
@@ -143,15 +129,9 @@ class GenericEigenMatrix {
    *
    * @return Eigen::SparseMatrix<double>&
    */
-  operator Eigen::SparseMatrix<double>&() { return data_; }
-
-  /**
-   * @brief Returns a constant reference to the SparseMatrix data class that
-   * manages the data array for the GenericEigenMatrix.
-   *
-   * @return const Eigen::SparseMatrix<double>&
-   */
-  const Eigen::SparseMatrix<double>& SparseMatrix() const { return data_; }
+  Eigen::Ref<const Eigen::SparseMatrix<double>> toConstSparseMatrixRef() const {
+    return data_;
+  }
 
   /**
    * @brief Returns the pointer to the data array for the GenericEigenMatrix
@@ -179,7 +159,7 @@ class GenericEigenMatrix {
 
 std::ostream& operator<<(std::ostream& os, const GenericEigenMatrix& data) {
   std::ostringstream oss;
-  oss << data.SparseMatrix() << '\n';
+  oss << data.toConstSparseMatrixRef() << '\n';
   return os << oss.str();
 }
 
