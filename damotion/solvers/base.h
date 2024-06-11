@@ -120,56 +120,6 @@ class SolverBase {
    */
   std::vector<Binding<Cost>>& GetCosts() { return costs_; }
 
-  template <typename T>
-  void SetBindingInputs(const Binding<T>& binding) {
-    VLOG(10) << "GetBindingInputs()";
-    // Get binding data
-    BindingInputData& data = GetBindingInputData(binding);
-    // Variables
-    int mapped_cnt = 0, manual_cnt = 0;
-    for (int i = 0; i < binding.nx(); ++i) {
-      const sym::VariableVector& xi = binding.x(i);
-      VLOG(10) << "xi = " << xi;
-      if (data.x_continuous[i]) {
-        VLOG(10) << "continuous";
-        // Provide mapped vector
-        x.push_back(data.x_mapped_vecs[mapped_cnt++]);
-      } else {
-        VLOG(10) << "not continuous";
-        VLOG(10) << data.x_manual_vecs.size();
-        // Construct a vector for this input
-        for (int j = 0; j < xi.size(); ++j) {
-          data.x_manual_vecs[manual_cnt][j] =
-              decision_variable_cache_[GetCurrentProgram()
-                                           .GetDecisionVariableIndex(xi[j])];
-        }
-        x.push_back(data.x_manual_vecs[manual_cnt++]);
-      }
-    }
-    // Parameters
-    mapped_cnt = 0, manual_cnt = 0;
-    for (int i = 0; i < binding.np(); ++i) {
-      const sym::ParameterVector& pi = binding.p(i);
-      VLOG(10) << "pi = " << pi;
-      if (data.p_continuous[i]) {
-        VLOG(10) << "continuous";
-        // Provide mapped vector
-        p.push_back(data.p_mapped_vecs[mapped_cnt++]);
-      } else {
-        VLOG(10) << "not continuous";
-        VLOG(10) << data.p_manual_vecs.size();
-        // Construct a vector for this input
-        for (int j = 0; j < pi.size(); ++j) {
-          data.p_manual_vecs[manual_cnt][j] =
-              decision_variable_cache_[GetCurrentProgram().GetParameterIndex(
-                  pi[j])];
-        }
-        p.push_back(data.p_manual_vecs[manual_cnt++]);
-      }
-    }
-    VLOG(10) << "Finished";
-  }
-
   void EvaluateCost(const Binding<Cost>& binding, const Eigen::VectorXd& x,
                     bool grd, bool hes, bool update_cache = true);
 
@@ -187,6 +137,61 @@ class SolverBase {
 
   void UpdateLagrangianHessian(const Binding<Cost>& binding);
 
+  template <typename T>
+  void EvaluateBinding(const Binding<T>& binding, const Eigen::VectorXd& x,
+                       const Eigen::VectorXd& p, bool derivative,
+                       bool hessian) {
+    // Create vectors for each input
+    std::vector<Eigen::Ref<Eigen::VectorXd>> in;
+    const std::vector<bool>&x_cont = binding_continuous_x_[binding.id()],
+          &p_cont = binding_continuous_p_[binding.id()];
+    for (int i = 0; i < binding.GetInputSize(); ++i) {
+      sym::VariableVector& xi = binding.x()[i];
+      if (x_cont[i]) {
+        // If binding continuous
+        // Map vector slice from x to binding input
+        in.push_back(Eigen::Map<const Eigen::VectorXd>(
+            x.data() + GetCurrentProgram().GetDecisionVariableIndex(xi[0]),
+            xi.size()));
+      } else {
+        Eigen::VectorXd v;
+        // Construct vector based on inputs
+        for (int j = 0; j < xi.size(); ++j) {
+          v[j] = x[GetCurrentProgram().GetDecisionVariableIndex(xi[j])];
+        }
+      }
+
+      // Otherwise
+      in.push_back(xi);
+      binding.Get().SetInput(i, xi);
+    }
+
+    // Parameters
+    for (int i = 0; i < binding.GetInputSize(); ++i) {
+      sym::VariableVector& pi = binding.p()[i];
+      if (p_cont[i]) {
+        // If binding continuous
+        // Map vector slice from p to binding input
+        in.push_back(Eigen::Map<const Eigen::VectorXd>(
+            p.data() + GetCurrentProgram().GetDecisionVariableIndex(pi[0]),
+            pi.size()));
+      } else {
+        Eigen::VectorXd v;
+        // Construct vector based on inputs
+        for (int j = 0; j < pi.size(); ++j) {
+          v[j] = p[GetCurrentProgram().GetDecisionVariableIndex(pi[j])];
+        }
+      }
+
+      // Otherwise
+      in.push_back(xi);
+      binding.Get().SetInput(i, xi);
+    }
+
+    // Evaluate the binding
+    binding.Get().call(derivative, hessian);
+  }
+
  protected:
   // Cache for current values of the decision variables
   Eigen::VectorXd decision_variable_cache_;
@@ -199,6 +204,11 @@ class SolverBase {
   // Cache for current value of the constraint vector
   Eigen::VectorXd constraint_vector_cache_;
 
+  // Constraint Jacobian
+  BlockMatrixFunction objective_gradient_;
+  BlockMatrixFunction constraint_jacobian_;
+  BlockMatrixFunction lagrangian_hessian_;
+
   // Primal solution of the program
   Eigen::VectorXd primal_solution_x_;
 
@@ -206,51 +216,6 @@ class SolverBase {
   std::vector<Binding<Constraint>> constraints_;
   // Vector of the cost bindings for the program
   std::vector<Binding<Cost>> costs_;
-
-  /**
-   * @brief Binding data related to whether the inputs are continuous within
-   * the optimisation vector as well as mappings and vectors for these inputs
-   *
-   */
-  struct BindingInputData {
-    BindingInputData()
-        : x_continuous({}),
-          x_mapped_vecs({}),
-          x_manual_vecs({}),
-          p_continuous({}),
-          p_mapped_vecs({}),
-          p_manual_vecs({}) {}
-    // Flags to whether the variables x[i] are continuous within the
-    // optimisation vector
-    std::vector<bool> x_continuous;
-    std::vector<Eigen::Map<const Eigen::VectorXd>> x_mapped_vecs;
-    std::vector<Eigen::VectorXd> x_manual_vecs;
-
-    std::vector<bool> p_continuous;
-    std::vector<Eigen::Map<const Eigen::VectorXd>> p_mapped_vecs;
-    std::vector<Eigen::VectorXd> p_manual_vecs;
-  };
-
-  /**
-   * @brief Provides a reference to the input data associated with the binding
-   *
-   * @tparam T
-   * @param binding
-   * @return BindingInputData&
-   */
-  template <typename T>
-  BindingInputData& GetBindingInputData(const Binding<T>& binding) {
-    VLOG(10) << "GetBindingInputData()";
-
-    auto idx = binding_idx_.find(binding.id());
-    if (idx == binding_idx_.end()) {
-      throw std::runtime_error("Binding is not included within program");
-    }
-    // Return the binding data given by the index
-    VLOG(10) << "Found Binding Data for " << binding.Get().name()
-             << " at Index " << idx->second;
-    return data_[idx->second];
-  }
 
  private:
   bool is_solved_ = false;
@@ -260,7 +225,9 @@ class SolverBase {
   std::vector<int> constraint_idx_;
 
   // Provides data for each variable
-  std::unordered_map<int, int> binding_idx_;
+  std::unordered_map<BindingBase::Id, std::vector<bool>> binding_continuous_x_;
+  std::unordered_map<BindingBase::Id, std::vector<bool>> binding_continuous_p_;
+
   std::vector<BindingInputData> data_ = {};
   std::vector<Binding<Cost>> cost_base_bindings_ = {};
   std::vector<Binding<Constraint>> constraint_base_bindings_ = {};
@@ -282,16 +249,7 @@ class SolverBase {
     for (int i = 0; i < binding.nx(); ++i) {
       const sym::VariableVector& vi = binding.x(i);
       if (GetCurrentProgram().IsContinuousInDecisionVariableVector(vi)) {
-        // Map vector slice from x to binding input
-        data.x_mapped_vecs.push_back(Eigen::Map<const Eigen::VectorXd>(
-            decision_variable_cache_.data() +
-                GetCurrentProgram().GetDecisionVariableIndex(vi[0]),
-            vi.size()));
-        data.x_continuous.push_back(true);
       } else {
-        // Create vector to manually place data in
-        data.x_manual_vecs.push_back(Eigen::VectorXd::Zero(vi.size()));
-        data.x_continuous.push_back(false);
       }
     }
 
@@ -300,16 +258,7 @@ class SolverBase {
     for (int i = 0; i < binding.np(); ++i) {
       const sym::ParameterVector& pi = binding.p(i);
       if (GetCurrentProgram().IsContinuousInParameterVector(pi)) {
-        // Map vector slice from x to binding input
-        data.p_mapped_vecs.push_back(Eigen::Map<const Eigen::VectorXd>(
-            GetCurrentProgram().GetParameterVector().data() +
-                GetCurrentProgram().GetParameterIndex(pi[0]),
-            pi.size()));
-        data.p_continuous.push_back(true);
       } else {
-        // Create vector to manually place data in
-        data.p_manual_vecs.push_back(Eigen::VectorXd::Zero(pi.size()));
-        data.p_continuous.push_back(false);
       }
     }
 
