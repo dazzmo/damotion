@@ -6,7 +6,7 @@
 namespace damotion {
 namespace optimisation {
 
-class LinearConstraint : public ConstraintBase {
+class LinearConstraint : public Constraint {
  public:
   using UniquePtr = std::unique_ptr<LinearConstraint>;
   using SharedPtr = std::shared_ptr<LinearConstraint>;
@@ -35,11 +35,9 @@ class LinearConstraint : public ConstraintBase {
     casadi::DM Ad, bd;
     damotion::casadi::toCasadi(b, bd);
     damotion::casadi::toCasadi(A, Ad);
-    casadi::SX bsx = bd;
-    casadi::SX Asx = Ad;
 
     // Construct constraint
-    ConstructConstraint(name, Asx, bsx, {}, bounds, jac);
+    ConstructConstraint(name, Ad, bd, {}, bounds, jac);
   }
 
   LinearConstraint(const std::string &name, const casadi::SX &ex,
@@ -52,29 +50,30 @@ class LinearConstraint : public ConstraintBase {
     ConstructConstraint(name, A, b, p, bounds, jac);
   }
 
-  void SetCallback(const typename common::CallbackFunction::f_callback_ &fA,
-                   const typename common::CallbackFunction::f_callback_ &fb) {
-    fA_ = std::make_shared<common::CallbackFunction>(1, 1, fA);
-    fb_ = std::make_shared<common::CallbackFunction>(1, 1, fb);
-  }
-
   /**
    * @brief The coefficient matrix A for the expression A x + b.
    *
    * @return const GenericEigenMatrix&
    */
-  const GenericEigenMatrix &A() const { return fA_->getOutput(0); }
+  const GenericEigenMatrix &A() const {
+    // TODO - Set inputs
+    fA_->call();
+    return fA_->GetOutput(0);
+  }
 
   /**
    * @brief The constant vector for the linear constraint A x + b
    *
    * @return const GenericEigenMatrix&
    */
-  const GenericEigenMatrix &b() const { return fb_->getOutput(0); }
+  const GenericEigenMatrix &b() const {
+    fb_->call();
+    return fb_->GetOutput(0);
+  }
 
  private:
-  common::Function::SharedPtr fA_;
-  common::Function::SharedPtr fb_;
+  mutable CasadiFunction::UniquePtr fA_;
+  mutable CasadiFunction::UniquePtr fb_;
 
   void ConstructConstraint(const std::string &name, const casadi::SX &A,
                            const casadi::SX &b, const casadi::SXVector &p,
@@ -89,29 +88,12 @@ class LinearConstraint : public ConstraintBase {
     VLOG(10) << "A = " << A;
     VLOG(10) << "b = " << b;
 
-    // Create constraint dimensions and update bounds
-    this->Resize(b.rows(), in.size(), p.size());
     this->SetBounds(bounds);
-
-    // Add any parameters that define A and b
-    for (const casadi::SX &pi : p) {
-      in.push_back(pi);
-    }
-
-    casadi::SX A_tmp = A, b_tmp = b;
-    if (!sparse) {
-      A_tmp = densify(A_tmp);
-      b_tmp = densify(b_tmp);
-    }
-
-    fA_ = std::make_shared<damotion::casadi::FunctionWrapper>(
-        casadi::Function(this->name() + "_A", in, {A_tmp}));
-
-    fb_ = std::make_shared<damotion::casadi::FunctionWrapper>(
-        casadi::Function(this->name() + "_b", in, {b_tmp}));
-
-    this->has_jac_ = true;
-    this->has_hes_ = false;
+    // Create specialised functions for A and b
+    fA_ = std::make_unique<damotion::casadi::CasadiFunction>(
+        ::casadi::SXVector({A}), ::casadi::SXVector(), p, false, false, sparse);
+    fb_ = std::make_unique<damotion::casadi::CasadiFunction>(
+        ::casadi::SXVector({b}), ::casadi::SXVector(), p, false, false, sparse);
   }
 };
 

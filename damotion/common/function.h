@@ -34,23 +34,17 @@ class Function {
    * @brief Empty constructor for the Function class
    *
    */
-  Function() {
-    SetNumberOfInputs(0);
-    SetNumberOfOutputs(0);
-  }
+  Function() { Resize(0, 0, 0); }
 
   /**
-   * @brief Construct a new Function object with number of inputs n_x and
-   * number of outputs n_y.
+   * @brief Construct a new Function object with number of variables nx and
+   * number of outputs ny.
    *
-   * @param n_x Number of inputs
-   * @param n_y Number of outputs
+   * @param nx Number of variables
+   * @param ny Number of outputs
+   * @param np Number of paramters
    */
-  Function(const int n_x, const int n_y, const int& n_p = 0) {
-    SetNumberOfInputs(n_x);
-    SetNumberOfInputs(n_p);
-    SetNumberOfOutputs(n_y);
-  }
+  Function(const int nx, const int ny, const int& np = 0) {}
 
   ~Function() = default;
 
@@ -59,21 +53,41 @@ class Function {
    *
    * @return const int&
    */
-  const int& n_x() const { return n_x_; }
+  const int& nx() const { return nx_; }
 
   /**
    * @brief Number of parameters for the function
    *
    * @return const int&
    */
-  const int& n_p() const { return n_p_; }
+  const int& np() const { return np_; }
 
   /**
    * @brief Number of outputs for the function
    *
    * @return const int&
    */
-  const int& n_y() const { return n_y_; }
+  const int& ny() const { return ny_; }
+
+  /**
+   * @brief Resize the function to the appropriate outputs
+   *
+   * @param nx
+   * @param ny
+   * @param np
+   */
+  void Resize(const int& nx, const int& ny, const int& np = 0) {
+    assert(nx > 0 && "A positive integer amount of inputs are required");
+    assert(ny > 0 && "A positive integer amount of outputs are required");
+    assert(np >= 0 &&
+           "A non-negative integer amount of parameters are required");
+    nx_ = nx;
+    ny_ = ny;
+    np_ = np;
+    // Set number of inputs to the function (variables, parameters and
+    // multipliers for hessian evaluation)
+    in_.assign(nx_ + np_ + ny_, nullptr);
+  }
 
   /**
    * @brief Calls the function, with options to compute the derivative and
@@ -136,41 +150,41 @@ class Function {
                 const std::vector<const double*> input, bool check = false);
 
   /**
-   * @brief Set the i-th paramter for the function using the vector paramter.
-   * Optionally can perform a check on the paramter to assess if it is valid.
+   * @brief Set the i-th parameter for the function using the vector parameter.
+   * Optionally can perform a check on the parameter to assess if it is valid.
    *
    * @param i
-   * @param paramter
+   * @param parameter
    * @param check
    */
   void SetParameter(const int& i,
-                    const Eigen::Ref<const Eigen::VectorXd>& paramter,
+                    const Eigen::Ref<const Eigen::VectorXd>& parameter,
                     bool check = false);
 
   /**
    * @brief Sets a collection of paramters to the function using the vector of
-   * vector references paramter. Optionally can perform a check on the paramter
-   * to assess if it is valid.
+   * vector references parameter. Optionally can perform a check on the
+   * parameter to assess if it is valid.
    *
    * @param indices
-   * @param paramter
+   * @param parameter
    * @param check
    */
   void SetParameter(
       const std::vector<int>& indices,
-      const std::vector<Eigen::Ref<const Eigen::VectorXd>>& paramter,
+      const std::vector<Eigen::Ref<const Eigen::VectorXd>>& parameter,
       bool check = false);
 
   /**
-   * @brief Set the i-th paramter for the function using the data array
-   * paramter. Optionally can perform a check on the paramter to assess if it is
-   * valid.
+   * @brief Set the i-th parameter for the function using the data array
+   * parameter. Optionally can perform a check on the parameter to assess if it
+   * is valid.
    *
    * @param i
-   * @param paramter
+   * @param parameter
    * @param check
    */
-  void SetParameter(const int& i, const double* paramter, bool check = false);
+  void SetParameter(const int& i, const double* parameter, bool check = false);
 
   /**
    * @brief Sets a collection of inputs to the function using the vector of data
@@ -183,6 +197,57 @@ class Function {
    */
   void SetParameter(const std::vector<int>& indices,
                     const std::vector<const double*> input, bool check = false);
+
+  /**
+   * @brief Set the i-th multipler for the function-multiplier product \f$
+   * \lambda^T f \f$ for evaluation of the system hessian.
+   *
+   * @param i
+   * @param parameter
+   * @param check
+   */
+  void SetMultiplier(const int& i,
+                     const Eigen::Ref<const Eigen::VectorXd>& multiplier,
+                     bool check = false);
+
+  /**
+   * @brief Set the i-th multipler for the function-multiplier product \f$
+   * \lambda^T f \f$ for evaluation of the system hessian. Optionally can
+   * perform a check on the multiplier to assess if it is valid.
+   *
+   * @param indices
+   * @param multiplier
+   * @param check
+   */
+  void SetMultiplier(
+      const std::vector<int>& indices,
+      const std::vector<Eigen::Ref<const Eigen::VectorXd>>& multiplier,
+      bool check = false);
+
+  /**
+   * @brief Set the i-th multiplier for the function using the data array
+   * multiplier. Optionally can perform a check on the multiplier to assess if
+   * it is valid.
+   *
+   * @param i
+   * @param multiplier
+   * @param check
+   */
+  void SetMultiplier(const int& i, const double* multiplier,
+                     bool check = false);
+
+  /**
+   * @brief Sets a collection of multipliers to the function using the vector of
+   * data pointers input. Optionally can perform a check on the input to assess
+   * if it is valid.
+   *
+   * @param indices
+   * @param input
+   * @param check
+   */
+  void SetMultiplier(const std::vector<int>& indices,
+                     const std::vector<const double*> multiplier,
+                     bool check = false);
 
   /**
    * @brief Returns the i-th output as a GenericEigenMatrix object.
@@ -217,9 +282,8 @@ class Function {
    * @param i
    * @return const GenericEigenMatrix&
    */
-  virtual const GenericEigenMatrix& GetDerivative() const {
-    throw std::runtime_error("Function " + this->name() +
-                             " does not have derivative information");
+  virtual const GenericEigenMatrix& GetDerivative(const int& i) const {
+    throw std::runtime_error("Function does not have derivative information");
   }
 
   /**
@@ -228,44 +292,11 @@ class Function {
    *
    * @return const GenericEigenMatrix&
    */
-  virtual const GenericEigenMatrix& GetHessian() const {
-    throw std::runtime_error("Function " + this->name() +
-                             " does not have hessian information");
+  virtual const GenericEigenMatrix& GetHessian(const int& i) const {
+    throw std::runtime_error("Function does not have hessian information");
   }
 
  protected:
-  /**
-   * @brief Set the number of inputs the function has.
-   *
-   * @param n
-   */
-  void SetNumberOfInputs(const int& n) {
-    assert(n > 0 && "A positive integer amount of inputs are required");
-    n_x_ = n;
-    in_.assign(n_x_, nullptr);
-  }
-
-  /**
-   * @brief Set the number of parameters the function has.
-   *
-   * @param n
-   */
-  void SetNumberOfParameters(const int& n) {
-    assert(n > 0 && "A non-negative integer amount of parameters are required");
-    n_p_ = n;
-    in_.assign(n_p_, nullptr);
-  }
-
-  /**
-   * @brief Set the number of outputs the function has
-   *
-   * @param n
-   */
-  void SetNumberOfOutputs(const int& n) {
-    assert(n > 0 && "A positive integer amount of outputs are required");
-    n_y_ = n;
-  }
-
   /**
    * @brief Virtual method for derived class to override
    *
@@ -287,19 +318,19 @@ class Function {
    */
   virtual void HessianImpl() = 0;
 
-  // Input data pointers that are stored for evaluation
+  // Input data pointers that are stored for evaluation (x, p and optionally l)
   std::vector<const double*> in_;
+
+  bool has_derivative_ = false;
+  bool has_hessian_ = false;
 
  private:
   // Number of inputs
-  int n_x_;
+  int nx_;
   // Number of parameters
-  int n_p_;
+  int np_;
   // Number of outputs
-  int n_y_;
-
-  bool has_derivative_;
-  bool has_hessian_;
+  int ny_;
 };
 
 }  // namespace common

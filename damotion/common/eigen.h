@@ -45,6 +45,24 @@ class GenericEigenMatrix {
    *
    * @param mat
    */
+  GenericEigenMatrix(const int& rows, const int& cols) {
+    data_.reserve(rows * cols);
+    for (int i = 0; i < rows; ++i) {
+      for (int j = 0; j < cols; ++j) {
+        data_.coeffRef(i, j) = 0.0;
+      }
+    }
+    // Convert matrix to compressed form
+    data_.makeCompressed();
+  }
+
+  /**
+   * @brief Construct a new GenericEigenMatrix object for a dense matrix with
+   * structure given by mat. Copies the data of mat to the GenericEigenMatrix
+   * object.
+   *
+   * @param mat
+   */
   GenericEigenMatrix(const Eigen::Ref<const Eigen::MatrixXd>& mat) {
     data_.reserve(mat.rows() * mat.cols());
     for (int i = 0; i < mat.rows(); ++i) {
@@ -81,9 +99,13 @@ class GenericEigenMatrix {
     return data_.valuePtr()[0];
   }
 
-  Eigen::Map<const Eigen::VectorXd> toConstVectorRef() const {
+  Eigen::Map<const Eigen::VectorXd> toConstVectorXdRef() const {
     return Eigen::Map<const Eigen::VectorXd>(data_.valuePtr(),
                                              data_.nonZeros());
+  }
+
+  Eigen::Map<Eigen::VectorXd> toVectorXdRef() {
+    return Eigen::Map<Eigen::VectorXd>(data_.valuePtr(), data_.nonZeros());
   }
 
   Eigen::VectorXd toVectorXd() {
@@ -109,6 +131,7 @@ class GenericEigenMatrix {
    * @return Eigen::MatrixXd
    */
   Eigen::MatrixXd toMatrixXd() {
+    // TODO - Convert to dense matrix instead
     assert(data_.nonZeros() == data_.rows() * data_.cols() &&
            "Data array is not large to provide a matrix map");
     return Eigen::Map<const Eigen::MatrixXd>(data_.valuePtr(), data_.rows(),
@@ -122,6 +145,14 @@ class GenericEigenMatrix {
    * @return Eigen::SparseMatrix<double>
    */
   Eigen::SparseMatrix<double> toSparseMatrix() const { return data_; }
+
+  /**
+   * @brief Returns a reference to the SparseMatrix class that manages the data
+   * array for the GenericEigenMatrix class.
+   *
+   * @return Eigen::SparseMatrix<double>&
+   */
+  Eigen::Ref<Eigen::SparseMatrix<double>> toSparseMatrixRef() { return data_; }
 
   /**
    * @brief Returns a reference to the SparseMatrix class that manages the data
@@ -148,12 +179,9 @@ class GenericEigenMatrix {
    *
    * @return const Eigen::Index&
    */
-  const Eigen::Index& nnz() { return data_.nonZeros(); }
+  Eigen::Index nnz() { return data_.nonZeros(); }
 
  private:
-  // Eigen maps for data handling
-  std::unique_ptr<Eigen::Map<Eigen::VectorXd>> vec_;
-
   Eigen::SparseMatrix<double> data_;
 };
 

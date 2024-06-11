@@ -12,13 +12,18 @@
 namespace damotion {
 namespace optimisation {
 
-class ConstraintBase {
+class Constraint : public damotion::casadi::CasadiFunction {
  public:
-  ConstraintBase() = default;
-  ~ConstraintBase() = default;
+  Constraint() = default;
+  ~Constraint() = default;
+
+  Constraint(const int &nx, const int &ny, const int &np = 0)
+      : damotion::casadi::CasadiFunction(nx, ny, np) {
+    ResizeBounds();
+  }
 
   /**
-   * @brief Construct a new ConstraintBase object from the symbolic
+   * @brief Construct a new Constraint object from the symbolic
    * expression c
    *
    * @param name Optional name for the constraint, if set to "", creates a
@@ -31,56 +36,12 @@ class ConstraintBase {
    * @param hes Flag to compute the hessian of c with respect to each input
    * variable
    */
-  ConstraintBase(const std::string &name, const casadi::SX &ex,
-                 const casadi::SXVector &x, const casadi::SXVector &p,
-                 const BoundsType &bounds, bool jac, bool hes,
-                 bool sparse = false) {
-    // Resize the constraint
-    Resize(ex.size1(), x.size(), p.size());
-
-    // Create functions to compute the constraint and derivatives given the
-    // variables and parameters
-    casadi::SXVector in = x;
-    for (const casadi::SX &pi : p) {
-      in.push_back(pi);
-    }
-
-    // Create concatenated vector
-    casadi::SX xc = casadi::SX::vertcat(x);
-
-    // Constraint
-    SetConstraintFunction(std::make_shared<damotion::casadi::FunctionWrapper>(
-        casadi::Function(this->name(), in, {ex})));
-
-    // Jacobian
-    if (jac) {
-      // Compute the Jacobian of the constraint
-      casadi::SX J = jacobian(ex, xc);
-      if (!sparse) J = densify(J);
-      SetJacobianFunction(std::make_shared<damotion::casadi::FunctionWrapper>(
-          casadi::Function(this->name() + "_jac", in, {J})));
-    }
-
-    // Hessian
-    if (hes) {
-      // Create dual-variables
-      casadi::SX l = casadi::SX::sym("l", ex.size1());
-      // Create dual-variable-constraint dot product
-      casadi::SX lTc = mtimes(l.T(), ex);
-
-      // Adjust input
-      in = x;
-      in.push_back(l);
-      for (const casadi::SX &pi : p) {
-        in.push_back(pi);
-      }
-      casadi::SX H = casadi::SX::tril(hessian(lTc, x));
-      if (!sparse) H = densify(H);
-      // Compute the Hessian of the product
-      SetHessianFunction(std::make_shared<damotion::casadi::FunctionWrapper>(
-          casadi::Function(this->name() + "_hes", in, {H})));
-    }
-
+  Constraint(const std::string &name, const casadi::SX &ex,
+             const casadi::SXVector &x, const casadi::SXVector &p,
+             const BoundsType &bounds, bool jac, bool hes, bool sparse = false)
+      : damotion::casadi::CasadiFunction({ex}, x, p, jac, hes, sparse) {
+    // Resize the bounds
+    ResizeBounds();
     // Update bounds for the constraint
     SetBounds(bounds);
   }
@@ -106,112 +67,15 @@ class ConstraintBase {
   }
 
   /**
-   * @brief Dimension of the constraint
+   * @brief Resizes the bounds the size of the constraint output given by
+   * common::Function::ny().
    *
-   * @return const int
    */
-  const int &Dimension() const { return dim_; }
-
-  /**
-   * @brief If the constraint has a non-zero Jacobian
-   *
-   * @return true
-   * @return false
-   */
-  bool HasJacobian() const { return has_jac_; }
-
-  /**
-   * @brief If the constraint has a non-zero Hessian
-   *
-   * @return true
-   * @return false
-   */
-  bool HasHessian() const { return has_hes_; }
-
-  /**
-   * @brief Evaluate the constraint with the current input variables and
-   * parameters
-   *
-   * @param x Variables for the constraint
-   * @param p Parameters for the constraint
-   */
-  virtual void eval(const common::InputRefVector &x,
-                    const common::InputRefVector &p) const {
-    VLOG(10) << this->name() << " eval()";
-    int cnt = 0;
-    for (const auto &xi : x) this->con_->SetInput(cnt++, xi);
-    for (const auto &pi : p) this->con_->SetInput(cnt++, pi);
-
-    // Call necessary constraint functions
-    this->con_->call();
-  }
-
-  /**
-   * @brief Evaluate the constraint jacobian with the current input variables
-   * and parameters
-   *
-   * @param x Variables for the constraint
-   * @param p Parameters for the constraint
-   */
-  virtual void eval_jac(const common::InputRefVector &x,
-                        const common::InputRefVector &p) const {
-    VLOG(10) << this->name() << " eval_jac()";
-    int cnt = 0;
-    for (const auto &xi : x) this->jac_->SetInput(cnt++, xi);
-    for (const auto &pi : p) this->jac_->SetInput(cnt++, pi);
-
-    // Call necessary constraint functions
-    this->jac_->call();
-  }
-
-  /**
-   * @brief Evaluate the dual-variable-Hessian product via a given strategy
-   *
-   * @param x Input vector
-   * @param l Dual variable vector
-   * @param p Vector of parameters
-   */
-  virtual void eval_hessian(const common::InputRefVector &x,
-                            const Eigen::VectorXd &l,
-                            const common::InputRefVector &p) const {
-    // Create input for the lambda-hessian product
-    common::InputRefVector in = {};
-    int cnt = 0;
-    for (const auto &xi : x) this->hes_.SetInput(cnt++, xi);
-    this->hes_.SetInput(cnt++, l);
-    for (const auto &pi : p) this->hes_.SetInput(cnt++, pi);
-
-    // Call necessary constraint functions
-    this->hes_->call();
-  }
-
-  /**
-   * @brief Returns the most recent evaluation of the constraint
-   *
-   * @return const GenericEigenMatrix&
-   */
-  virtual const GenericEigenMatrix &Vector() const {
-    return con_->getOutput(0);
-  }
-  /**
-   * @brief The Jacobian of the constraint with respect to the variables
-   * vector
-   *
-   * @param i
-   * @return const GenericEigenMatrix&
-   */
-  virtual const GenericEigenMatrix &Jacobian() const {
-    return jac_->getOutput(0);
-  }
-  /**
-   * @brief Returns the Hessian block with respect to the variables
-   *
-   * @param i
-   * @param j
-   * @return const GenericEigenMatrix&
-   */
-  virtual const GenericEigenMatrix &Hessian() const {
-    return hes_->getOutput(0);
+  void ResizeBounds() {
+    // Initialise the bounds of the constraint
+    double inf = std::numeric_limits<double>::infinity();
+    ub_ = inf * Eigen::VectorXd::Ones(ny());
+    lb_ = -inf * Eigen::VectorXd::Ones(ny());
   }
 
   /**
@@ -263,13 +127,6 @@ class ConstraintBase {
   Eigen::VectorXd &UpperBound() { return ub_; }
 
   /**
-   * @brief Number of parameters used to determine the constraint
-   *
-   * @return const int&
-   */
-  const int &NumberOfInputParameters() const { return np_; }
-
-  /**
    * @brief Tests whether the p-norm of the constraint is within
    * the threshold eps.
    *
@@ -282,7 +139,8 @@ class ConstraintBase {
   bool CheckViolation(const int &p = 2, const double &eps = 1e-6) {
     // Determine if constraint within threshold
     double c_norm = 0.0;
-    Eigen::VectorXd c = this->Vector();
+    Eigen::Ref<const Eigen::VectorXd> c =
+        this->GetOutput(0).toConstVectorXdRef();
     if (p == 1) {
       c_norm = c.lpNorm<1>();
     } else if (p == 2) {
@@ -305,54 +163,6 @@ class ConstraintBase {
   bool &IsUpdated() { return updated_; }
 
  protected:
-  /**
-   * @brief Resizes the constraint dimensions.
-   *
-   * @param dim Dimension of the constraint
-   * @param nx Number of input variables
-   * @param np Number of input parameters
-   */
-  void Resize(int dim, int nx, int np) {
-    dim_ = dim;
-    nx_ = nx;
-    np_ = np;
-
-    double inf = std::numeric_limits<double>::infinity();
-    ub_ = inf * Eigen::VectorXd::Ones(dim_);
-    lb_ = -inf * Eigen::VectorXd::Ones(dim_);
-  }
-
-  /**
-   * @brief Set the Constraint Function object
-   *
-   * @param f
-   */
-  void SetConstraintFunction(const common::Function::SharedPtr &f) { con_ = f; }
-
-  /**
-   * @brief Set the Jacobian Function object
-   *
-   * @param f
-   */
-  void SetJacobianFunction(const typename common::Function::SharedPtr &f) {
-    jac_ = f;
-    has_jac_ = true;
-  }
-
-  /**
-   * @brief Set the Hessian Function object
-   *
-   * @param f
-   */
-  void SetHessianFunction(const typename common::Function::SharedPtr &f) {
-    hes_ = f;
-    has_hes_ = true;
-  }
-
-  // Flags to indicate if constraint can compute derivatives
-  bool has_jac_ = false;
-  bool has_hes_ = false;
-
  private:
   // Dimension of the constraint
   int dim_ = 0;
@@ -371,18 +181,6 @@ class ConstraintBase {
   Eigen::VectorXd lb_;
   // Constraint upper bound
   Eigen::VectorXd ub_;
-
-  // Constraint function pointer
-  common::Function::SharedPtr con_;
-  // Jacobian function pointer
-  common::Function::SharedPtr jac_;
-  // Hessian of vector-product function pointer
-  common::Function::SharedPtr hes_;
-
-  // Number of variable inputs
-  int nx_ = 0;
-  // Number of parameter inputs
-  int np_ = 0;
 
   /**
    * @brief Creates a unique id for each constraint
