@@ -34,7 +34,7 @@ class Function {
    * @brief Empty constructor for the Function class
    *
    */
-  Function() { Resize(0, 0, 0); }
+  Function() { Resize(0, 0); }
 
   /**
    * @brief Construct a new Function object with number of variables n_in and
@@ -50,16 +50,16 @@ class Function {
   /**
    * @brief Number of inputs for the function
    *
-   * @return int
+   * @return size_t
    */
-  int n_in() const { return n_in_; }
+  size_t n_in() const { return n_in_; }
 
   /**
    * @brief Number of outputs for the function
    *
-   * @return int
+   * @return size_t
    */
-  int n_out() const { return n_out_; }
+  size_t n_out() const { return n_out_; }
 
   /**
    * @brief Resize the function to the appropriate outputs
@@ -72,40 +72,22 @@ class Function {
     assert(n_out > 0 && "A positive integer amount of outputs are required");
     n_in_ = n_in;
     n_out_ = n_out;
-    // Set number of inputs to the function (variables, parameters and
-    // multipliers for hessian evaluation)
+    // Set number of inputs to the function
     in_.assign(n_in_, nullptr);
   }
 
   /**
-   * @brief Calls the function
+   * @brief Evaluates the function using the provided inputs
    *
+   * @param in Vector of inputs to evaluate the function
+   * @param check Whether to assess each input for inconsistencies (e.g.
+   * infinite values, bad data)
    */
-  void call() { EvalImpl(); }
-
-  /**
-   * @brief Set the i-th input for the function using the vector input.
-   * Optionally can perform a check on the input to assess if it is valid.
-   *
-   * @param i
-   * @param input
-   * @param check
-   */
-  void SetInput(const int& i, const Eigen::Ref<const Eigen::VectorXd>& input,
-                bool check = false);
-
-  /**
-   * @brief Sets a collection of inputs to the function using the vector of
-   * vector references input. Optionally can perform a check on the input to
-   * assess if it is valid.
-   *
-   * @param indices
-   * @param input
-   * @param check
-   */
-  void SetInputs(const std::vector<int>& indices,
-                 const std::vector<Eigen::Ref<const Eigen::VectorXd>>& input,
-                 bool check = false);
+  void Eval(const InputRefVector& in, bool check = false) {
+    assert(in.size() == n_in() && "Incorrect number of inputs provided");
+    // Evaluate the function using the provided implementation
+    EvalImpl(in, check);
+  }
 
   /**
    * @brief Returns the i-th output as a GenericEigenMatrix object.
@@ -113,7 +95,10 @@ class Function {
    * @param i
    * @return const GenericEigenMatrix&
    */
-  virtual const GenericEigenMatrix& GetOutput(const int& i) const = 0;
+  const GenericEigenMatrix& GetOutput(const size_t& i) const {
+    assert(i < n_out() && "Index exceeds number of outputs specified");
+    return GetOutputImpl(i);
+  }
 
  protected:
   /**
@@ -121,16 +106,18 @@ class Function {
    *
    * @param input
    */
-  virtual void EvalImpl() = 0;
+  virtual void EvalImpl(const InputRefVector& in, bool check = false) = 0;
+
+  virtual const GenericEigenMatrix& GetOutputImpl(const size_t& i) const = 0;
 
   // Input data pointers that are stored for evaluation (x, p and optionally l)
   std::vector<const double*> in_;
 
  private:
   // Number of inputs
-  int n_in_;
+  size_t n_in_;
   // Number of outputs
-  int n_out_;
+  size_t n_out_;
 };
 
 }  // namespace common

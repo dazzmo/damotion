@@ -6,21 +6,17 @@
 
 #include "damotion/casadi/eigen.h"
 #include "damotion/casadi/function.h"
+#include "damotion/common/eigen.h"
 #include "damotion/optimisation/bounds.h"
 #include "damotion/optimisation/fwd.h"
 
 namespace damotion {
 namespace optimisation {
 
-class Constraint : public damotion::casadi::CasadiFunction {
+class Constraint {
  public:
   Constraint() = default;
   ~Constraint() = default;
-
-  Constraint(const int &nx, const int &ny, const int &np = 0)
-      : damotion::casadi::CasadiFunction(nx, ny, np) {
-    ResizeBounds();
-  }
 
   /**
    * @brief Construct a new Constraint object from the symbolic
@@ -31,17 +27,33 @@ class Constraint : public damotion::casadi::CasadiFunction {
    * @param c The expression to compute the constraint and derivatives from
    * @param bounds Bounds for the constraint (e.g. equality, positive,
    * negative ...)
-   * @param jac Flag to compute the jacobian of c with respect to each input
-   * variable
-   * @param hes Flag to compute the hessian of c with respect to each input
-   * variable
    */
   Constraint(const std::string &name, const casadi::SX &ex,
              const casadi::SXVector &x, const casadi::SXVector &p,
-             const BoundsType &bounds, bool jac, bool hes, bool sparse = false)
-      : damotion::casadi::CasadiFunction({ex}, x, p, jac, hes, sparse) {
+             const BoundsType &bounds, bool sparse = false) {
+    // Create function based on casadi
+    f_ = std::make_shared<damotion::casadi::FunctionWrapper>(
+        damotion::casadi::CreateFunction({ex}, x, p, sparse));
+
     // Resize the bounds
-    ResizeBounds();
+    ResizeBounds(ex.size1());
+    // Update bounds for the constraint
+    SetBounds(bounds);
+  }
+
+  /**
+   * @brief Construct a new Constraint object using an existing common::Function
+   * object.
+   *
+   * @param name
+   * @param f
+   * @param bounds
+   */
+  Constraint(const std::string &name, const common::Function::SharedPtr &f,
+             const BoundsType &bounds)
+      : f_(std::move(f)) {
+    // Resize the bounds
+    ResizeBounds(f_->GetOutput(0).toConstVectorXdRef().size());
     // Update bounds for the constraint
     SetBounds(bounds);
   }
@@ -57,10 +69,7 @@ class Constraint : public damotion::casadi::CasadiFunction {
    * @brief Dimension of the constraint
    *
    */
-  int Dimension() const {
-    // TODO - Fix this
-    return this->ny();
-  }
+  int Dimension() const { return 0; }
 
   /**
    * @brief Set the name of the constraint
@@ -75,16 +84,35 @@ class Constraint : public damotion::casadi::CasadiFunction {
     }
   }
 
+  void Eval(const common::InputRefVector &x, const common::InputRefVector &p,
+            bool check = false) {
+    // Evaluate the constraints based on the
+    common::InputRefVector in = {};
+    for (const auto &xi : x) in.push_back(xi);
+    for (const auto &pi : p) in.push_back(pi);
+    Eigen::VectorXd one(1.0);
+    for (size_t i = 0; i < f_->n_out(); ++i) in.push_back(one);
+    // Append flags for evaluating jacobian and hessian
+    Eigen::VectorXd d_flag(1.0), h_flag(0.0);
+    in.push_back(d_flag);
+    in.push_back(h_flag);
+    f_->Eval(in, check);
+  }
+
+  const GenericEigenMatrix &Vector() { return f_->GetOutput(0); }
+  const GenericEigenMatrix &Jacobian() { return f_->GetOutput(1); }
+  const GenericEigenMatrix &Hessian() { return f_->GetOutput(2); }
+
   /**
    * @brief Resizes the bounds the size of the constraint output given by
    * common::Function::ny().
    *
    */
-  void ResizeBounds() {
+  void ResizeBounds(const size_t &n) {
     // Initialise the bounds of the constraint
     double inf = std::numeric_limits<double>::infinity();
-    ub_ = inf * Eigen::VectorXd::Ones(ny());
-    lb_ = -inf * Eigen::VectorXd::Ones(ny());
+    ub_ = inf * Eigen::VectorXd::Ones(n);
+    lb_ = -inf * Eigen::VectorXd::Ones(n);
   }
 
   /**
@@ -148,8 +176,7 @@ class Constraint : public damotion::casadi::CasadiFunction {
   bool CheckViolation(const int &p = 2, const double &eps = 1e-6) {
     // Determine if constraint within threshold
     double c_norm = 0.0;
-    Eigen::Ref<const Eigen::VectorXd> c =
-        this->GetOutput(0).toConstVectorXdRef();
+    Eigen::Ref<const Eigen::VectorXd> c = Vector().toConstVectorXdRef();
     if (p == 1) {
       c_norm = c.lpNorm<1>();
     } else if (p == 2) {
@@ -190,6 +217,9 @@ class Constraint : public damotion::casadi::CasadiFunction {
   Eigen::VectorXd lb_;
   // Constraint upper bound
   Eigen::VectorXd ub_;
+
+  // Function to evaluate the constraint
+  common::Function::SharedPtr f_;
 
   /**
    * @brief Creates a unique id for each constraint

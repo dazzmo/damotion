@@ -7,7 +7,7 @@
 namespace damotion {
 namespace optimisation {
 /**
- * @brief A cost of the form 0.5 x^T Q x + g^T x + c
+ * @brief A cost of the form 0.5 x^T A x + b^T x + c
  *
  */
 class QuadraticCost : public Cost {
@@ -15,32 +15,11 @@ class QuadraticCost : public Cost {
   using UniquePtr = std::unique_ptr<QuadraticCost>;
   using SharedPtr = std::shared_ptr<QuadraticCost>;
 
-  QuadraticCost(const std::string &name, const Eigen::MatrixXd &A,
-                const Eigen::VectorXd &b, const double &c, bool jac = true,
-                bool hes = true) {
-    // Cost
-    casadi::DM Ad, bd, cd = c;
-    damotion::casadi::toCasadi(A, Ad);
-    damotion::casadi::toCasadi(b, bd);
-    ConstructConstraint(name, Ad, bd, cd, {}, jac, hes);
-  }
-
   QuadraticCost(const std::string &name, const casadi::SX &A,
-                const casadi::SX &b, const casadi::SX &c,
-                const casadi::SXVector &p, bool jac = true, bool hes = true) {
-    ConstructConstraint(name, A, b, c, p, jac, hes);
-  }
-
-  QuadraticCost(const std::string &name, const casadi::SX &ex,
-                const casadi::SX &x, const casadi::SXVector &p, bool jac = true,
-                bool hes = true) {
-    // Extract quadratic form
-    casadi::SX A, b, c;
-    casadi::SX::quadratic_coeff(ex, x, A, b, c, true);
-    // Remove factor of two from hessian
-    A *= 0.5;
-    ConstructConstraint(name, A, b, c, p, jac, hes);
-  }
+                const casadi::SX &b, const casadi::SX &c, const casadi::SX &x,
+                const casadi::SXVector &p)
+      : Cost(mtimes(mtimes(x.T(), A), x) + mtimes(b.T(), x) + c, {x}, p,
+             false) {}
 
   /**
    * @brief Lower triangle representation of the quadratic cost Hessian
@@ -63,33 +42,9 @@ class QuadraticCost : public Cost {
   }
 
  private:
-  common::Function::UniquePtr fA_;
-  common::Function::UniquePtr fb_;
-  common::Function::UniquePtr fc_;
-
-  void ConstructConstraint(const std::string &name, const casadi::SX &A,
-                           const casadi::SX &b, const casadi::SX &c,
-                           const casadi::SXVector &p, bool jac = true,
-                           bool hes = true, bool sparse = false) {
-    this->SetName(name);
-
-    // Create expression
-    int nx = A.columns();
-
-    // Quadratic cost
-    casadi::SX x = casadi::SX::sym("x", nx);
-    casadi::SX ex = mtimes(x.T(), mtimes(A, x)) + mtimes(b.T(), x) + c;
-
-    GenerateFunction({ex}, {x}, p, jac, hes, sparse);
-
-    // Create specialised functions for A, b and c
-    fA_ = std::make_unique<damotion::casadi::CasadiFunction>(
-        ::casadi::SXVector({A}), ::casadi::SXVector(), p, false, false, sparse);
-    fb_ = std::make_unique<damotion::casadi::CasadiFunction>(
-        ::casadi::SXVector({b}), ::casadi::SXVector(), p, false, false, sparse);
-    fc_ = std::make_unique<damotion::casadi::CasadiFunction>(
-        ::casadi::SXVector({c}), ::casadi::SXVector(), p, false, false, sparse);
-  }
+  common::Function::SharedPtr fA_;
+  common::Function::SharedPtr fb_;
+  common::Function::SharedPtr fc_;
 };
 
 }  // namespace optimisation

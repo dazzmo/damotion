@@ -11,44 +11,31 @@ class LinearConstraint : public Constraint {
   using UniquePtr = std::unique_ptr<LinearConstraint>;
   using SharedPtr = std::shared_ptr<LinearConstraint>;
 
+  LinearConstraint(const std::string &name, common::Function::SharedPtr &f,
+                   common::Function::SharedPtr &fc,
+                   common::Function::SharedPtr &fb, const BoundsType &bounds)
+      : Constraint(name, f, bounds), fA_(std::move(fA)), fb_(std::move(fb)) {
+    // Create constraint based on the function
+  }
+
+  LinearConstraint(const std::string &name, const ::casadi::SX &A,
+                   const ::casadi::SX &b, const ::casadi::SX &x,
+                   const ::casadi::SXVector &p, const BoundsType &bounds)
+      : Constraint(name, mtimes(A, x) + b, ::casadi::SXVector({x}), p, bounds) {
+    // Create constraint based on the function
+
+    // Create functions for A and b seperately
+    ::casadi::Function f_coefs("lin_coefs", p, {A, b});
+    f_coefs_ = std::make_shared<damotion::casadi::FunctionWrapper>(f_coefs);
+  }
+
   /**
-   * @brief Construct a new Linear Constraint object of the form \f$ A x + b
-   * \f$
+   * @brief Evaluates the coefficients comprising the linear constraint (i.e. A,
+   * b)
    *
-   * @param name Name of the constraint. Default name given if provided ""
-   * @param A Vector of coefficient matrices
-   * @param b
-   * @param p Parameters that A and b depend on
-   * @param bounds
-   * @param jac
+   * @param input
    */
-  LinearConstraint(const std::string &name, const casadi::SX &A,
-                   const casadi::SX &b, const casadi::SXVector &p,
-                   const BoundsType &bounds, bool jac = true) {
-    ConstructConstraint(name, A, b, p, bounds, jac);
-  }
-
-  LinearConstraint(const std::string &name, const Eigen::MatrixXd &A,
-                   const Eigen::VectorXd &b, const BoundsType &bounds,
-                   bool jac = true) {
-    // Constant vector b
-    casadi::DM Ad, bd;
-    damotion::casadi::toCasadi(b, bd);
-    damotion::casadi::toCasadi(A, Ad);
-
-    // Construct constraint
-    ConstructConstraint(name, Ad, bd, {}, bounds, jac);
-  }
-
-  LinearConstraint(const std::string &name, const casadi::SX &ex,
-                   const casadi::SXVector &x, const casadi::SXVector &p,
-                   const BoundsType &bounds, bool jac = true) {
-    // Extract linear form
-    casadi::SX A, b;
-    casadi::SX::linear_coeff(ex, x[0], A, b, true);
-
-    ConstructConstraint(name, A, b, p, bounds, jac);
-  }
+  void EvalCoefficients(const common::InputRefVector &p) { f_coefs_->Eval(p); }
 
   /**
    * @brief The coefficient matrix A for the expression A x + b.
@@ -56,9 +43,7 @@ class LinearConstraint : public Constraint {
    * @return const GenericEigenMatrix&
    */
   const GenericEigenMatrix &A() const {
-    // TODO - Set inputs
-    fA_->call();
-    return fA_->GetOutput(0);
+    return f_coefs_->GetOutput(CoefficientIndices::A);
   }
 
   /**
@@ -67,41 +52,12 @@ class LinearConstraint : public Constraint {
    * @return const GenericEigenMatrix&
    */
   const GenericEigenMatrix &b() const {
-    fb_->call();
-    return fb_->GetOutput(0);
+    return f_coefs_->GetOutput(CoefficientIndices::b);
   }
 
  private:
-  mutable common::Function::UniquePtr fA_;
-  mutable common::Function::UniquePtr fb_;
-
-  void ConstructConstraint(const std::string &name, const casadi::SX &A,
-                           const casadi::SX &b, const casadi::SXVector &p,
-                           const BoundsType &bounds, bool jac = true,
-                           bool sparse = false) {
-    assert(A.rows() == b.rows() && "A and b must be same dimension!");
-    this->SetName(name);
-
-    VLOG(10) << this->name() << " ConstructConstraint()";
-    VLOG(10) << "A = " << A;
-    VLOG(10) << "b = " << b;
-
-    // Create expression
-    int nx = A.columns();
-
-    ::casadi::SX x = ::casadi::SX::sym("x", nx);
-    ::casadi::SX ex = mtimes(A, x) + b;
-
-    GenerateFunction({ex}, {x}, p, jac, false, sparse);
-
-    this->SetBounds(bounds);
-
-    // Create specialised functions for A and b
-    fA_ = std::make_unique<damotion::casadi::CasadiFunction>(
-        ::casadi::SXVector({A}), ::casadi::SXVector(), p, false, false, sparse);
-    fb_ = std::make_unique<damotion::casadi::CasadiFunction>(
-        ::casadi::SXVector({b}), ::casadi::SXVector(), p, false, false, sparse);
-  }
+  const enum CoefficientIndices { A = 0, b };
+  mutable common::Function::SharedPtr f_coefs_;
 };
 
 }  // namespace optimisation

@@ -12,25 +12,13 @@ namespace optimisation {
  */
 class LinearCost : public Cost {
  public:
-  LinearCost(const std::string &name, const Eigen::VectorXd &c, const double &b,
-             bool jac = true) {
-    // Create Costs
-    casadi::DM cd, bd = b;
-    damotion::casadi::toCasadi(c, cd);
-    ConstructCost(name, cd, bd, {}, jac, true);
-  }
-
   LinearCost(const std::string &name, const casadi::SX &c, const casadi::SX &b,
-             const casadi::SXVector &p, bool jac = true) {
-    ConstructCost(name, c, b, p, jac, true);
-  }
-
-  LinearCost(const std::string &name, const casadi::SX &ex, const casadi::SX &x,
-             const casadi::SXVector &p, bool jac = true, bool hes = true) {
-    // Extract quadratic form
-    casadi::SX c, b;
-    casadi::SX::linear_coeff(ex, x, c, b, true);
-    ConstructCost(name, c, b, p, jac, hes);
+             const casadi::SX &x, const casadi::SXVector &p)
+      : Cost(mtimes(c.T(), x) + b, {x}, p, false) {
+    // Create specialty functions for coefficient evaluation
+    ::casadi::Function fc("c", p, {c}), fb("b", p, {b});
+    fc_ = std::make_shared<damotion::casadi::FunctionWrapper>(fc);
+    fb_ = std::make_shared<damotion::casadi::FunctionWrapper>(fb);
   }
 
   /**
@@ -54,30 +42,8 @@ class LinearCost : public Cost {
   }
 
  private:
-  common::Function::UniquePtr fc_;
-  common::Function::UniquePtr fb_;
-
-  void ConstructCost(const std::string &name, const casadi::SX &c,
-                     const casadi::SX &b, const casadi::SXVector &p,
-                     bool jac = true, bool hes = true, bool sparse = false) {
-    assert(b.rows() == 1 && "b must be scalar!");
-
-    this->SetName(name);
-
-    // Create expression
-    int nx = c.rows();
-
-    ::casadi::SX x = ::casadi::SX::sym("x", nx);
-    ::casadi::SX ex = mtimes(c.T(), x) + b;
-
-    GenerateFunction({ex}, {x}, p, jac, false, sparse);
-
-    // Create coefficient functions
-    fc_ = std::make_unique<damotion::casadi::CasadiFunction>(
-        ::casadi::SXVector({c}), ::casadi::SXVector(), p, false, false, sparse);
-    fb_ = std::make_unique<damotion::casadi::CasadiFunction>(
-        ::casadi::SXVector({b}), ::casadi::SXVector(), p, false, false, sparse);
-  }
+  common::Function::SharedPtr fc_;
+  common::Function::SharedPtr fb_;
 };
 
 }  // namespace optimisation

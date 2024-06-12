@@ -11,18 +11,19 @@
 namespace damotion {
 namespace optimisation {
 
-class Cost : public damotion::casadi::CasadiFunction {
+class Cost {
  public:
   Cost() = default;
   ~Cost() = default;
 
-  Cost(const int &nx, const int &np = 0)
-      : damotion::casadi::CasadiFunction(nx, 1, np) {}
+  Cost(const int &nx, const int &np = 0) {}
 
   Cost(const casadi::SX &ex, const casadi::SXVector &x,
-       const casadi::SXVector &p, bool grd = false, bool hes = false,
-       bool sparse = false)
-      : damotion::casadi::CasadiFunction({ex}, x, p, grd, hes, sparse) {}
+       const casadi::SXVector &p, bool sparse = false) {
+    // Create function based on casadi
+    f_ = std::make_shared<damotion::casadi::FunctionWrapper>(
+        damotion::casadi::CreateFunction({ex}, x, p, sparse));
+  }
 
   /**
    * @brief Name of the cost
@@ -44,9 +45,31 @@ class Cost : public damotion::casadi::CasadiFunction {
     }
   }
 
+  void Eval(const common::InputRefVector &x, const common::InputRefVector &p,
+            bool check = false) {
+    // Evaluate the constraints based on the
+    common::InputRefVector in = {};
+    for (const auto &xi : x) in.push_back(xi);
+    for (const auto &pi : p) in.push_back(pi);
+    Eigen::VectorXd one(1.0);
+    for (size_t i = 0; i < f_->n_out(); ++i) in.push_back(one);
+    // Append flags for evaluating jacobian and hessian
+    Eigen::VectorXd d_flag(1.0), h_flag(0.0);
+    in.push_back(d_flag);
+    in.push_back(h_flag);
+    f_->Eval(in, check);
+  }
+
+  const GenericEigenMatrix &Value() { return f_->GetOutput(0); }
+  const GenericEigenMatrix &Gradient() { return f_->GetOutput(1); }
+  const GenericEigenMatrix &Hessian() { return f_->GetOutput(2); }
+
  private:
   // Name of the cost
   std::string name_;
+
+  // Function to evaluate the cost
+  common::Function::SharedPtr f_;
 
   /**
    * @brief Creates a unique id for each cost

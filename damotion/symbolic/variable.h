@@ -142,11 +142,9 @@ class VariableManager {
    * @brief Returns a vector of the values of each variable entry in the manager
    * in the current order provided
    *
-   * @return const Eigen::Ref<const Eigen::VectorXd>&
+   * @return const Eigen::VectorXd&
    */
-  const Eigen::Ref<const Eigen::VectorXd> &GetVariableValueVector() const {
-    return x_;
-  }
+  const Eigen::VectorXd &GetVariableValueVector() const { return x_; }
 
   /**
    * @brief Determines whether a vector of variables var is continuous within
