@@ -139,6 +139,16 @@ class VariableManager {
   bool SetVariableVector(const Eigen::Ref<VariableVector> &var);
 
   /**
+   * @brief Returns a vector of the values of each variable entry in the manager
+   * in the current order provided
+   *
+   * @return const Eigen::Ref<const Eigen::VectorXd>&
+   */
+  const Eigen::Ref<const Eigen::VectorXd> &GetVariableValueVector() const {
+    return x_;
+  }
+
+  /**
    * @brief Determines whether a vector of variables var is continuous within
    * the optimisation vector of the program.
    *
@@ -226,6 +236,8 @@ class VariableManager {
   Eigen::VectorXd xbl_;
   // Initial values for decision variables
   Eigen::VectorXd x0_;
+  // Vector of variable values
+  Eigen::VectorXd x_;
 
   // Location of each decision variable within the optimisation vector
   std::unordered_map<Variable::Id, int> decision_variable_idx_;

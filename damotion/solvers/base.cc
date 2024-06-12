@@ -1,16 +1,14 @@
 #include "damotion/solvers/base.h"
 
-void SolverBase::EvaluateCost(const Binding<CostType>& binding,
+namespace damotion {
+namespace optimisation {
+namespace solvers {
+
+void SolverBase::EvaluateCost(const Binding<Cost>& binding,
                               const Eigen::VectorXd& x, bool grd, bool hes,
                               bool update_cache) {
-  common::InputRefVector x_in = {}, p_in = {};
-  GetBindingInputs(binding, x_in, p_in);
-
-  const CostType& cost = binding.Get();
-  // Evaluate the constraint
-  cost.eval(x_in, p_in, grd);
-  // if(hes) constraint.eval_hessian(x_in, p_in, l_in)
-
+  // Evaluate the binding
+  EvaluateBinding(binding, x, GetCurrentProgram().ParameterVector(), grd, hes);
   if (update_cache == false) return;
 
   objective_cache_ += cost.Objective();
@@ -25,20 +23,20 @@ void SolverBase::EvaluateCosts(const Eigen::VectorXd& x, bool grad, bool hes) {
   if (hes) lagrangian_hes_cache_.setZero();
 
   // Evaluate all costs in the program
-  for (Binding<CostType>& b : GetCosts()) {
+  for (Binding<Cost>& b : GetCosts()) {
     EvaluateCost(b, x, grad, hes);
   }
 }
 
 // Evaluates the constraint and updates the cache for the gradients
-void SolverBase::EvaluateConstraint(const Binding<ConstraintType>& binding,
+void SolverBase::EvaluateConstraint(const Binding<Constraint>& binding,
                                     const int& constraint_idx,
                                     const Eigen::VectorXd& x, bool jac,
                                     bool update_cache) {
   common::InputRefVector x_in = {}, p_in = {};
   GetBindingInputs(binding, x_in, p_in);
 
-  const ConstraintType& constraint = binding.Get();
+  const Constraint& constraint = binding.Get();
   // Evaluate the constraint
   constraint.eval(x_in, p_in, jac);
   // if(hes) constraint.eval_hessian(x_in, p_in, l_in)
@@ -62,13 +60,13 @@ void SolverBase::EvaluateConstraints(const Eigen::VectorXd& x, bool jac) {
     constraint_jacobian_cache_.setZero();
   }
   // Loop through all constraints
-  for (Binding<ConstraintType>& b : GetConstraints()) {
+  for (Binding<Constraint>& b : GetConstraints()) {
     EvaluateConstraint(b, 0, x, jac);
   }
 }
 
-void SolverBase::UpdateConstraintJacobian(
-    const Binding<ConstraintType>& binding, const int& constraint_idx) {
+void SolverBase::UpdateConstraintJacobian(const Binding<Constraint>& binding,
+                                          const int& constraint_idx) {
   // Get data related to the binding
   BindingInputData& data = GetBindingInputData(binding);
   // Get block rows related to the binding constraint
@@ -83,7 +81,7 @@ void SolverBase::UpdateConstraintJacobian(
   }
 }
 
-void SolverBase::UpdateLagrangianHessian(const Binding<CostType>& binding) {
+void SolverBase::UpdateLagrangianHessian(const Binding<Cost>& binding) {
   // Get data related to the binding
   BindingInputData& data = GetBindingInputData(binding);
 
@@ -105,3 +103,7 @@ void SolverBase::UpdateLagrangianHessian(const Binding<CostType>& binding) {
     idx_x += xi.size();
   }
 }
+
+}  // namespace solvers
+}  // namespace optimisation
+}  // namespace damotion

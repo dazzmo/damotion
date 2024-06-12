@@ -31,6 +31,9 @@ class BlockMatrixFunction {
    */
   enum class Type { kJacobian, kHessian, kGradient, kQuadratic, kLinear };
 
+  using SharedPtr = std::shared_ptr<BlockMatrixFunction>;
+  using UniquePtr = std::unique_ptr<BlockMatrixFunction>;
+
   /**
    * @brief Construct a new Block Matrix Function object
    *

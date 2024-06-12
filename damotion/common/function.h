@@ -128,28 +128,6 @@ class Function {
                 bool check = false);
 
   /**
-   * @brief Set the i-th input for the function using the data array input.
-   * Optionally can perform a check on the input to assess if it is valid.
-   *
-   * @param i
-   * @param input
-   * @param check
-   */
-  void SetInput(const int& i, const double* input, bool check = false);
-
-  /**
-   * @brief Sets a collection of inputs to the function using the vector of data
-   * pointers input. Optionally can perform a check on the input to assess if it
-   * is valid.
-   *
-   * @param indices
-   * @param input
-   * @param check
-   */
-  void SetInput(const std::vector<int>& indices,
-                const std::vector<const double*> input, bool check = false);
-
-  /**
    * @brief Set the i-th parameter for the function using the vector parameter.
    * Optionally can perform a check on the parameter to assess if it is valid.
    *
@@ -176,29 +154,6 @@ class Function {
       bool check = false);
 
   /**
-   * @brief Set the i-th parameter for the function using the data array
-   * parameter. Optionally can perform a check on the parameter to assess if it
-   * is valid.
-   *
-   * @param i
-   * @param parameter
-   * @param check
-   */
-  void SetParameter(const int& i, const double* parameter, bool check = false);
-
-  /**
-   * @brief Sets a collection of inputs to the function using the vector of data
-   * pointers input. Optionally can perform a check on the input to assess if it
-   * is valid.
-   *
-   * @param indices
-   * @param input
-   * @param check
-   */
-  void SetParameter(const std::vector<int>& indices,
-                    const std::vector<const double*> input, bool check = false);
-
-  /**
    * @brief Set the i-th multipler for the function-multiplier product \f$
    * \lambda^T f \f$ for evaluation of the system hessian.
    *
@@ -223,31 +178,6 @@ class Function {
       const std::vector<int>& indices,
       const std::vector<Eigen::Ref<const Eigen::VectorXd>>& multiplier,
       bool check = false);
-
-  /**
-   * @brief Set the i-th multiplier for the function using the data array
-   * multiplier. Optionally can perform a check on the multiplier to assess if
-   * it is valid.
-   *
-   * @param i
-   * @param multiplier
-   * @param check
-   */
-  void SetMultiplier(const int& i, const double* multiplier,
-                     bool check = false);
-
-  /**
-   * @brief Sets a collection of multipliers to the function using the vector of
-   * data pointers input. Optionally can perform a check on the input to assess
-   * if it is valid.
-   *
-   * @param indices
-   * @param input
-   * @param check
-   */
-  void SetMultiplier(const std::vector<int>& indices,
-                     const std::vector<const double*> multiplier,
-                     bool check = false);
 
   /**
    * @brief Returns the i-th output as a GenericEigenMatrix object.

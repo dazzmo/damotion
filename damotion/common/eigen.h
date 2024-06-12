@@ -1,20 +1,25 @@
 #ifndef COMMON_EIGEN_DATA_H
 #define COMMON_EIGEN_DATA_H
 
-namespace damotion {
-
 #include <Eigen/Core>
 #include <Eigen/Sparse>
 #include <memory>
 
+namespace damotion {
+
 /**
- * @brief This class represents any matrix-type data of Eigen by representing it
+ * @brief This class represents any matrix-type data of Eigen by representing
+ it
  * as an array of continuous data. At its core, it is a sparse matrix object
- * handled by Eigen's SparseMatrix class. The data vector can then be viewed as
- * any of Eigen's MatrixBase objects, such dense vectors and matrices as well as
- * of course sparse matrices. The data array is initialised on construction of
+ * handled by Eigen's SparseMatrix class. The data vector can then be viewed
+ as
+ * any of Eigen's MatrixBase objects, such dense vectors and matrices as well
+ as
+ * of course sparse matrices. The data array is initialised on construction
+ of
  * the class, making the array sufficiently large to represent its intended
- * matrix type. Any view can be chosen by this class provided the data array is
+ * matrix type. Any view can be chosen by this class provided the data array
+ is
  * large enough to represent the desired view.
  *
  */
@@ -27,7 +32,8 @@ class GenericEigenMatrix {
   ~GenericEigenMatrix() = default;
 
   /**
-   * @brief Construct a new GenericEigenMatrix object for the 1x1 matrix class.
+   * @brief Construct a new GenericEigenMatrix object for the 1x1 matrix
+   class.
    *
    */
   GenericEigenMatrix(const double& val) {
@@ -125,7 +131,8 @@ class GenericEigenMatrix {
   }
 
   /**
-   * @brief Create an Eigen::MatrixXd object from the GenericMatrixData object.
+   * @brief Create an Eigen::MatrixXd object from the GenericMatrixData
+   object.
    *
    * @return Eigen::MatrixXd
    */
@@ -138,7 +145,8 @@ class GenericEigenMatrix {
   }
 
   /**
-   * @brief Returns a copy of the SparseMatrix class that manages the data array
+   * @brief Returns a copy of the SparseMatrix class that manages the data
+   array
    * for the GenericEigenMatrix class.
    *
    * @return Eigen::SparseMatrix<double>
@@ -146,7 +154,8 @@ class GenericEigenMatrix {
   Eigen::SparseMatrix<double> toSparseMatrix() const { return data_; }
 
   /**
-   * @brief Returns a reference to the SparseMatrix class that manages the data
+   * @brief Returns a reference to the SparseMatrix class that manages the
+   data
    * array for the GenericEigenMatrix class.
    *
    * @return Eigen::SparseMatrix<double>&
@@ -154,7 +163,8 @@ class GenericEigenMatrix {
   Eigen::Ref<Eigen::SparseMatrix<double>> toSparseMatrixRef() { return data_; }
 
   /**
-   * @brief Returns a reference to the SparseMatrix class that manages the data
+   * @brief Returns a reference to the SparseMatrix class that manages the
+   data
    * array for the GenericEigenMatrix class.
    *
    * @return Eigen::SparseMatrix<double>&
@@ -165,7 +175,8 @@ class GenericEigenMatrix {
 
   /**
    * @brief Returns the pointer to the data array for the GenericEigenMatrix
-   * object. This can be used to modify and insert values directly into the data
+   * object. This can be used to modify and insert values directly into the
+   data
    * array.
    *
    * @return double*

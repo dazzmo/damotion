@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "damotion/common/logging.h"
 #include "damotion/optimisation/fwd.h"
 
 namespace damotion {

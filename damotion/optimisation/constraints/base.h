@@ -57,7 +57,7 @@ class Constraint : public damotion::casadi::CasadiFunction {
    * @brief Dimension of the constraint
    *
    */
-  const int Dimension() const {
+  int Dimension() const {
     // TODO - Fix this
     return this->ny();
   }

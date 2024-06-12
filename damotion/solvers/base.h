@@ -22,14 +22,30 @@ class SolverBase {
     constraint_vector_cache_ = Eigen::VectorXd::Zero(nc);
     dual_variable_cache_ = Eigen::VectorXd::Zero(nc);
 
+    // Create block matrix functions with the provided bindings
+    objective_gradient_ = std::make_unique<BlockMatrixFunction>(
+        nx, 1, BlockMatrixFunction::Type::kGradient);
+    constraint_jacobian_ = std::make_unique<BlockMatrixFunction>(
+        nc, nx, BlockMatrixFunction::Type::kJacobian);
+    lagrangian_hessian_ = std::make_unique<BlockMatrixFunction>(
+        nx, nx, BlockMatrixFunction::Type::kHessian);
+
     // Register all bindings
     for (auto& b : program.GetAllConstraintBindings()) {
-      RegisterBinding(b);
       constraint_base_bindings_.push_back(b);
+      // Add bindings to the block functions
+      constraint_jacobian_->AddBinding(b, b.Get().GetDerivative(0),
+                                       GetCurrentProgram());
+      lagrangian_hessian_->AddBinding(b, b.Get().GetHessian(0),
+                                      GetCurrentProgram());
     }
     for (auto& b : program.GetAllCostBindings()) {
-      RegisterBinding(b);
       cost_base_bindings_.push_back(b);
+      // Add bindings to the block functions
+      objective_gradient_->AddBinding(b, b.Get().GetDerivative(0),
+                                      GetCurrentProgram());
+      lagrangian_hessian_->AddBinding(b, b.Get().GetHessian(0),
+                                      GetCurrentProgram());
     }
   }
 
@@ -143,7 +159,7 @@ class SolverBase {
                        const Eigen::VectorXd& p, bool derivative,
                        bool hessian) {
     // Create vectors for each input
-    std::vector<Eigen::Ref<Eigen::VectorXd>> in;
+    std::vector<Eigen::Ref<const Eigen::VectorXd>> in;
     for (int i = 0; i < binding.GetInputSize(); ++i) {
       sym::VariableVector& xi = binding.x()[i];
       std::vector<int> indices =
@@ -159,6 +175,7 @@ class SolverBase {
       in.push_back(p(indices));
     }
 
+    // Set the values for the expression
     for (int i = 0; i < in.size(); ++i) binding.Get().SetInput(i, in[i]);
 
     // Evaluate the binding
@@ -178,9 +195,9 @@ class SolverBase {
   Eigen::VectorXd constraint_vector_cache_;
 
   // Constraint Jacobian
-  BlockMatrixFunction objective_gradient_;
-  BlockMatrixFunction constraint_jacobian_;
-  BlockMatrixFunction lagrangian_hessian_;
+  BlockMatrixFunction::UniquePtr objective_gradient_;
+  BlockMatrixFunction::UniquePtr constraint_jacobian_;
+  BlockMatrixFunction::UniquePtr lagrangian_hessian_;
 
   // Primal solution of the program
   Eigen::VectorXd primal_solution_x_;
@@ -197,47 +214,8 @@ class SolverBase {
   // Index of the constraints within the constraint vector
   std::vector<int> constraint_idx_;
 
-  // Provides data for each variable
-  std::unordered_map<BindingBase::Id, std::vector<bool>> binding_continuous_x_;
-  std::unordered_map<BindingBase::Id, std::vector<bool>> binding_continuous_p_;
-
-  std::vector<BindingInputData> data_ = {};
   std::vector<Binding<Cost>> cost_base_bindings_ = {};
   std::vector<Binding<Constraint>> constraint_base_bindings_ = {};
-
-  /**
-   * @brief Register a binding with the solver
-   *
-   * @tparam T
-   * @param binding
-   * @param manager
-   * @param x
-   */
-  template <typename T>
-  void RegisterBinding(const Binding<T>& binding) {
-    VLOG(10) << "RegisterBinding()";
-    BindingInputData data;
-    // Assess if each input for the binding is continuous in the given
-    // decision variable vector
-    std::vector<bool> x_continuous = {};
-    for (int i = 0; i < binding.nx(); ++i) {
-      const sym::VariableVector& vi = binding.x(i);
-      x_continuous.push_back(
-          GetCurrentProgram().IsContinuousInDecisionVariableVector(vi));
-    }
-    for (int i = 0; i < binding.np(); ++i) {
-      const sym::VariableVector& vi = binding.p(i);
-      p_continuous.push_back(
-          GetCurrentProgram().IsContinuousInParameterVector(vi));
-    }
-
-    // Register data
-    binding_idx_[binding.id()] = data_.size();
-    data_.push_back(data);
-
-    VLOG(10) << "Binding Data ID " << binding.id();
-    VLOG(10) << "Binding Data at Index " << binding_idx_[binding.id()];
-  }
 };
 
 }  // namespace solvers
