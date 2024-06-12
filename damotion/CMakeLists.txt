@@ -14,6 +14,7 @@ casadi/codegen.cc
 casadi/pinocchio_model.cc
 optimisation/program.cc
 optimisation/bounds.cc
+optimisation/block.cc
 common/function.cc
 common/math/log.cc
 common/math/binomial.cc

@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 
+#include "damotion/optimisation/block.h"
 #include "damotion/optimisation/program.h"
 
 namespace damotion {
@@ -143,50 +144,22 @@ class SolverBase {
                        bool hessian) {
     // Create vectors for each input
     std::vector<Eigen::Ref<Eigen::VectorXd>> in;
-    const std::vector<bool>&x_cont = binding_continuous_x_[binding.id()],
-          &p_cont = binding_continuous_p_[binding.id()];
     for (int i = 0; i < binding.GetInputSize(); ++i) {
       sym::VariableVector& xi = binding.x()[i];
-      if (x_cont[i]) {
-        // If binding continuous
-        // Map vector slice from x to binding input
-        in.push_back(Eigen::Map<const Eigen::VectorXd>(
-            x.data() + GetCurrentProgram().GetDecisionVariableIndex(xi[0]),
-            xi.size()));
-      } else {
-        Eigen::VectorXd v;
-        // Construct vector based on inputs
-        for (int j = 0; j < xi.size(); ++j) {
-          v[j] = x[GetCurrentProgram().GetDecisionVariableIndex(xi[j])];
-        }
-      }
-
-      // Otherwise
-      in.push_back(xi);
-      binding.Get().SetInput(i, xi);
+      std::vector<int> indices =
+          GetCurrentProgram().GetDecisionVariableIndices(xi);
+      // Create indexed vector view for the system
+      in.push_back(x(indices));
     }
 
-    // Parameters
     for (int i = 0; i < binding.GetInputSize(); ++i) {
       sym::VariableVector& pi = binding.p()[i];
-      if (p_cont[i]) {
-        // If binding continuous
-        // Map vector slice from p to binding input
-        in.push_back(Eigen::Map<const Eigen::VectorXd>(
-            p.data() + GetCurrentProgram().GetDecisionVariableIndex(pi[0]),
-            pi.size()));
-      } else {
-        Eigen::VectorXd v;
-        // Construct vector based on inputs
-        for (int j = 0; j < pi.size(); ++j) {
-          v[j] = p[GetCurrentProgram().GetDecisionVariableIndex(pi[j])];
-        }
-      }
-
-      // Otherwise
-      in.push_back(xi);
-      binding.Get().SetInput(i, xi);
+      std::vector<int> indices = GetCurrentProgram().GetParameterIndices(pi);
+      // Create indexed vector view for the system
+      in.push_back(p(indices));
     }
+
+    for (int i = 0; i < in.size(); ++i) binding.Get().SetInput(i, in[i]);
 
     // Evaluate the binding
     binding.Get().call(derivative, hessian);
@@ -246,20 +219,16 @@ class SolverBase {
     BindingInputData data;
     // Assess if each input for the binding is continuous in the given
     // decision variable vector
+    std::vector<bool> x_continuous = {};
     for (int i = 0; i < binding.nx(); ++i) {
       const sym::VariableVector& vi = binding.x(i);
-      if (GetCurrentProgram().IsContinuousInDecisionVariableVector(vi)) {
-      } else {
-      }
+      x_continuous.push_back(
+          GetCurrentProgram().IsContinuousInDecisionVariableVector(vi));
     }
-
-    // Assess if each input for the binding is continuous in the given
-    // parameter vector
     for (int i = 0; i < binding.np(); ++i) {
-      const sym::ParameterVector& pi = binding.p(i);
-      if (GetCurrentProgram().IsContinuousInParameterVector(pi)) {
-      } else {
-      }
+      const sym::VariableVector& vi = binding.p(i);
+      p_continuous.push_back(
+          GetCurrentProgram().IsContinuousInParameterVector(vi));
     }
 
     // Register data

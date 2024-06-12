@@ -4,7 +4,6 @@
 namespace damotion {
 
 #include <Eigen/Core>
-#include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <memory>
 
