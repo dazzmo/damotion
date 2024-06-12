@@ -13,6 +13,54 @@ namespace damotion {
 namespace casadi {
 
 /**
+ * @brief Creates a function that given variables x, parameters p, computes the
+ * expressions f and optionally their derivatives and hessians. This function is
+ * of the form f(x, p, l, der, hes).
+ *
+ * @param f
+ * @param x
+ * @param p
+ * @return ::casadi::Function
+ */
+::casadi::Function CreateFunction(const ::casadi::SXVector &f,
+                                  const ::casadi::SXVector &x,
+                                  const ::casadi::SXVector &p,
+                                  const bool &sparse = false) {
+  // Create concatenated x vector for derivative purposes
+  ::casadi::SX xv = ::casadi::SX::vertcat(x);
+  ::casadi::SX d = ::casadi::SX::sym("derivative"),
+               h = ::casadi::SX::sym("hessian");
+
+  // Create input and output vectors
+  ::casadi::SXVector in = {}, out = {};
+  for (const auto &xi : x) in.push_back(xi);
+  for (const auto &pi : p) in.push_back(pi);
+
+  // Organise vector such that it is of the form [f, df, ddf, g, dg, ddg, ...]
+  for (const auto &fi : f) {
+    out.push_back(fi);
+
+    ::casadi::SX dfi;
+    if (fi.size1() == 1) {
+      dfi = ::casadi::SX::gradient(f, xv);
+    } else {
+      dfi = ::casadi::SX::jacobian(f, xv);
+    }
+    // Densify if requested
+    if (!sparse) dfi = ::casadi::SX::densify(dfi);
+    out.push_back(dfi);
+
+    ::casadi::SX hfi;
+    ::casadi::SX li = ::casadi::SX::sym("l", fi.size1());
+    // Compute lower-triangular hessian matrix
+    hfi = ::casadi::SX::tril(::casadi::SX::hessian(mtimes(li.T(), fi), xv));
+    // Densify if requested
+    if (!sparse) hfi = ::casadi::SX::densify(hfi);
+    out.push_back(hfi);
+  }
+}
+
+/**
  * @brief Function wrapper base class for casadi functions to Eigen
  * representation
  *
@@ -50,10 +98,7 @@ class CasadiFunction : public common::Function {
    * @param hessian Whether to compute the hessian of the expression with
    * respect to x
    */
-  CasadiFunction(const ::casadi::SXVector &f, const ::casadi::SXVector &x,
-                 const ::casadi::SXVector &p, bool derivative = false,
-                 bool hessian = false, bool sparse = false)
-      : common::Function() {
+  CasadiFunction(const ::casadi::Function &f) : common::Function() {
     GenerateFunction(f, x, p, derivative, hessian, sparse);
   }
 
@@ -75,10 +120,7 @@ class CasadiFunction : public common::Function {
    * @param hessian
    * @param sparse
    */
-  void GenerateFunction(const ::casadi::SXVector &f,
-                        const ::casadi::SXVector &x,
-                        const ::casadi::SXVector &p, bool derivative = false,
-                        bool hessian = false, bool sparse = false) {
+  void GenerateFunction(::casadi::Function &f) {
     // Resize the function
     Resize(x.size(), f.size(), p.size());
     // Create functions to compute the function, derivative and hessian
