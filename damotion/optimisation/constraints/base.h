@@ -84,10 +84,10 @@ class Constraint {
     }
   }
 
-  void Eval(const common::InputRefVector &x, const common::InputRefVector &p,
-            bool check = false) {
+  void Eval(const std::vector<ConstVectorRef> &x,
+            const std::vector<ConstVectorRef> &p, bool check = false) {
     // Evaluate the constraints based on the
-    common::InputRefVector in = {};
+    std::vector<ConstVectorRef> in = {};
     for (const auto &xi : x) in.push_back(xi);
     for (const auto &pi : p) in.push_back(pi);
     Eigen::VectorXd one(1.0);
@@ -99,6 +99,8 @@ class Constraint {
     f_->Eval(in, check);
   }
 
+  // Vector(const Eigen::VectorXd &v);
+  // Jacobian(const Eigen::VectorXd &v);
   const GenericEigenMatrix &Vector() { return f_->GetOutput(0); }
   const GenericEigenMatrix &Jacobian() { return f_->GetOutput(1); }
   const GenericEigenMatrix &Hessian() { return f_->GetOutput(2); }

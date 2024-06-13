@@ -201,6 +201,26 @@ std::ostream& operator<<(std::ostream& os, const GenericEigenMatrix& data) {
   return os << oss.str();
 }
 
+class MatrixData {
+ public:
+  Eigen::Ref<const Eigen::MatrixXd> asDense() {
+    return Eigen::Map<Eigen::MatrixXd>(data.data(), rows, cols);
+  }
+
+  Eigen::Ref<const Eigen::SparseMatrix<double>> asSparse() {
+    return Eigen::Map<Eigen::SparseMatrix<double>>(
+        nnz, rows, cols, inner.data(), outer.data(), data.data());
+  }
+
+ private:
+  int rows;
+  int cols;
+  int nnz;
+  std::vector<int> inner;
+  std::vector<int> outer;
+  std::vector<double> data;
+};
+
 }  // namespace damotion
 
 #endif /* COMMON_EIGEN_DATA_H */

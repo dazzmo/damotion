@@ -11,7 +11,7 @@ namespace common = damotion::common;
 
 class TestCallback {
  public:
-  void foo(const common::InputRefVector &in,
+  void foo(const common::std::vector<ConstVectorRef> &in,
            std::vector<Eigen::VectorXd> &out) {
     out[0] = in[0] + in[1];
   }
@@ -27,7 +27,7 @@ TEST(Function, CallbackFunction) {
 
   f = std::make_unique<common::CallbackFunction<Eigen::VectorXd>>(
       2, 1,
-      [&b](const common::InputRefVector &in,
+      [&b](const common::std::vector<ConstVectorRef> &in,
            std::vector<Eigen::VectorXd> &out) { b.foo(in, out); });
 
   // Create dummy input

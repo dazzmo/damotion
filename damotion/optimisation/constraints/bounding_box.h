@@ -22,7 +22,8 @@ class BoundingBoxFunction : public common::Function {
     out_.push_back(GenericEigenMatrix(I));
   }
 
-  void EvalImpl(const common::InputRefVector &input, bool check = false) {
+  void EvalImpl(const common::std::vector<ConstVectorRef> &input,
+                bool check = false) {
     // Adjust constraint vector
     out_[0].toVectorXdRef() << input[0];
     // Jacobian is constant

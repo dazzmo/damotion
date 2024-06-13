@@ -168,33 +168,39 @@ class FunctionWrapper : public common::Function {
    * @brief Calls the function with the current inputs
    *
    */
-  void EvalImpl(const common::InputRefVector &input,
-                bool check = false) override {
-    // TODO - If performing a check
+  void EvalImpl(const std::vector<ConstVectorRef> &in,
+                std::vector<VectorRef> &out) override {
     // Set inputs
-    std::vector<const double *> in_data_ptr = {};
-    for (const auto &in : input) {
-      in_data_ptr.push_back(in.data());
+    std::vector<const double *> in_data_ptr = {}, out_data_ptr = {};
+    for (const auto &x : input) {
+      in_data_ptr.push_back(x.data());
+    }
+    for (const auto &y : out) {
+      out_data_ptr.push_back(y.data());
     }
 
-    // Call the function using the currently set inputs
-    f_(in_data_ptr.data(), out_data_ptr_.data(), iw_.data(), dw_.data(), mem_);
+    // Call the function
+    f_(in_data_ptr.data(), out_data_ptr.data(), iw_.data(), dw_.data(), mem_);
   }
 
-  /**
-   * @copydoc GenericEigenMatrix::getOutput()
-   *
-   * @param i
-   * @return const GenericEigenMatrix&
-   */
-  const GenericEigenMatrix &GetOutputImpl(const size_t &i) const override {
-    return f_out_[i];
+  void GetOutputSparsityInfoImpl(const size_t &i, size_t &rows, size_t &cols,
+                                 size_t &nnz, std::vector<int> &i_row,
+                                 std::vector<int> &j_col) {
+    const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
+
+    rows = sparsity.rows();
+    cols = sparsity.cols();
+    nnz = sparsity.nnz();
+
+    i_row = {};
+    j_col = {};
+    if (nnz < rows * cols) {
+      // Sparse output, get i_row and j_col pointers
+      sparsity.get_triplet(i_row, j_col);
+    }
   }
 
  protected:
-  // Data output pointers for casadi function
-  std::vector<double *> out_data_ptr_;
-
   // Row triplet data for nnz of each output
   std::vector<std::vector<casadi_int>> rows_;
   // Column triplet data for nnz of each output
@@ -212,8 +218,6 @@ class FunctionWrapper : public common::Function {
   mutable ::casadi::Function f_;
 
  private:
-  // Output matrix data
-  std::vector<GenericEigenMatrix> f_out_;
 };
 
 }  // namespace casadi

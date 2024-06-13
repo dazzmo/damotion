@@ -15,10 +15,11 @@ namespace damotion {
 namespace common {
 
 /**
- * @brief Vector of input vector references to the function
+ * @brief Vector of Eigen::Ref<const Eigen::VectorXd>
  *
  */
-typedef std::vector<Eigen::Ref<const Eigen::VectorXd>> InputRefVector;
+typedef VectorRef Eigen::Ref<Eigen::VectorXd>;
+typedef ConstVectorRef Eigen::Ref<const Eigen::VectorXd>;
 
 /**
  * @brief Base class for a function \f$ y = f(x) \f$ that takes independent
@@ -62,6 +63,17 @@ class Function {
   size_t n_out() const { return n_out_; }
 
   /**
+   * @brief Size of the i-th input
+   *
+   * @param i
+   * @return size_t
+   */
+  size_t size_in(const size_t& i) const {
+    assert(i < n_in() && "Index for input out of range");
+    return size_in_[i];
+  }
+
+  /**
    * @brief Resize the function to the appropriate outputs
    *
    * @param n_in
@@ -80,24 +92,42 @@ class Function {
    * @brief Evaluates the function using the provided inputs
    *
    * @param in Vector of inputs to evaluate the function
+   * @param out Vector of outputs to evaluate to. If the vector is shorter than
+   * @ref n_out(), only the provided outputs will be evaluated.
    * @param check Whether to assess each input for inconsistencies (e.g.
    * infinite values, bad data)
    */
-  void Eval(const InputRefVector& in, bool check = false) {
+  void Eval(const std::vector<Eigen::Ref<const Eigen::VectorXd>>& in,
+            std::vector<Eigen::Ref<Eigen::MatrixXd>>& out, bool check = false) {
     assert(in.size() == n_in() && "Incorrect number of inputs provided");
+    assert(out.size() == n_out() && "Incorrect number of outputs provided");
+    // Perform input check, if using
+    if (check) {
+      for (const auto& x : in) {
+        CheckInput(x);
+      }
+    }
     // Evaluate the function using the provided implementation
-    EvalImpl(in, check);
+    EvalImpl(in, out);
   }
 
   /**
-   * @brief Returns the i-th output as a GenericEigenMatrix object.
+   * @brief Retrive the sparsity information for the i-th output of the
+   * function. If the expression is dense, the inner and outer pointer vectors
+   * will return with a size of zero.
    *
-   * @param i
-   * @return const GenericEigenMatrix&
+   * @param i The index of the input to extract
+   * @param rows The number of rows for the input
+   * @param cols The number of columns for the input
+   * @param nnz The number of non-zero elements in the input
+   * @param i_row Row data in triplet form
+   * @param j_col Column data in triplet form
    */
-  const GenericEigenMatrix& GetOutput(const size_t& i) const {
-    assert(i < n_out() && "Index exceeds number of outputs specified");
-    return GetOutputImpl(i);
+  void GetOutputSparsityInfo(const size_t& i, size_t& rows, size_t& cols,
+                             size_t& nnz, std::vector<int>& i_row,
+                             std::vector<int>& j_col) {
+    assert(out.size() < n_out() && "Number of outputs exceeded");
+    GetOutputSparsityInfoImpl(i, rows, cols, nnz, i_row, j_col);
   }
 
  protected:
@@ -106,18 +136,34 @@ class Function {
    *
    * @param input
    */
-  virtual void EvalImpl(const InputRefVector& in, bool check = false) = 0;
+  virtual void EvalImpl(
+      const std::vector<const Eigen::Ref<Eigen::VectorXd>>& in,
+      std::vector<Eigen::Ref<Eigen::MatrixXd>>& out) = 0;
 
-  virtual const GenericEigenMatrix& GetOutputImpl(const size_t& i) const = 0;
+  virtual void GetOutputSparsityInfoImpl(const size_t& i, size_t& rows,
+                                         size_t& cols, size_t& nnz,
+                                         std::vector<int>& inner,
+                                         std::vector<int>& outer) = 0;
 
-  // Input data pointers that are stored for evaluation (x, p and optionally l)
-  std::vector<const double*> in_;
+  bool CheckInput(const Eigen::Ref<const Eigen::VectorXd>& v) {
+    if (v.hasNaN() || !v.allFinite()) {
+      std::ostringstream ss;
+      ss << "Input has invalid values:\n" << v.transpose().format(3);
+      throw std::runtime_error(ss.str());
+    }
+    return true;
+  }
+
+  void CheckInputRange(const size_t& i) {}
 
  private:
   // Number of inputs
   size_t n_in_;
   // Number of outputs
   size_t n_out_;
+
+  // Size of each input argument
+  std::vector<size_t> size_in_;
 };
 
 }  // namespace common

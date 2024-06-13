@@ -35,7 +35,9 @@ class LinearConstraint : public Constraint {
    *
    * @param input
    */
-  void EvalCoefficients(const common::InputRefVector &p) { f_coefs_->Eval(p); }
+  void EvalCoefficients(const common::std::vector<ConstVectorRef> &p) {
+    f_coefs_->Eval(p);
+  }
 
   /**
    * @brief The coefficient matrix A for the expression A x + b.

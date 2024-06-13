@@ -33,7 +33,7 @@ void SolverBase::EvaluateConstraint(const Binding<Constraint>& binding,
                                     const int& constraint_idx,
                                     const Eigen::VectorXd& x, bool jac,
                                     bool update_cache) {
-  common::InputRefVector x_in = {}, p_in = {};
+  common::std::vector<ConstVectorRef> x_in = {}, p_in = {};
   GetBindingInputs(binding, x_in, p_in);
 
   const Constraint& constraint = binding.Get();
