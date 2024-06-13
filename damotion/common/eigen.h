@@ -8,6 +8,36 @@
 namespace damotion {
 
 /**
+ * @brief Create a Eigen::SparseMatrix of size rows x cols using the triplet
+ * data and optional value initialisation. Returns a matrix in compressed form.
+ *
+ * @param rows
+ * @param cols
+ * @param i_row
+ * @param j_col
+ * @param val
+ * @return Eigen::SparseMatrix<double>
+ */
+Eigen::SparseMatrix<double> SparseMatrixFromTripletData(
+    const size_t& rows, const size_t& cols, const std::vector<int>& i_row,
+    const std::vector<int>& j_col, const std::vector<double>& val = {}) {
+  // Compute sparse matrix through eigen
+  std::vector<Eigen::Triplet<int>> triplets;
+  size_t nnz = i_row.size();
+  double v = 0.0;
+  for (size_t i = 0; i < nnz; ++i) {
+    if (val.size()) v = val[i];
+    triplets.push_back(Eigen::Triplet<int>(i_row[i], j_col[i], v));
+  }
+  Eigen::SparseMatrix<double> mat(rows, cols);
+  mat.setFromTriplets(triplets.begin(), triplets.end());
+
+  mat.makeCompressed();
+
+  return mat;
+}
+
+/**
  * @brief This class represents any matrix-type data of Eigen by representing
  it
  * as an array of continuous data. At its core, it is a sparse matrix object

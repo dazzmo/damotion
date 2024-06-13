@@ -160,22 +160,22 @@ bool IpoptSolverInstance::get_bounds_info(Index n, Number* x_l, Number* x_u,
     const sym::VariableVector& v = binding.x(0);
     for (int i = 0; i < v.size(); ++i) {
       GetCurrentProgram().SetDecisionVariableBounds(
-          v[i], binding.Get().LowerBound()[i], binding.Get().UpperBound()[i]);
+          v[i], binding.Get().lowerBound()[i], binding.Get().upperBound()[i]);
     }
   }
 
   GetCurrentProgram().UpdateDecisionVariableBoundVectors();
   GetCurrentProgram().UpdateConstraintBoundVectors();
-  VLOG(10) << GetCurrentProgram().DecisionVariableUpperBounds();
-  VLOG(10) << GetCurrentProgram().DecisionVariableLowerBounds();
-  VLOG(10) << GetCurrentProgram().ConstraintUpperBounds();
-  VLOG(10) << GetCurrentProgram().ConstraintLowerBounds();
+  VLOG(10) << GetCurrentProgram().DecisionVariableupperBounds();
+  VLOG(10) << GetCurrentProgram().DecisionVariablelowerBounds();
+  VLOG(10) << GetCurrentProgram().ConstraintupperBounds();
+  VLOG(10) << GetCurrentProgram().ConstraintlowerBounds();
   // Decision variable bounds
-  std::copy_n(GetCurrentProgram().DecisionVariableUpperBounds().data(), n, x_u);
-  std::copy_n(GetCurrentProgram().DecisionVariableLowerBounds().data(), n, x_l);
+  std::copy_n(GetCurrentProgram().DecisionVariableupperBounds().data(), n, x_u);
+  std::copy_n(GetCurrentProgram().DecisionVariablelowerBounds().data(), n, x_l);
   // Constraint bounds
-  std::copy_n(GetCurrentProgram().ConstraintUpperBounds().data(), m, g_u);
-  std::copy_n(GetCurrentProgram().ConstraintLowerBounds().data(), m, g_l);
+  std::copy_n(GetCurrentProgram().ConstraintupperBounds().data(), m, g_u);
+  std::copy_n(GetCurrentProgram().ConstraintlowerBounds().data(), m, g_l);
 
   return true;
 }

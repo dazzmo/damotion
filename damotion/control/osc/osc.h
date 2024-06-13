@@ -131,13 +131,13 @@ class OSC : public opt::Program<Eigen::MatrixXd> {
       // Get parameters related to the contact task
       ContactTaskParameters &p = contact_task_parameters_[task_idx];
       // Update bounding box constraints
-      contact_force_bounds_[task_idx].Get().SetBounds(task->fmin(),
+      contact_force_bounds_[task_idx].Get().setBounds(task->fmin(),
                                                       task->fmax());
       p.mu << task->mu();
       p.normal << task->normal();
 
     } else {
-      contact_force_bounds_[task_idx].Get().SetBounds(
+      contact_force_bounds_[task_idx].Get().setBounds(
           opt::BoundsType::kEquality);
     }
   }

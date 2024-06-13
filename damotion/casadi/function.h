@@ -37,7 +37,6 @@ namespace casadi {
   for (const auto &xi : x) in.push_back(xi);
   for (const auto &pi : p) in.push_back(pi);
 
-  // Organise vector such that it is of the form [f, df, ddf, g, dg, ddg, ...]
   for (const auto &fi : f) {
     out.push_back(fi);
 
@@ -90,12 +89,11 @@ class FunctionWrapper : public common::Function {
    * @brief Constructs a new FunctionWrapper without an expression, but
    * initialises the function for the provided dimensions.
    *
-   * @param nx
-   * @param ny
-   * @param np
+   * @param n_in
+   * @param n_out
    */
-  FunctionWrapper(const int &nx, const int &ny, const int &np = 0)
-      : common::Function(nx, ny) {}
+  FunctionWrapper(const size_t &n_in, const size_t &n_out)
+      : common::Function(n_in, n_out) {}
 
   /**
    * @brief Creates a function object based on the Casadi symbolic type.
@@ -110,6 +108,21 @@ class FunctionWrapper : public common::Function {
    */
   FunctionWrapper(const ::casadi::Function &f) : common::Function() {}
 
+  FunctionWrapper(const std::vector<::casadi::Function> &f)
+      : common::Function() {
+    // Create data related to each function
+    int f_cnt = 0;
+    for (const auto &fi : f) {
+      // For each output index, indicate which function it belongs to and what
+      // output index it is
+      for (int i = 0; i < fi.n_out(); ++i) {
+        f_out_idx_[cnt++] = std::pair<size_t, size_t>(f_cnt, i);
+      }
+      // Increase function counter
+      f_cnt++;
+    }
+  }
+
   ~FunctionWrapper() {
     // Release memory for casadi functions
     if (!f_.is_null()) f_.release(mem_);
@@ -123,9 +136,7 @@ class FunctionWrapper : public common::Function {
    * @param data
    * @param out
    */
-  void CreateFunctionData(const ::casadi::Function &f,
-                          FunctionWrapperData &data,
-                          std::vector<GenericEigenMatrix> &out) {
+  void createFunctionData(const ::casadi::Function &f) {
     if (f.is_null()) {
       return;
     }
@@ -133,91 +144,76 @@ class FunctionWrapper : public common::Function {
     // TODO - See if this has a negative effect
     f_ = std::move(f);
 
-    // Initialise output data
-    out = {};
-    out_data_ptr_ = {};
-
     // Checkout memory object for function
     mem_ = f.checkout();
 
     iw_.assign(f.sz_iw(), 0);
     dw_.assign(f.sz_w(), 0.0);
-
-    // Create dense matrices for the output
-    for (int i = 0; i < f.n_out(); ++i) {
-      const ::casadi::Sparsity &sparsity = f.sparsity_out(i);
-      std::vector<casadi_int> rows = {}, cols = {};
-      sparsity.get_triplet(rows, cols);
-      // Compute sparse matrix through eigen
-      std::vector<Eigen::Triplet<int>> triplets;
-      for (int i = 0; i < sparsity.nnz(); ++i) {
-        triplets.push_back(Eigen::Triplet<int>(rows[i], cols[i], 0.0));
-      }
-      Eigen::SparseMatrix<double> M(sparsity.rows(), sparsity.columns());
-      M.setFromTriplets(triplets.begin(), triplets.end());
-      // Create generic matrix data
-      out.push_back(GenericEigenMatrix(M));
-      out_data_ptr_.push_back(out.back().data());
-
-      VLOG(10) << f.name() << " Dense Output " << i;
-      VLOG(10) << out.back();
-    }
   }
 
   /**
    * @brief Calls the function with the current inputs
    *
    */
-  void EvalImpl(const std::vector<ConstVectorRef> &in,
-                std::vector<VectorRef> &out) override {
+  void evalImpl(const std::vector<ConstVectorRef> &in,
+                std::vector<MatrixRef> &out) override {
     // Set inputs
-    std::vector<const double *> in_data_ptr = {}, out_data_ptr = {};
-    for (const auto &x : input) {
+    std::vector<const double *> in_data_ptr = {};
+    std::vector<double *> out_data_ptr = {};
+    for (const auto &x : in) {
       in_data_ptr.push_back(x.data());
     }
-    for (const auto &y : out) {
-      out_data_ptr.push_back(y.data());
+
+    // For each output, set the functions
+    out_data_ptr.assign(n_out(), nullptr);
+    for (size_t i = 0; i < out.size(); ++i) {
+      out_data_ptr[i] = out[i].data();
     }
 
     // Call the function
     f_(in_data_ptr.data(), out_data_ptr.data(), iw_.data(), dw_.data(), mem_);
   }
 
-  void GetOutputSparsityInfoImpl(const size_t &i, size_t &rows, size_t &cols,
+  void getOutputSparsityInfoImpl(const size_t &i, size_t &rows, size_t &cols,
                                  size_t &nnz, std::vector<int> &i_row,
-                                 std::vector<int> &j_col) {
+                                 std::vector<int> &j_col) override {
+    // Determine which function it is referring to
+    int n = 0;
+    int cnt = 0;
+    while (i < n) {
+      f_[cnt].n_out();
+    }
+
     const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
 
     rows = sparsity.rows();
-    cols = sparsity.cols();
+    cols = sparsity.columns();
     nnz = sparsity.nnz();
 
     i_row = {};
     j_col = {};
     if (nnz < rows * cols) {
       // Sparse output, get i_row and j_col pointers
-      sparsity.get_triplet(i_row, j_col);
+      std::vector<casadi_int> r, c;
+      sparsity.get_triplet(r, c);
+      i_row = std::vector<int>(r.begin(), r.end());
+      j_col = std::vector<int>(c.begin(), c.end());
     }
   }
 
  protected:
-  // Row triplet data for nnz of each output
-  std::vector<std::vector<casadi_int>> rows_;
-  // Column triplet data for nnz of each output
-  std::vector<std::vector<casadi_int>> cols_;
+  // Memory allocated for function evaluations
+  std::vector<int> mem_;
+  // Integer working vectors
+  std::vector<std::vector<casadi_int>> iw_;
+  // Double working vectors
+  std::vector<std::vector<double>> dw_;
 
-  // Memory allocated for function evaluation
-  int mem_;
-
-  // Integer working vector
-  std::vector<casadi_int> iw_;
-  // Double working vector
-  std::vector<double> dw_;
-
-  // Function
-  mutable ::casadi::Function f_;
+  // Functions
+  mutable std::vector<::casadi::Function> f_;
 
  private:
+  std::unordered_map<size_t, std::pair<size_t, size_t>> f_out_idx_;
 };
 
 }  // namespace casadi

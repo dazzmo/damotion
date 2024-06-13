@@ -39,7 +39,7 @@ class Cost {
    */
   void SetName(const std::string &name) {
     if (name == "") {
-      name_ = "cost_" + std::to_string(CreateID());
+      name_ = "cost_" + std::to_string(createID());
     } else {
       name_ = name;
     }
@@ -76,7 +76,7 @@ class Cost {
    *
    * @return int
    */
-  int CreateID() {
+  int createID() {
     static int next_id = 0;
     int id = next_id;
     next_id++;

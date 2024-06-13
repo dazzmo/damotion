@@ -32,30 +32,39 @@ class Constraint {
              const casadi::SXVector &x, const casadi::SXVector &p,
              const BoundsType &bounds, bool sparse = false) {
     // Create function based on casadi
-    f_ = std::make_shared<damotion::casadi::FunctionWrapper>(
-        damotion::casadi::CreateFunction({ex}, x, p, sparse));
+    // Create functions for evaluating the constraint, jacobian and hessian
+    ::casadi::Function fc, fj, fh;
+    f_ = std::make_shared<damotion::casadi::FunctionWrapper>(fc);
+    fjac_ = std::make_shared<damotion::casadi::FunctionWrapper>(fc);
+    fhes_ = std::make_shared<damotion::casadi::FunctionWrapper>(fc);
 
     // Resize the bounds
     ResizeBounds(ex.size1());
     // Update bounds for the constraint
-    SetBounds(bounds);
+    setBounds(bounds);
   }
 
   /**
    * @brief Construct a new Constraint object using an existing common::Function
-   * object.
+   * object with the ability to compute the constraint.
    *
    * @param name
    * @param f
    * @param bounds
    */
   Constraint(const std::string &name, const common::Function::SharedPtr &f,
-             const BoundsType &bounds)
-      : f_(std::move(f)) {
+             const BoundsType &bounds,
+             const common::Function::SharedPtr &fjac = nullptr,
+             const common::Function::SharedPtr &fhes = nullptr)
+      : f_({std::move(f)}) {
+    // Get sparsity pattern
+    size_t rows, cols, nnz;
+    std::vector<int> i_row, j_col;
+    f_->getOutputSparsityInfo(0, rows, cols, nnz, i_row, j_col);
     // Resize the bounds
-    ResizeBounds(f_->GetOutput(0).toConstVectorXdRef().size());
+    ResizeBounds(rows);
     // Update bounds for the constraint
-    SetBounds(bounds);
+    setBounds(bounds);
   }
 
   /**
@@ -72,38 +81,57 @@ class Constraint {
   int Dimension() const { return 0; }
 
   /**
+   * @brief Whether the constraint provides the ability to compute its Jacobian
+   *
+   * @return true
+   * @return false
+   */
+  bool hasJacobian() const { return fjac_ != nullptr; }
+
+  /**
+   * @brief Whether the constraint provides the ability to compute its Hessian
+   * (based on the multipler-constraint product)
+   *
+   * @return true
+   * @return false
+   */
+  bool hasHessian() const { return fhes_ != nullptr; }
+
+  void getOutputSparsityInfo() {}
+
+  /**
    * @brief Set the name of the constraint
    *
    * @param name
    */
   void SetName(const std::string &name) {
     if (name == "") {
-      name_ = "constraint_" + std::to_string(CreateID());
+      name_ = "constraint_" + std::to_string(createID());
     } else {
       name_ = name;
     }
   }
 
-  void Eval(const std::vector<ConstVectorRef> &x,
-            const std::vector<ConstVectorRef> &p, bool check = false) {
+  /**
+   * @brief
+   *
+   * @param x
+   * @param p
+   * @param out
+   */
+  void eval(const std::vector<ConstVectorRef> &x,
+            const std::vector<ConstVectorRef> &p,
+            const std::vector<ConstVectorRef> &l, std::vector<MatrixRef> &out) {
     // Evaluate the constraints based on the
     std::vector<ConstVectorRef> in = {};
     for (const auto &xi : x) in.push_back(xi);
     for (const auto &pi : p) in.push_back(pi);
     Eigen::VectorXd one(1.0);
     for (size_t i = 0; i < f_->n_out(); ++i) in.push_back(one);
-    // Append flags for evaluating jacobian and hessian
-    Eigen::VectorXd d_flag(1.0), h_flag(0.0);
-    in.push_back(d_flag);
-    in.push_back(h_flag);
-    f_->Eval(in, check);
-  }
 
-  // Vector(const Eigen::VectorXd &v);
-  // Jacobian(const Eigen::VectorXd &v);
-  const GenericEigenMatrix &Vector() { return f_->GetOutput(0); }
-  const GenericEigenMatrix &Jacobian() { return f_->GetOutput(1); }
-  const GenericEigenMatrix &Hessian() { return f_->GetOutput(2); }
+    // Perform evaluation depending on what method is used
+    f_->eval(in, out);
+  }
 
   /**
    * @brief Resizes the bounds the size of the constraint output given by
@@ -122,9 +150,9 @@ class Constraint {
    *
    * @param type
    */
-  void SetBounds(const BoundsType &type) {
+  void setBounds(const BoundsType &type) {
     bounds_type_ = type;
-    SetBoundsByType(ub_, lb_, bounds_type_);
+    setBoundsByType(ub_, lb_, bounds_type_);
   }
 
   /**
@@ -133,13 +161,13 @@ class Constraint {
    * @param lb
    * @param ub
    */
-  void SetBounds(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub) {
+  void setBounds(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub) {
     bounds_type_ = BoundsType::kCustom;
     lb_ = lb;
     ub_ = ub;
 
     // Indicate constraint was updated
-    IsUpdated() = true;
+    isUpdated() = true;
   }
 
   /**
@@ -147,23 +175,23 @@ class Constraint {
    *
    * @return const BoundsType&
    */
-  const BoundsType &GetBoundsType() const { return bounds_type_; }
+  const BoundsType &getBoundsType() const { return bounds_type_; }
 
   /**
    * @brief Constraint lower bound (dim x 1)
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &LowerBound() const { return lb_; }
-  Eigen::VectorXd &LowerBound() { return lb_; }
+  const Eigen::VectorXd &lowerBound() const { return lb_; }
+  Eigen::VectorXd &lowerBound() { return lb_; }
 
   /**
    * @brief Constraint upper bound (dim x 1)
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &UpperBound() const { return ub_; }
-  Eigen::VectorXd &UpperBound() { return ub_; }
+  const Eigen::VectorXd &upperBound() const { return ub_; }
+  Eigen::VectorXd &upperBound() { return ub_; }
 
   /**
    * @brief Tests whether the p-norm of the constraint is within
@@ -175,10 +203,10 @@ class Constraint {
    * @return true
    * @return false
    */
-  bool CheckViolation(const int &p = 2, const double &eps = 1e-6) {
+  bool checkViolation(const ConstVectorRef &c, const int &p = 2,
+                      const double &eps = 1e-6) {
     // Determine if constraint within threshold
     double c_norm = 0.0;
-    Eigen::Ref<const Eigen::VectorXd> c = Vector().toConstVectorXdRef();
     if (p == 1) {
       c_norm = c.lpNorm<1>();
     } else if (p == 2) {
@@ -197,8 +225,8 @@ class Constraint {
    * @return true
    * @return false
    */
-  const bool &IsUpdated() const { return updated_; }
-  bool &IsUpdated() { return updated_; }
+  const bool &isUpdated() const { return updated_; }
+  bool &isUpdated() { return updated_; }
 
  protected:
  private:
@@ -207,6 +235,9 @@ class Constraint {
 
   // Flag to indicate if the constraint has changed since it was used
   bool updated_;
+
+  bool has_jac_;
+  bool has_hes_;
 
   bool code_generated_ = false;
 
@@ -220,15 +251,19 @@ class Constraint {
   // Constraint upper bound
   Eigen::VectorXd ub_;
 
-  // Function to evaluate the constraint
+  // Vector of function pointers for evaluation
   common::Function::SharedPtr f_;
+  // Function pointer for constraint Jacobian evaluation
+  common::Function::SharedPtr fjac_;
+  // Function pointer for multiplier-constraint product Hessian evaluation
+  common::Function::SharedPtr fhes_;
 
   /**
    * @brief Creates a unique id for each constraint
    *
    * @return int
    */
-  int CreateID() {
+  int createID() {
     static int next_id = 0;
     int id = next_id;
     next_id++;

@@ -22,7 +22,7 @@ class BoundingBoxFunction : public common::Function {
     out_.push_back(GenericEigenMatrix(I));
   }
 
-  void EvalImpl(const common::std::vector<ConstVectorRef> &input,
+  void evalImpl(const common::std::vector<ConstVectorRef> &input,
                 bool check = false) {
     // Adjust constraint vector
     out_[0].toVectorXdRef() << input[0];
@@ -43,7 +43,7 @@ class BoundingBoxConstraint : public Constraint {
                    BoundsType::kCustom) {
     assert(lb.rows() == ub.rows() && "lb and ub must be same dimension!");
     // Create output vector and derivative
-    this->SetBounds(lb, ub);
+    this->setBounds(lb, ub);
   }
 };
 

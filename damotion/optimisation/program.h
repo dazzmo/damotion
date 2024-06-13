@@ -208,7 +208,7 @@ class ConstraintManager {
       std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
       for (int i = 0; i < b.Get().Dimension(); ++i) {
         std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
-                  << b.Get().LowerBound()[i] << "\t" << b.Get().UpperBound()[i]
+                  << b.Get().lowerBound()[i] << "\t" << b.Get().upperBound()[i]
                   << "\n";
       }
     }
@@ -217,7 +217,7 @@ class ConstraintManager {
       std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
       for (int i = 0; i < b.Get().Dimension(); ++i) {
         std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
-                  << b.Get().LowerBound()[i] << "\t" << b.Get().UpperBound()[i]
+                  << b.Get().lowerBound()[i] << "\t" << b.Get().upperBound()[i]
                   << "\n";
       }
     }
@@ -229,14 +229,14 @@ class ConstraintManager {
     // Set first-in-first out order
     int idx = 0;
     for (Binding<Constraint> &b : GetAllConstraintBindings()) {
-      lbg_.middleRows(idx, b.Get().Dimension()) = b.Get().LowerBound();
-      ubg_.middleRows(idx, b.Get().Dimension()) = b.Get().UpperBound();
+      lbg_.middleRows(idx, b.Get().Dimension()) = b.Get().lowerBound();
+      ubg_.middleRows(idx, b.Get().Dimension()) = b.Get().upperBound();
       idx += b.Get().Dimension();
     }
   }
 
-  const Eigen::VectorXd &ConstraintLowerBounds() { return lbg_; }
-  const Eigen::VectorXd &ConstraintUpperBounds() { return ubg_; }
+  const Eigen::VectorXd &ConstraintlowerBounds() { return lbg_; }
+  const Eigen::VectorXd &ConstraintupperBounds() { return ubg_; }
 
  private:
   // Number of constraints
@@ -382,14 +382,14 @@ class Program : public CostManager, public ConstraintManager {
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &DecisionVariableUpperBounds() const;
+  const Eigen::VectorXd &DecisionVariableupperBounds() const;
 
   /**
    * @brief Upper bound for decision variables within the current program.
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &DecisionVariableLowerBounds() const;
+  const Eigen::VectorXd &DecisionVariablelowerBounds() const;
 
   void SetDecisionVariableBounds(const sym::Variable &v, const double &lb,
                                  const double &ub);

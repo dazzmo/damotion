@@ -48,12 +48,12 @@ class QPOASESSolverInstance : public SolverBase {
       const sym::VariableVector& v = binding.x(0);
       for (int i = 0; i < v.size(); ++i) {
         lbx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
-            binding.Get().LowerBound()[i];
+            binding.Get().lowerBound()[i];
         ubx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
-            binding.Get().UpperBound()[i];
+            binding.Get().upperBound()[i];
       }
       // Set updated constraint to false
-      binding.Get().IsUpdated() = false;
+      binding.Get().isUpdated() = false;
     }
 
     // Constraint bounds
@@ -84,17 +84,17 @@ class QPOASESSolverInstance : public SolverBase {
     // Update variable bounds, if any have changed
     for (Binding<BoundingBoxConstraint<Eigen::MatrixXd>>& binding :
          GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
-      if (binding.Get().IsUpdated()) {
+      if (binding.Get().isUpdated()) {
         // For each variable of the constraint
         const sym::VariableVector& v = binding.x(0);
         for (int i = 0; i < v.size(); ++i) {
           lbx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
-              binding.Get().LowerBound()[i];
+              binding.Get().lowerBound()[i];
           ubx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
-              binding.Get().UpperBound()[i];
+              binding.Get().upperBound()[i];
         }
 
-        binding.Get().IsUpdated() = false;
+        binding.Get().isUpdated() = false;
       }
     }
     // Linear costs
@@ -135,9 +135,9 @@ class QPOASESSolverInstance : public SolverBase {
 
       // Adapt bounds for the linear constraints
       ubA_.middleRows(idx, binding.Get().Dimension()) =
-          binding.Get().UpperBound() - binding.Get().b();
+          binding.Get().upperBound() - binding.Get().b();
       lbA_.middleRows(idx, binding.Get().Dimension()) =
-          binding.Get().LowerBound() - binding.Get().b();
+          binding.Get().lowerBound() - binding.Get().b();
 
       // Increase constraint index
       idx += binding.Get().Dimension();

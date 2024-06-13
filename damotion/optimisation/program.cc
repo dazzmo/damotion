@@ -54,12 +54,12 @@ const Eigen::VectorXd &Program::DecisionVariableInitialValues() const {
   return x_manager_->VariableInitialValues();
 }
 
-const Eigen::VectorXd &Program::DecisionVariableUpperBounds() const {
-  return x_manager_->VariableUpperBounds();
+const Eigen::VectorXd &Program::DecisionVariableupperBounds() const {
+  return x_manager_->VariableupperBounds();
 }
 
-const Eigen::VectorXd &Program::DecisionVariableLowerBounds() const {
-  return x_manager_->VariableLowerBounds();
+const Eigen::VectorXd &Program::DecisionVariablelowerBounds() const {
+  return x_manager_->VariablelowerBounds();
 }
 
 void Program::SetDecisionVariableBounds(const Variable &v, const double &lb,

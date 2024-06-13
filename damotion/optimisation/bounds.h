@@ -33,7 +33,7 @@ enum class BoundsType {
  * @param lb
  * @param type
  */
-void SetBoundsByType(Eigen::Ref<Eigen::VectorXd> ub,
+void setBoundsByType(Eigen::Ref<Eigen::VectorXd> ub,
                      Eigen::Ref<Eigen::VectorXd> lb,
                      const BoundsType type = BoundsType::kUnbounded);
 

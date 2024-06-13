@@ -200,14 +200,14 @@ class VariableManager {
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &VariableUpperBounds() const { return xbu_; }
+  const Eigen::VectorXd &VariableupperBounds() const { return xbu_; }
 
   /**
    * @brief Upper bound for decision variables within the current program.
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &VariableLowerBounds() const { return xbl_; }
+  const Eigen::VectorXd &VariablelowerBounds() const { return xbl_; }
 
   void SetVariableBounds(const Variable &v, const double &lb, const double &ub);
   void SetVariableBounds(const VariableVector &v, const Eigen::VectorXd &lb,

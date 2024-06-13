@@ -12,14 +12,13 @@
 #include "damotion/common/sparsity.h"
 
 namespace damotion {
-namespace common {
 
-/**
- * @brief Vector of Eigen::Ref<const Eigen::VectorXd>
- *
- */
-typedef VectorRef Eigen::Ref<Eigen::VectorXd>;
-typedef ConstVectorRef Eigen::Ref<const Eigen::VectorXd>;
+typedef Eigen::Ref<Eigen::VectorXd> VectorRef;
+typedef Eigen::Ref<Eigen::MatrixXd> MatrixRef;
+typedef Eigen::Ref<const Eigen::VectorXd> ConstVectorRef;
+typedef Eigen::Ref<const Eigen::MatrixXd> ConstMatrixRef;
+
+namespace common {
 
 /**
  * @brief Base class for a function \f$ y = f(x) \f$ that takes independent
@@ -35,16 +34,17 @@ class Function {
    * @brief Empty constructor for the Function class
    *
    */
-  Function() { Resize(0, 0); }
+  Function() : n_in_(0), n_out_(0), size_in_({}) {}
 
   /**
    * @brief Construct a new Function object with number of variables n_in and
    * number of outputs n_out.
    *
-   * @param n_in Number of variables
+   * @param n_in Number of inputs
    * @param n_out Number of outputs
    */
-  Function(const int n_in, const int n_out) {}
+  Function(const size_t& n_in, const size_t& n_out)
+      : n_in_(n_in), n_out_(n_out) {}
 
   ~Function() = default;
 
@@ -74,21 +74,6 @@ class Function {
   }
 
   /**
-   * @brief Resize the function to the appropriate outputs
-   *
-   * @param n_in
-   * @param n_out
-   */
-  void Resize(const int& n_in, const int& n_out) {
-    assert(n_in > 0 && "A positive integer amount of inputs are required");
-    assert(n_out > 0 && "A positive integer amount of outputs are required");
-    n_in_ = n_in;
-    n_out_ = n_out;
-    // Set number of inputs to the function
-    in_.assign(n_in_, nullptr);
-  }
-
-  /**
    * @brief Evaluates the function using the provided inputs
    *
    * @param in Vector of inputs to evaluate the function
@@ -97,18 +82,18 @@ class Function {
    * @param check Whether to assess each input for inconsistencies (e.g.
    * infinite values, bad data)
    */
-  void Eval(const std::vector<Eigen::Ref<const Eigen::VectorXd>>& in,
-            std::vector<Eigen::Ref<Eigen::MatrixXd>>& out, bool check = false) {
+  void eval(const std::vector<ConstVectorRef>& in, std::vector<MatrixRef>& out,
+            bool check = false) {
     assert(in.size() == n_in() && "Incorrect number of inputs provided");
     assert(out.size() == n_out() && "Incorrect number of outputs provided");
     // Perform input check, if using
     if (check) {
       for (const auto& x : in) {
-        CheckInput(x);
+        checkInput(x);
       }
     }
     // Evaluate the function using the provided implementation
-    EvalImpl(in, out);
+    evalImpl(in, out);
   }
 
   /**
@@ -123,12 +108,14 @@ class Function {
    * @param i_row Row data in triplet form
    * @param j_col Column data in triplet form
    */
-  void GetOutputSparsityInfo(const size_t& i, size_t& rows, size_t& cols,
+  void getOutputSparsityInfo(const size_t& i, size_t& rows, size_t& cols,
                              size_t& nnz, std::vector<int>& i_row,
                              std::vector<int>& j_col) {
-    assert(out.size() < n_out() && "Number of outputs exceeded");
-    GetOutputSparsityInfoImpl(i, rows, cols, nnz, i_row, j_col);
+    assert(i < n_out() && "Number of outputs exceeded");
+    getOutputSparsityInfoImpl(i, rows, cols, nnz, i_row, j_col);
   }
+
+  // TODO - Reduced number of arguments for getOutputSparsityInfo
 
  protected:
   /**
@@ -136,16 +123,15 @@ class Function {
    *
    * @param input
    */
-  virtual void EvalImpl(
-      const std::vector<const Eigen::Ref<Eigen::VectorXd>>& in,
-      std::vector<Eigen::Ref<Eigen::MatrixXd>>& out) = 0;
+  virtual void evalImpl(const std::vector<ConstVectorRef>& in,
+                        std::vector<MatrixRef>& out) = 0;
 
-  virtual void GetOutputSparsityInfoImpl(const size_t& i, size_t& rows,
+  virtual void getOutputSparsityInfoImpl(const size_t& i, size_t& rows,
                                          size_t& cols, size_t& nnz,
                                          std::vector<int>& inner,
                                          std::vector<int>& outer) = 0;
 
-  bool CheckInput(const Eigen::Ref<const Eigen::VectorXd>& v) {
+  bool checkInput(const ConstVectorRef& v) {
     if (v.hasNaN() || !v.allFinite()) {
       std::ostringstream ss;
       ss << "Input has invalid values:\n" << v.transpose().format(3);
@@ -153,8 +139,6 @@ class Function {
     }
     return true;
   }
-
-  void CheckInputRange(const size_t& i) {}
 
  private:
   // Number of inputs
