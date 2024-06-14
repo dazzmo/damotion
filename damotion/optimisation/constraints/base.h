@@ -13,6 +13,31 @@
 namespace damotion {
 namespace optimisation {
 
+/**
+ * @brief Tests whether the p-norm of the constraint is within
+ * the threshold eps.
+ *
+ * @param p The norm of the constraint (use Eigen::Infinity for the
+ * infinity norm)
+ * @param eps
+ * @return true
+ * @return false
+ */
+bool checkConstraintViolation(const ConstVectorRef &c, const int &p = 2,
+                              const double &eps = 1e-6) {
+  // Determine if constraint within threshold
+  double c_norm = 0.0;
+  if (p == 1) {
+    c_norm = c.lpNorm<1>();
+  } else if (p == 2) {
+    c_norm = c.lpNorm<2>();
+  } else if (p == Eigen::Infinity) {
+    c_norm = c.lpNorm<Eigen::Infinity>();
+  }
+
+  return c_norm <= eps;
+}
+
 class Constraint {
  public:
   Constraint() = default;
@@ -31,15 +56,41 @@ class Constraint {
   Constraint(const std::string &name, const casadi::SX &ex,
              const casadi::SXVector &x, const casadi::SXVector &p,
              const BoundsType &bounds, bool sparse = false) {
-    // Create function based on casadi
-    // Create functions for evaluating the constraint, jacobian and hessian
-    ::casadi::Function fc, fj, fh;
+    // Create concatenated x vector for derivative purposes
+    ::casadi::SX xv = ::casadi::SX::vertcat(x);
+
+    // Create input and output vectors
+    ::casadi::SXVector in = {}, out = {};
+
+    for (const auto &xi : x) in.push_back(xi);
+    for (const auto &pi : p) in.push_back(pi);
+
+    ::casadi::Function fc("f", in, {ex});
+
+    ::casadi::SX df;
+    df = ::casadi::SX::jacobian(f, xv);
+    // Densify if requested
+    if (!sparse) df = ::casadi::SX::densify(df);
+
+    ::casadi::Function fj("df", in, {df});
+
+    ::casadi::SX hf;
+    ::casadi::SX l = ::casadi::SX::sym("l", fi.size1());
+    // Add these multipliers to the input parameters
+    in.push_back(l);
+    // Compute lower-triangular hessian matrix
+    hf = ::casadi::SX::tril(::casadi::SX::hessian(mtimes(l.T(), f), xv));
+    // Densify if requested
+    if (!sparse) hf = ::casadi::SX::densify(hf);
+
+    ::casadi::Function fh("hf", in, {hf});
+
     f_ = std::make_shared<damotion::casadi::FunctionWrapper>(fc);
-    fjac_ = std::make_shared<damotion::casadi::FunctionWrapper>(fc);
-    fhes_ = std::make_shared<damotion::casadi::FunctionWrapper>(fc);
+    fjac_ = std::make_shared<damotion::casadi::FunctionWrapper>(fj);
+    fhes_ = std::make_shared<damotion::casadi::FunctionWrapper>(fh);
 
     // Resize the bounds
-    ResizeBounds(ex.size1());
+    resizeBounds(ex.size1());
     // Update bounds for the constraint
     setBounds(bounds);
   }
@@ -62,7 +113,7 @@ class Constraint {
     std::vector<int> i_row, j_col;
     f_->getOutputSparsityInfo(0, rows, cols, nnz, i_row, j_col);
     // Resize the bounds
-    ResizeBounds(rows);
+    resizeBounds(rows);
     // Update bounds for the constraint
     setBounds(bounds);
   }
@@ -112,25 +163,38 @@ class Constraint {
     }
   }
 
-  /**
-   * @brief
-   *
-   * @param x
-   * @param p
-   * @param out
-   */
   void eval(const std::vector<ConstVectorRef> &x,
-            const std::vector<ConstVectorRef> &p,
-            const std::vector<ConstVectorRef> &l, std::vector<MatrixRef> &out) {
+            const std::vector<ConstVectorRef> &p, VectorRef &c) {
     // Evaluate the constraints based on the
     std::vector<ConstVectorRef> in = {};
     for (const auto &xi : x) in.push_back(xi);
     for (const auto &pi : p) in.push_back(pi);
-    Eigen::VectorXd one(1.0);
-    for (size_t i = 0; i < f_->n_out(); ++i) in.push_back(one);
-
     // Perform evaluation depending on what method is used
-    f_->eval(in, out);
+    fc_->eval(in, {c});
+  }
+
+  void eval(const std::vector<ConstVectorRef> &x,
+            const std::vector<ConstVectorRef> &p, VectorRef &c,
+            MatrixRef &jac) {
+    // Evaluate the constraints based on the
+    std::vector<ConstVectorRef> in = {};
+    for (const auto &xi : x) in.push_back(xi);
+    for (const auto &pi : p) in.push_back(pi);
+    // Perform evaluation depending on what method is used
+    fc_->eval(in, {c});
+    fj_->eval(in, {j});
+  }
+
+  void eval_h(const std::vector<ConstVectorRef> &x,
+              const std::vector<ConstVectorRef> &p, const ConstVectorRef &l,
+              MatrixRef &hes) {
+    // Evaluate the constraints based on the
+    std::vector<ConstVectorRef> in = {};
+    for (const auto &xi : x) in.push_back(xi);
+    for (const auto &pi : p) in.push_back(pi);
+    in.push_back(l);
+    // Perform evaluation depending on what method is used
+    fh_->eval(in, {hes});
   }
 
   /**
@@ -138,7 +202,7 @@ class Constraint {
    * common::Function::ny().
    *
    */
-  void ResizeBounds(const size_t &n) {
+  void resizeBounds(const size_t &n) {
     // Initialise the bounds of the constraint
     double inf = std::numeric_limits<double>::infinity();
     ub_ = inf * Eigen::VectorXd::Ones(n);
@@ -192,31 +256,6 @@ class Constraint {
    */
   const Eigen::VectorXd &upperBound() const { return ub_; }
   Eigen::VectorXd &upperBound() { return ub_; }
-
-  /**
-   * @brief Tests whether the p-norm of the constraint is within
-   * the threshold eps.
-   *
-   * @param p The norm of the constraint (use Eigen::Infinity for the
-   * infinity norm)
-   * @param eps
-   * @return true
-   * @return false
-   */
-  bool checkViolation(const ConstVectorRef &c, const int &p = 2,
-                      const double &eps = 1e-6) {
-    // Determine if constraint within threshold
-    double c_norm = 0.0;
-    if (p == 1) {
-      c_norm = c.lpNorm<1>();
-    } else if (p == 2) {
-      c_norm = c.lpNorm<2>();
-    } else if (p == Eigen::Infinity) {
-      c_norm = c.lpNorm<Eigen::Infinity>();
-    }
-
-    return c_norm <= eps;
-  }
 
   /**
    * @brief Indicates if the constraint has been updated since it was last
