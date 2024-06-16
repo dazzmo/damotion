@@ -53,9 +53,10 @@ class Constraint {
    * @param bounds Bounds for the constraint (e.g. equality, positive,
    * negative ...)
    */
-  Constraint(const std::string &name, const casadi::SX &ex,
+  Constraint(const std::string &name, const casadi::SX &f,
              const casadi::SXVector &x, const casadi::SXVector &p,
-             const BoundsType &bounds, bool sparse = false) {
+             const BoundsType &bounds, bool sparse = false)
+      : dim_(f.size1()) {
     // Create concatenated x vector for derivative purposes
     ::casadi::SX xv = ::casadi::SX::vertcat(x);
 
@@ -65,32 +66,32 @@ class Constraint {
     for (const auto &xi : x) in.push_back(xi);
     for (const auto &pi : p) in.push_back(pi);
 
-    ::casadi::Function fc("f", in, {ex});
+    ::casadi::Function fc("f", in, {f});
 
+    // Jacobian
     ::casadi::SX df;
     df = ::casadi::SX::jacobian(f, xv);
     // Densify if requested
     if (!sparse) df = ::casadi::SX::densify(df);
-
     ::casadi::Function fj("df", in, {df});
 
+    // Hessian
     ::casadi::SX hf;
-    ::casadi::SX l = ::casadi::SX::sym("l", fi.size1());
+    ::casadi::SX l = ::casadi::SX::sym("l", dim());
     // Add these multipliers to the input parameters
     in.push_back(l);
     // Compute lower-triangular hessian matrix
     hf = ::casadi::SX::tril(::casadi::SX::hessian(mtimes(l.T(), f), xv));
     // Densify if requested
     if (!sparse) hf = ::casadi::SX::densify(hf);
-
     ::casadi::Function fh("hf", in, {hf});
 
-    f_ = std::make_shared<damotion::casadi::FunctionWrapper>(fc);
-    fjac_ = std::make_shared<damotion::casadi::FunctionWrapper>(fj);
-    fhes_ = std::make_shared<damotion::casadi::FunctionWrapper>(fh);
+    fc_ = std::make_shared<damotion::casadi::FunctionWrapper>(fc);
+    fj_ = std::make_shared<damotion::casadi::FunctionWrapper>(fj);
+    fh_ = std::make_shared<damotion::casadi::FunctionWrapper>(fh);
 
     // Resize the bounds
-    resizeBounds(ex.size1());
+    resizeBounds(dim());
     // Update bounds for the constraint
     setBounds(bounds);
   }
@@ -107,13 +108,13 @@ class Constraint {
              const BoundsType &bounds,
              const common::Function::SharedPtr &fjac = nullptr,
              const common::Function::SharedPtr &fhes = nullptr)
-      : f_({std::move(f)}) {
+      : fc_({std::move(f)}), fj_({std::move(fjac)}), fh_({std::move(fhes)}) {
     // Get sparsity pattern
-    size_t rows, cols, nnz;
+    size_t cols, nnz;
     std::vector<int> i_row, j_col;
-    f_->getOutputSparsityInfo(0, rows, cols, nnz, i_row, j_col);
+    fc_->getOutputSparsityInfo(0, dim_, cols, nnz, i_row, j_col);
     // Resize the bounds
-    resizeBounds(rows);
+    resizeBounds(dim());
     // Update bounds for the constraint
     setBounds(bounds);
   }
@@ -129,7 +130,7 @@ class Constraint {
    * @brief Dimension of the constraint
    *
    */
-  int Dimension() const { return 0; }
+  size_t dim() const { return dim_; }
 
   /**
    * @brief Whether the constraint provides the ability to compute its Jacobian
@@ -137,7 +138,7 @@ class Constraint {
    * @return true
    * @return false
    */
-  bool hasJacobian() const { return fjac_ != nullptr; }
+  bool hasJacobian() const { return fj_ != nullptr; }
 
   /**
    * @brief Whether the constraint provides the ability to compute its Hessian
@@ -146,7 +147,7 @@ class Constraint {
    * @return true
    * @return false
    */
-  bool hasHessian() const { return fhes_ != nullptr; }
+  bool hasHessian() const { return fh_ != nullptr; }
 
   void getOutputSparsityInfo() {}
 
@@ -170,7 +171,8 @@ class Constraint {
     for (const auto &xi : x) in.push_back(xi);
     for (const auto &pi : p) in.push_back(pi);
     // Perform evaluation depending on what method is used
-    fc_->eval(in, {c});
+    std::vector<MatrixRef> out = {c};
+    fc_->eval(in, out);
   }
 
   void eval(const std::vector<ConstVectorRef> &x,
@@ -181,8 +183,11 @@ class Constraint {
     for (const auto &xi : x) in.push_back(xi);
     for (const auto &pi : p) in.push_back(pi);
     // Perform evaluation depending on what method is used
-    fc_->eval(in, {c});
-    fj_->eval(in, {j});
+    std::vector<MatrixRef> out;
+    out = {c};
+    fc_->eval(in, out);
+    out = {jac};
+    fj_->eval(in, out);
   }
 
   void eval_h(const std::vector<ConstVectorRef> &x,
@@ -194,7 +199,8 @@ class Constraint {
     for (const auto &pi : p) in.push_back(pi);
     in.push_back(l);
     // Perform evaluation depending on what method is used
-    fh_->eval(in, {hes});
+    std::vector<MatrixRef> out = {hes};
+    fh_->eval(in, out);
   }
 
   /**
@@ -269,14 +275,11 @@ class Constraint {
 
  protected:
  private:
-  // Dimension of the constraint
-  int dim_ = 0;
+  // dimension of the constraint
+  size_t dim_ = 0;
 
   // Flag to indicate if the constraint has changed since it was used
   bool updated_;
-
-  bool has_jac_;
-  bool has_hes_;
 
   bool code_generated_ = false;
 
@@ -291,11 +294,11 @@ class Constraint {
   Eigen::VectorXd ub_;
 
   // Vector of function pointers for evaluation
-  common::Function::SharedPtr f_;
+  common::Function::SharedPtr fc_;
   // Function pointer for constraint Jacobian evaluation
-  common::Function::SharedPtr fjac_;
+  common::Function::SharedPtr fj_;
   // Function pointer for multiplier-constraint product Hessian evaluation
-  common::Function::SharedPtr fhes_;
+  common::Function::SharedPtr fh_;
 
   /**
    * @brief Creates a unique id for each constraint

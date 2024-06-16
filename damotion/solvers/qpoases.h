@@ -134,13 +134,13 @@ class QPOASESSolverInstance : public SolverBase {
       EvaluateConstraint(binding, idx, primal_solution_x_, true, true);
 
       // Adapt bounds for the linear constraints
-      ubA_.middleRows(idx, binding.Get().Dimension()) =
+      ubA_.middleRows(idx, binding.Get().dim()) =
           binding.Get().upperBound() - binding.Get().b();
-      lbA_.middleRows(idx, binding.Get().Dimension()) =
+      lbA_.middleRows(idx, binding.Get().dim()) =
           binding.Get().lowerBound() - binding.Get().b();
 
       // Increase constraint index
-      idx += binding.Get().Dimension();
+      idx += binding.Get().dim();
     }
 
     typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,

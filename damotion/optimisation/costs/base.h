@@ -45,10 +45,10 @@ class Cost {
     }
   }
 
-  void Eval(const common::std::vector<ConstVectorRef> &x,
-            const common::std::vector<ConstVectorRef> &p, bool check = false) {
+  void Eval(const std::vector<ConstVectorRef> &x,
+            const std::vector<ConstVectorRef> &p, bool check = false) {
     // Evaluate the constraints based on the
-    common::std::vector<ConstVectorRef> in = {};
+    std::vector<ConstVectorRef> in = {};
     for (const auto &xi : x) in.push_back(xi);
     for (const auto &pi : p) in.push_back(pi);
     Eigen::VectorXd one(1.0);

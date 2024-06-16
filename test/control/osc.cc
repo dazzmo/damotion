@@ -65,7 +65,7 @@ TEST(TrackingCost, QuadraticForm) {
                                .toVector();
 
   // Create input
-  damotion::common::std::vector<ConstVectorRef> x = {a, q, v, e};
+  damotion::std::vector<ConstVectorRef> x = {a, q, v, e};
   cost->eval(x, {}, true);
   cost->eval_hessian(x, {});
 

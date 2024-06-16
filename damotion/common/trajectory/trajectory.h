@@ -23,7 +23,7 @@ class TrajectoryBase {
    * @brief Construct a new Trajectory Base object with dimension dim with
    * start and ending times set to zero
    *
-   * @param dim Dimension of the trajectory
+   * @param dim dimension of the trajectory
    */
   TrajectoryBase(const int& dim) : dim_(dim), t0_(Scalar(0)), tf_(Scalar(0)) {}
   ~TrajectoryBase() = default;
@@ -79,7 +79,7 @@ class TrajectoryBase {
   }
 
  protected:
-  // Dimension of the trajectory
+  // dimension of the trajectory
   int dim_;
   // Starting time of the trajectory
   Scalar t0_;
@@ -100,7 +100,7 @@ class Trajectory : public TrajectoryBase<Scalar> {
   /**
    * @brief Construct a new Trajectory object with dimension dim
    *
-   * @param dim Dimension of the trajectory
+   * @param dim dimension of the trajectory
    */
   Trajectory(const int& dim) : TrajectoryBase<Scalar>(dim) {}
 

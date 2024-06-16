@@ -33,7 +33,7 @@ void SolverBase::EvaluateConstraint(const Binding<Constraint>& binding,
                                     const int& constraint_idx,
                                     const Eigen::VectorXd& x, bool jac,
                                     bool update_cache) {
-  common::std::vector<ConstVectorRef> x_in = {}, p_in = {};
+  std::vector<ConstVectorRef> x_in = {}, p_in = {};
   GetBindingInputs(binding, x_in, p_in);
 
   const Constraint& constraint = binding.Get();
@@ -44,7 +44,7 @@ void SolverBase::EvaluateConstraint(const Binding<Constraint>& binding,
   // Update the caches if required, otherwise break early
   if (update_cache == false) return;
 
-  constraint_vector_cache_.middleRows(constraint_idx, constraint.Dimension()) =
+  constraint_vector_cache_.middleRows(constraint_idx, constraint.dim()) =
       constraint.Vector();
   VLOG(10) << "constraint_cache = " << constraint_vector_cache_;
 

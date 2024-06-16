@@ -35,7 +35,7 @@ class LinearConstraint : public Constraint {
    *
    * @param input
    */
-  void EvalCoefficients(const common::std::vector<ConstVectorRef> &p) {
+  void EvalCoefficients(const std::vector<ConstVectorRef> &p) {
     f_coefs_->Eval(p);
   }
 
@@ -58,7 +58,6 @@ class LinearConstraint : public Constraint {
   }
 
  private:
-  const enum CoefficientIndices { A = 0, b };
   mutable common::Function::SharedPtr f_coefs_;
 };
 

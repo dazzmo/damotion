@@ -13,63 +13,6 @@ namespace damotion {
 namespace casadi {
 
 /**
- * @brief Creates a function that given variables x, parameters p, computes the
- * expressions f and optionally their derivatives and hessians. This function is
- * of the form f(x, p, l, der, hes).
- *
- * @param f
- * @param x
- * @param p
- * @return ::casadi::Function
- */
-::casadi::Function CreateFunction(const ::casadi::SXVector &f,
-                                  const ::casadi::SXVector &x,
-                                  const ::casadi::SXVector &p,
-                                  const bool &sparse = false) {
-  // Create concatenated x vector for derivative purposes
-  ::casadi::SX xv = ::casadi::SX::vertcat(x);
-  // Flags for whether to compute derivative data
-  ::casadi::SX d = ::casadi::SX::sym("derivative"),
-               h = ::casadi::SX::sym("hessian");
-
-  // Create input and output vectors
-  ::casadi::SXVector in = {}, out = {};
-  for (const auto &xi : x) in.push_back(xi);
-  for (const auto &pi : p) in.push_back(pi);
-
-  for (const auto &fi : f) {
-    out.push_back(fi);
-
-    ::casadi::SX dfi;
-    if (fi.size1() == 1) {
-      dfi = ::casadi::SX::gradient(f, xv);
-    } else {
-      dfi = ::casadi::SX::jacobian(f, xv);
-    }
-    // Densify if requested
-    if (!sparse) dfi = ::casadi::SX::densify(dfi);
-    out.push_back(::casadi::SX::if_else_zero(d, dfi));
-
-    ::casadi::SX hfi;
-    ::casadi::SX li = ::casadi::SX::sym("l", fi.size1());
-    // Add these multipliers to the input parameters
-    in.push_back(li);
-    // Compute lower-triangular hessian matrix
-    hfi = ::casadi::SX::tril(::casadi::SX::hessian(mtimes(li.T(), fi), xv));
-    // Densify if requested
-    if (!sparse) hfi = ::casadi::SX::densify(hfi);
-    out.push_back(::casadi::SX::if_else_zero(h, hfi));
-  }
-
-  // Append derivative flags at the end of the inputs
-  in.push_back(d);
-  in.push_back(h);
-
-  // Create function
-  return ::casadi::Function("f", in, out);
-}
-
-/**
  * @brief Function wrapper base class for casadi functions to Eigen
  * representation
  *
@@ -107,21 +50,6 @@ class FunctionWrapper : public common::Function {
    * respect to x
    */
   FunctionWrapper(const ::casadi::Function &f) : common::Function() {}
-
-  FunctionWrapper(const std::vector<::casadi::Function> &f)
-      : common::Function() {
-    // Create data related to each function
-    int f_cnt = 0;
-    for (const auto &fi : f) {
-      // For each output index, indicate which function it belongs to and what
-      // output index it is
-      for (int i = 0; i < fi.n_out(); ++i) {
-        f_out_idx_[cnt++] = std::pair<size_t, size_t>(f_cnt, i);
-      }
-      // Increase function counter
-      f_cnt++;
-    }
-  }
 
   ~FunctionWrapper() {
     // Release memory for casadi functions
@@ -178,12 +106,6 @@ class FunctionWrapper : public common::Function {
                                  size_t &nnz, std::vector<int> &i_row,
                                  std::vector<int> &j_col) override {
     // Determine which function it is referring to
-    int n = 0;
-    int cnt = 0;
-    while (i < n) {
-      f_[cnt].n_out();
-    }
-
     const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
 
     rows = sparsity.rows();
@@ -203,17 +125,16 @@ class FunctionWrapper : public common::Function {
 
  protected:
   // Memory allocated for function evaluations
-  std::vector<int> mem_;
+  int mem_;
   // Integer working vectors
-  std::vector<std::vector<casadi_int>> iw_;
+  std::vector<casadi_int> iw_;
   // Double working vectors
-  std::vector<std::vector<double>> dw_;
+  std::vector<double> dw_;
 
   // Functions
-  mutable std::vector<::casadi::Function> f_;
+  mutable ::casadi::Function f_;
 
  private:
-  std::unordered_map<size_t, std::pair<size_t, size_t>> f_out_idx_;
 };
 
 }  // namespace casadi

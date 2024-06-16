@@ -136,7 +136,7 @@ class ConstraintManager {
                                     const sym::VariableRefVector &p) {
     // Create a binding for the constraint
     constraints_.push_back(Binding<Constraint>(con, x, p));
-    n_constraints_ += con->Dimension();
+    n_constraints_ += con->dim();
     return constraints_.back();
   }
 
@@ -144,7 +144,7 @@ class ConstraintManager {
       const std::shared_ptr<LinearConstraint> &con,
       const sym::VariableRefVector &x, const sym::VariableRefVector &p) {
     linear_constraints_.push_back(Binding<LinearConstraint>(con, x, p));
-    n_constraints_ += con->Dimension();
+    n_constraints_ += con->dim();
     return linear_constraints_.back();
   }
 
@@ -205,8 +205,8 @@ class ConstraintManager {
     // Get all constraints
     std::vector<Binding<Constraint>> constraints = GetAllConstraintBindings();
     for (Binding<Constraint> &b : constraints) {
-      std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
-      for (int i = 0; i < b.Get().Dimension(); ++i) {
+      std::cout << b.Get().name() << "\t[" << b.Get().dim() << ",1]\n";
+      for (size_t i = 0; i < b.Get().dim(); ++i) {
         std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
                   << b.Get().lowerBound()[i] << "\t" << b.Get().upperBound()[i]
                   << "\n";
@@ -214,8 +214,8 @@ class ConstraintManager {
     }
     for (Binding<BoundingBoxConstraint> &b :
          GetBoundingBoxConstraintBindings()) {
-      std::cout << b.Get().name() << "\t[" << b.Get().Dimension() << ",1]\n";
-      for (int i = 0; i < b.Get().Dimension(); ++i) {
+      std::cout << b.Get().name() << "\t[" << b.Get().dim() << ",1]\n";
+      for (size_t i = 0; i < b.Get().dim(); ++i) {
         std::cout << b.Get().name() << "_" + std::to_string(i) << "\t\t"
                   << b.Get().lowerBound()[i] << "\t" << b.Get().upperBound()[i]
                   << "\n";
@@ -229,9 +229,9 @@ class ConstraintManager {
     // Set first-in-first out order
     int idx = 0;
     for (Binding<Constraint> &b : GetAllConstraintBindings()) {
-      lbg_.middleRows(idx, b.Get().Dimension()) = b.Get().lowerBound();
-      ubg_.middleRows(idx, b.Get().Dimension()) = b.Get().upperBound();
-      idx += b.Get().Dimension();
+      lbg_.middleRows(idx, b.Get().dim()) = b.Get().lowerBound();
+      ubg_.middleRows(idx, b.Get().dim()) = b.Get().upperBound();
+      idx += b.Get().dim();
     }
   }
 

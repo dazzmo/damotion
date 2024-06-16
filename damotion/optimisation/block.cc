@@ -67,7 +67,7 @@ void BlockMatrixFunction::AddBinding(const BindingBase &binding,
       // Increase data array counter
       cnt++;
       // Increase constraint counter
-      if (type_ == Type::kJacobian) nc_ += binding.Get().Dimension();
+      if (type_ == Type::kJacobian) nc_ += binding.Get().dim();
     }
   }
 }

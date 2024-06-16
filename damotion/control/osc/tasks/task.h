@@ -33,8 +33,8 @@ class Task {
    * xdim and tangent space of size vdim.
    *
    * @param name Name of the task
-   * @param xdim Dimension of the configuration space of the task
-   * @param vdim Dimension of the tangent space of the task
+   * @param xdim dimension of the configuration space of the task
+   * @param vdim dimension of the tangent space of the task
    */
   Task(const std::string &name, const int &xdim, const int &vdim)
       : name_(name) {
@@ -42,14 +42,14 @@ class Task {
   }
 
   /**
-   * @brief Dimension of the task configuration space.
+   * @brief dimension of the task configuration space.
    *
    * @return const int
    */
   const int &xdim() const { return xdim_; }
 
   /**
-   * @brief Dimension of the task tangent space
+   * @brief dimension of the task tangent space
    *
    * @return const int&
    */
@@ -81,8 +81,8 @@ class Task {
   /**
    * @brief Resizes the dimension of the task.
    *
-   * @param xdim Dimension of the task configuration space
-   * @param vdim Dimension of the task tangent space
+   * @param xdim dimension of the task configuration space
+   * @param vdim dimension of the task tangent space
    */
   void ResizeTask(const int &xdim, const int &vdim) {
     // Set dimension of task
@@ -182,9 +182,9 @@ class Task {
   Eigen::VectorXd w_;
 
  private:
-  // Dimension of the task configurations space
+  // dimension of the task configurations space
   int xdim_ = 0;
-  // Dimension of the task tangent space
+  // dimension of the task tangent space
   int vdim_ = 0;
   std::string name_;
 

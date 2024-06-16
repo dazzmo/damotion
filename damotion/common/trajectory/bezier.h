@@ -14,7 +14,7 @@ template <typename Scalar>
 class Bezier : public Trajectory<Scalar> {
  public:
   Bezier(int n, int order) : Trajectory<Scalar>(n) {
-    // this->Dimension of curve
+    // this->dimension of curve
     order_ = order;
     // Duration of curve
     this->UpdateBeginningTime(0.0);
