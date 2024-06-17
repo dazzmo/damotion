@@ -167,26 +167,37 @@ class Constraint {
   void eval(const std::vector<ConstVectorRef> &x,
             const std::vector<ConstVectorRef> &p, VectorRef &c) {
     // Evaluate the constraints based on the
-    std::vector<ConstVectorRef> in = {};
-    for (const auto &xi : x) in.push_back(xi);
-    for (const auto &pi : p) in.push_back(pi);
+    InputDataVector in = {};
+    for (const auto &xi : x) in.push_back(xi.data());
+    for (const auto &pi : p) in.push_back(pi.data());
     // Perform evaluation depending on what method is used
-    std::vector<MatrixRef> out = {c};
+    OutputDataVector out = {c.data()};
     fc_->eval(in, out);
   }
 
   void eval(const std::vector<ConstVectorRef> &x,
             const std::vector<ConstVectorRef> &p, VectorRef &c,
             MatrixRef &jac) {
-    // Evaluate the constraints based on the
-    std::vector<ConstVectorRef> in = {};
-    for (const auto &xi : x) in.push_back(xi);
-    for (const auto &pi : p) in.push_back(pi);
+    InputDataVector in = {};
+    for (const auto &xi : x) in.push_back(xi.data());
+    for (const auto &pi : p) in.push_back(pi.data());
     // Perform evaluation depending on what method is used
-    std::vector<MatrixRef> out;
-    out = {c};
+    OutputDataVector out = {c.data()};
     fc_->eval(in, out);
-    out = {jac};
+    out = {jac.data()};
+    fj_->eval(in, out);
+  }
+
+  void eval(const std::vector<ConstVectorRef> &x,
+            const std::vector<ConstVectorRef> &p, VectorRef &c,
+            SparseMatrixRef &jac) {
+    InputDataVector in = {};
+    for (const auto &xi : x) in.push_back(xi.data());
+    for (const auto &pi : p) in.push_back(pi.data());
+    // Perform evaluation depending on what method is used
+    OutputDataVector out = {c.data()};
+    fc_->eval(in, out);
+    out = {jac.valuePtr()};
     fj_->eval(in, out);
   }
 
@@ -194,12 +205,25 @@ class Constraint {
               const std::vector<ConstVectorRef> &p, const ConstVectorRef &l,
               MatrixRef &hes) {
     // Evaluate the constraints based on the
-    std::vector<ConstVectorRef> in = {};
-    for (const auto &xi : x) in.push_back(xi);
-    for (const auto &pi : p) in.push_back(pi);
-    in.push_back(l);
+    InputDataVector in = {};
+    for (const auto &xi : x) in.push_back(xi.data());
+    for (const auto &pi : p) in.push_back(pi.data());
+    in.push_back(l.data());
     // Perform evaluation depending on what method is used
-    std::vector<MatrixRef> out = {hes};
+    OutputDataVector out = {hes.data()};
+    fh_->eval(in, out);
+  }
+
+  void eval_h(const std::vector<ConstVectorRef> &x,
+              const std::vector<ConstVectorRef> &p, const ConstVectorRef &l,
+              SparseMatrixRef &hes) {
+    // Evaluate the constraints based on the
+    InputDataVector in = {};
+    for (const auto &xi : x) in.push_back(xi.data());
+    for (const auto &pi : p) in.push_back(pi.data());
+    in.push_back(l.data());
+    // Perform evaluation depending on what method is used
+    OutputDataVector out = {hes.valuePtr()};
     fh_->eval(in, out);
   }
 

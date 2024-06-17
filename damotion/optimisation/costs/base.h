@@ -18,11 +18,38 @@ class Cost {
 
   Cost(const int &nx, const int &np = 0) {}
 
-  Cost(const casadi::SX &ex, const casadi::SXVector &x,
+  Cost(const casadi::SX &f, const casadi::SXVector &x,
        const casadi::SXVector &p, bool sparse = false) {
     // Create function based on casadi
-    f_ = std::make_shared<damotion::casadi::FunctionWrapper>(
-        damotion::casadi::CreateFunction({ex}, x, p, sparse));
+    // Create concatenated x vector for derivative purposes
+    ::casadi::SX xv = ::casadi::SX::vertcat(x);
+
+    // Create input and output vectors
+    ::casadi::SXVector in = {}, out = {};
+
+    for (const auto &xi : x) in.push_back(xi);
+    for (const auto &pi : p) in.push_back(pi);
+
+    ::casadi::Function fc("f", in, {f});
+
+    // Jacobian
+    ::casadi::SX df;
+    df = ::casadi::SX::gradient(f, xv);
+    // Densify if requested
+    if (!sparse) df = ::casadi::SX::densify(df);
+    ::casadi::Function fj("df", in, {df});
+
+    // Hessian
+    ::casadi::SX hf;
+    // Compute lower-triangular hessian matrix
+    hf = ::casadi::SX::tril(::casadi::SX::hessian(f, xv));
+    // Densify if requested
+    if (!sparse) hf = ::casadi::SX::densify(hf);
+    ::casadi::Function fh("hf", in, {hf});
+
+    fc_ = std::make_shared<damotion::casadi::FunctionWrapper>(fc);
+    fj_ = std::make_shared<damotion::casadi::FunctionWrapper>(fj);
+    fh_ = std::make_shared<damotion::casadi::FunctionWrapper>(fh);
   }
 
   /**
@@ -45,7 +72,7 @@ class Cost {
     }
   }
 
-  void Eval(const std::vector<ConstVectorRef> &x,
+  void eval(const std::vector<ConstVectorRef> &x,
             const std::vector<ConstVectorRef> &p, bool check = false) {
     // Evaluate the constraints based on the
     std::vector<ConstVectorRef> in = {};

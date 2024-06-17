@@ -11,10 +11,11 @@ class LinearConstraint : public Constraint {
   using UniquePtr = std::unique_ptr<LinearConstraint>;
   using SharedPtr = std::shared_ptr<LinearConstraint>;
 
-  LinearConstraint(const std::string &name, common::Function::SharedPtr &f,
-                   common::Function::SharedPtr &fc,
-                   common::Function::SharedPtr &fb, const BoundsType &bounds)
-      : Constraint(name, f, bounds), fA_(std::move(fA)), fb_(std::move(fb)) {
+  LinearConstraint(const std::string &name,
+                   const common::Function::SharedPtr &fcon,
+                   const BoundsType &bounds,
+                   const common::Function::SharedPtr &fcoefs = nullptr)
+      : Constraint(name, fcon, bounds), fcoefs_(std::move(fcoefs)) {
     // Create constraint based on the function
   }
 
@@ -22,43 +23,27 @@ class LinearConstraint : public Constraint {
                    const ::casadi::SX &b, const ::casadi::SX &x,
                    const ::casadi::SXVector &p, const BoundsType &bounds)
       : Constraint(name, mtimes(A, x) + b, ::casadi::SXVector({x}), p, bounds) {
-    // Create constraint based on the function
-
     // Create functions for A and b seperately
     ::casadi::Function f_coefs("lin_coefs", p, {A, b});
-    f_coefs_ = std::make_shared<damotion::casadi::FunctionWrapper>(f_coefs);
+    fcoefs_ = std::make_shared<damotion::casadi::FunctionWrapper>(f_coefs);
   }
+
+  bool hasCoefficientFunction() { return fcoefs_ != nullptr; }
 
   /**
    * @brief Evaluates the coefficients comprising the linear constraint (i.e. A,
    * b)
    *
-   * @param input
+   * @param p
    */
-  void EvalCoefficients(const std::vector<ConstVectorRef> &p) {
-    f_coefs_->Eval(p);
-  }
-
-  /**
-   * @brief The coefficient matrix A for the expression A x + b.
-   *
-   * @return const GenericEigenMatrix&
-   */
-  const GenericEigenMatrix &A() const {
-    return f_coefs_->GetOutput(CoefficientIndices::A);
-  }
-
-  /**
-   * @brief The constant vector for the linear constraint A x + b
-   *
-   * @return const GenericEigenMatrix&
-   */
-  const GenericEigenMatrix &b() const {
-    return f_coefs_->GetOutput(CoefficientIndices::b);
+  void evalCoefficients(const std::vector<ConstVectorRef> &p,
+                        std::vector<MatrixRef> &coefs) {
+    fcoefs_->eval(p, coefs);
   }
 
  private:
-  mutable common::Function::SharedPtr f_coefs_;
+  // Optional function to compute constraints individually
+  mutable common::Function::SharedPtr fcoefs_;
 };
 
 }  // namespace optimisation

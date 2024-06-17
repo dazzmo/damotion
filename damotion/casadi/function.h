@@ -83,21 +83,7 @@ class FunctionWrapper : public common::Function {
    * @brief Calls the function with the current inputs
    *
    */
-  void evalImpl(const std::vector<ConstVectorRef> &in,
-                std::vector<MatrixRef> &out) override {
-    // Set inputs
-    std::vector<const double *> in_data_ptr = {};
-    std::vector<double *> out_data_ptr = {};
-    for (const auto &x : in) {
-      in_data_ptr.push_back(x.data());
-    }
-
-    // For each output, set the functions
-    out_data_ptr.assign(n_out(), nullptr);
-    for (size_t i = 0; i < out.size(); ++i) {
-      out_data_ptr[i] = out[i].data();
-    }
-
+  void evalImpl(const InputDataVector &in, OutputDataVector &out) override {
     // Call the function
     f_(in_data_ptr.data(), out_data_ptr.data(), iw_.data(), dw_.data(), mem_);
   }

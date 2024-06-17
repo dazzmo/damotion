@@ -13,10 +13,16 @@
 
 namespace damotion {
 
-typedef Eigen::Ref<Eigen::VectorXd> VectorRef;
-typedef Eigen::Ref<Eigen::MatrixXd> MatrixRef;
-typedef Eigen::Ref<const Eigen::VectorXd> ConstVectorRef;
-typedef Eigen::Ref<const Eigen::MatrixXd> ConstMatrixRef;
+typedef double Scalar;
+
+typedef std::vector<const Scalar*> InputDataVector;
+typedef std::vector<Scalar*> OutputDataVector;
+
+typedef Eigen::Ref<Eigen::VectorX<Scalar>> VectorRef;
+typedef Eigen::Ref<Eigen::MatrixX<Scalar>> MatrixRef;
+typedef Eigen::Ref<Eigen::SparseMatrix<Scalar>> SparseMatrixRef;
+typedef Eigen::Ref<const Eigen::VectorX<Scalar>> ConstVectorRef;
+typedef Eigen::Ref<const Eigen::MatrixX<Scalar>> ConstMatrixRef;
 
 namespace common {
 
@@ -82,7 +88,7 @@ class Function {
    * @param check Whether to assess each input for inconsistencies (e.g.
    * infinite values, bad data)
    */
-  void eval(const std::vector<ConstVectorRef>& in, std::vector<MatrixRef>& out,
+  void eval(const InputDataVector& in, OutputDataVector& out,
             bool check = false) {
     assert(in.size() == n_in() && "Incorrect number of inputs provided");
     assert(out.size() == n_out() && "Incorrect number of outputs provided");
@@ -123,8 +129,7 @@ class Function {
    *
    * @param input
    */
-  virtual void evalImpl(const std::vector<ConstVectorRef>& in,
-                        std::vector<MatrixRef>& out) = 0;
+  virtual void evalImpl(const InputDataVector& in, OutputDataVector& out) = 0;
 
   virtual void getOutputSparsityInfoImpl(const size_t& i, size_t& rows,
                                          size_t& cols, size_t& nnz,
