@@ -11,7 +11,7 @@ bool IpoptSolverInstance::get_nlp_info(Index& n, Index& m, Index& nnz_jac_g,
                                        Index& nnz_h_lag,
                                        IndexStyleEnum& index_style) {
   VLOG(10) << "get_nlp_info()";
-  n = GetCurrentProgram().NumberOfDecisionVariables();
+  n = GetCurrentProgram().numberOfDecisionVariables();
   m = GetCurrentProgram().NumberOfConstraints();
   nnz_jac_g = GetSparseConstraintJacobian().nonZeros();
   nnz_h_lag = GetSparseLagrangianHessian().nonZeros();
@@ -159,20 +159,20 @@ bool IpoptSolverInstance::get_bounds_info(Index n, Number* x_l, Number* x_u,
   for (auto& binding : GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
     const sym::VariableVector& v = binding.x(0);
     for (int i = 0; i < v.size(); ++i) {
-      GetCurrentProgram().SetDecisionVariableBounds(
+      GetCurrentProgram().setDecisionVariableBounds(
           v[i], binding.Get().lowerBound()[i], binding.Get().upperBound()[i]);
     }
   }
 
-  GetCurrentProgram().UpdateDecisionVariableBoundVectors();
+  GetCurrentProgram().updateDecisionVariableBoundVectors();
   GetCurrentProgram().UpdateConstraintBoundVectors();
-  VLOG(10) << GetCurrentProgram().DecisionVariableupperBounds();
-  VLOG(10) << GetCurrentProgram().DecisionVariablelowerBounds();
+  VLOG(10) << GetCurrentProgram().decisionVariableupperBounds();
+  VLOG(10) << GetCurrentProgram().decisionVariablelowerBounds();
   VLOG(10) << GetCurrentProgram().ConstraintupperBounds();
   VLOG(10) << GetCurrentProgram().ConstraintlowerBounds();
   // Decision variable bounds
-  std::copy_n(GetCurrentProgram().DecisionVariableupperBounds().data(), n, x_u);
-  std::copy_n(GetCurrentProgram().DecisionVariablelowerBounds().data(), n, x_l);
+  std::copy_n(GetCurrentProgram().decisionVariableupperBounds().data(), n, x_u);
+  std::copy_n(GetCurrentProgram().decisionVariablelowerBounds().data(), n, x_l);
   // Constraint bounds
   std::copy_n(GetCurrentProgram().ConstraintupperBounds().data(), m, g_u);
   std::copy_n(GetCurrentProgram().ConstraintlowerBounds().data(), m, g_l);
@@ -187,8 +187,8 @@ bool IpoptSolverInstance::get_starting_point(Index n, bool init_x, Number* x,
   VLOG(10) << "get_starting_point()";
   if (init_x) {
     GetCurrentProgram().UpdateInitialValueVector();
-    VLOG(10) << GetCurrentProgram().DecisionVariableInitialValues();
-    std::copy_n(GetCurrentProgram().DecisionVariableInitialValues().data(), n,
+    VLOG(10) << GetCurrentProgram().decisionVariableInitialValues();
+    std::copy_n(GetCurrentProgram().decisionVariableInitialValues().data(), n,
                 x);
   }
 

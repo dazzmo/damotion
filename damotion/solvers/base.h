@@ -13,7 +13,7 @@ namespace solvers {
 class SolverBase {
  public:
   SolverBase(Program& program) : program_(program) {
-    int nx = program_.NumberOfDecisionVariables();
+    int nx = program_.numberOfDecisionVariables();
     int nc = program_.NumberOfConstraints();
     // Initialise vectors
     decision_variable_cache_ = Eigen::VectorXd::Zero(nx);
@@ -119,7 +119,7 @@ class SolverBase {
   Eigen::VectorXd GetDecisionVariableValues(const sym::VariableVector& var,
                                             bool is_continuous = false) {
     std::vector<int> indices =
-        GetCurrentProgram().GetDecisionVariableIndices(var);
+        GetCurrentProgram().getDecisionVariableIndices(var);
     return decision_variable_cache_(indices);
   }
 
@@ -163,14 +163,14 @@ class SolverBase {
     for (int i = 0; i < binding.GetInputSize(); ++i) {
       sym::VariableVector& xi = binding.x()[i];
       std::vector<int> indices =
-          GetCurrentProgram().GetDecisionVariableIndices(xi);
+          GetCurrentProgram().getDecisionVariableIndices(xi);
       // Create indexed vector view for the system
       in.push_back(x(indices));
     }
 
     for (int i = 0; i < binding.GetInputSize(); ++i) {
       sym::VariableVector& pi = binding.p()[i];
-      std::vector<int> indices = GetCurrentProgram().GetParameterIndices(pi);
+      std::vector<int> indices = GetCurrentProgram().getParameterIndices(pi);
       // Create indexed vector view for the system
       in.push_back(p(indices));
     }

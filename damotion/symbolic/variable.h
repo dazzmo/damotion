@@ -11,7 +11,7 @@ namespace symbolic {
 class Variable {
  public:
   // ID type for the variables
-  typedef int Id;
+  typedef size_t Id;
 
   Variable() = default;
 
@@ -39,22 +39,27 @@ class Variable {
   std::string name_;
 };
 
-typedef Eigen::VectorX<Variable> VariableVector;
-typedef Eigen::MatrixX<Variable> VariableMatrix;
-typedef std::vector<Eigen::Ref<const VariableVector>> VariableRefVector;
+typedef Eigen::VectorX<Variable> Vector;
+typedef Eigen::MatrixX<Variable> Matrix;
+
+typedef Eigen::Ref<const Vector> VectorRef;
+typedef Eigen::Ref<const Matrix> MatrixRef;
+
+typedef std::list<VectorRef> VectorRefList;
+typedef std::list<VectorRef> MatrixRefList;
 
 // Variable matrix
-VariableMatrix CreateVariableMatrix(const std::string &name, const int m,
-                                    const int n);
+Matrix createMatrix(const std::string &name, const int m, const int n);
 // Variable vector
-VariableVector CreateVariableVector(const std::string &name, const int n);
+Vector createVector(const std::string &name, const int n);
 // Create vector of decision variables
-VariableVector ConcatenateVariableRefVector(const VariableRefVector &vars);
+Vector concatenateVariables(const VectorRefList &vars);
+Vector concatenateVariables(const MatrixRefList &vars);
 
 // Operator overloading
 std::ostream &operator<<(std::ostream &os, Variable var);
-std::ostream &operator<<(std::ostream &os, VariableVector vector);
-std::ostream &operator<<(std::ostream &os, VariableMatrix mat);
+std::ostream &operator<<(std::ostream &os, Vector vector);
+std::ostream &operator<<(std::ostream &os, Matrix mat);
 
 /**
  * @brief Class that maintains and adjusts variables organised into a
@@ -74,28 +79,28 @@ class VariableManager {
    *
    * @return const int&
    */
-  const int &NumberOfVariables() const { return n_variables_; }
+  const int &numberOfVariables() const { return n_variables_; }
 
   /**
    * @brief Adds a decision variable
    *
    * @param var
    */
-  void AddVariable(const Variable &var);
+  void addVariable(const Variable &var);
 
   /**
    * @brief Add decision variables
    *
    * @param var
    */
-  void AddVariables(const Eigen::Ref<const VariableMatrix> &var);
+  void addVariables(const MatrixRef &var);
 
   /**
    * @brief Removes variables currently considered by the program.
    *
    * @param var
    */
-  void RemoveVariables(const Eigen::Ref<VariableMatrix> &var);
+  void removeVariables(const MatrixRef &var);
 
   /**
    * @brief Whether a variable var is a decision variable within the program
@@ -104,7 +109,7 @@ class VariableManager {
    * @return true
    * @return false
    */
-  bool IsVariable(const Variable &var);
+  bool isVariable(const Variable &var);
 
   /**
    * @brief Returns the index of the given variable within the created
@@ -113,7 +118,7 @@ class VariableManager {
    * @param v
    * @return int
    */
-  int GetVariableIndex(const Variable &v);
+  int getVariableIndex(const Variable &v);
 
   /**
    * @brief Returns a vector of indices for the position of each entry in v in
@@ -122,21 +127,21 @@ class VariableManager {
    * @param v
    * @return std::vector<int>
    */
-  std::vector<int> GetVariableIndices(const VariableVector &v);
+  std::vector<int> getVariableIndices(const Vector &v);
 
   /**
    * @brief Set the vector of decision variables to the default ordering of
    * variables (ordered by when they were added)
    *
    */
-  void SetVariableVector();
+  void setVector();
 
   /**
    * @brief Sets the optimisation vector with the given ordering of variables
    *
    * @param var
    */
-  bool SetVariableVector(const Eigen::Ref<VariableVector> &var);
+  bool setVector(const VectorRef &var);
 
   /**
    * @brief Returns a vector of the values of each variable entry in the manager
@@ -144,7 +149,7 @@ class VariableManager {
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &GetVariableValueVector() const { return x_; }
+  const Eigen::VectorXd &getVariableValueVector() const { return x_; }
 
   /**
    * @brief Determines whether a vector of variables var is continuous within
@@ -154,18 +159,18 @@ class VariableManager {
    * @return true
    * @return false
    */
-  bool IsContinuousInVariableVector(const VariableVector &var);
+  bool isContinuousInVector(const Vector &var);
 
   /**
    * @brief Updates the decision variable bound vectors with all the current
    * values set for the decision variables.
    *
    */
-  void UpdateVariableBoundVectors() {
+  void updateVariableBoundVectors() {
     for (size_t i = 0; i < decision_variables_.size(); ++i) {
       VariableData &data = decision_variables_data_[i];
       if (data.bounds_updated) {
-        int idx = GetVariableIndex(decision_variables_[i]);
+        int idx = getVariableIndex(decision_variables_[i]);
         xbl_[idx] = data.bl;
         xbu_[idx] = data.bu;
       }
@@ -177,11 +182,11 @@ class VariableManager {
    * the current values set for the decision variables.
    *
    */
-  void UpdateInitialValueVector() {
+  void updateInitialValueVector() {
     for (size_t i = 0; i < decision_variables_.size(); ++i) {
       VariableData &data = decision_variables_data_[i];
       if (data.initial_value_updated) {
-        int idx = GetVariableIndex(decision_variables_[i]);
+        int idx = getVariableIndex(decision_variables_[i]);
         x0_[idx] = data.x0;
       }
     }
@@ -193,36 +198,35 @@ class VariableManager {
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &VariableInitialValues() const { return x0_; }
+  const Eigen::VectorXd &variableInitialValues() const { return x0_; }
 
   /**
    * @brief Upper bound for decision variables within the current program.
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &VariableupperBounds() const { return xbu_; }
+  const Eigen::VectorXd &variableupperBounds() const { return xbu_; }
 
   /**
    * @brief Upper bound for decision variables within the current program.
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd &VariablelowerBounds() const { return xbl_; }
+  const Eigen::VectorXd &variablelowerBounds() const { return xbl_; }
 
-  void SetVariableBounds(const Variable &v, const double &lb, const double &ub);
-  void SetVariableBounds(const VariableVector &v, const Eigen::VectorXd &lb,
+  void setVariableBounds(const Variable &v, const double &lb, const double &ub);
+  void setVariableBounds(const Vector &v, const Eigen::VectorXd &lb,
                          const Eigen::VectorXd &ub);
 
-  void SetVariableInitialValue(const Variable &v, const double &x0);
-  void SetVariableInitialValue(const VariableVector &v,
-                               const Eigen::VectorXd &x0);
+  void setVariableInitialValue(const Variable &v, const double &x0);
+  void setVariableInitialValue(const Vector &v, const Eigen::VectorXd &x0);
 
   /**
    * @brief Prints the current set of parameters for the program to the
    * screen
    *
    */
-  void ListVariables();
+  void listVariables();
 
  private:
   // Number of decision variables

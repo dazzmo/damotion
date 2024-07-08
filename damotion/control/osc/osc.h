@@ -138,7 +138,7 @@ class OSC : public opt::Program<Eigen::MatrixXd> {
 
     } else {
       contact_force_bounds_[task_idx].Get().setBounds(
-          opt::BoundsType::kEquality);
+          opt::Bounds::Type::kEquality);
     }
   }
 
@@ -155,7 +155,7 @@ class OSC : public opt::Program<Eigen::MatrixXd> {
            "Generalised acceleration vectors must be size nv");
     qacc_ = var;
     qacc_sx_ = sym;
-    AddDecisionVariables(var);
+    addDecisionVariables(var);
   }
   void SetControlVariables(const sym::VariableVector &var,
                            const casadi::SX &sym) {
@@ -163,21 +163,21 @@ class OSC : public opt::Program<Eigen::MatrixXd> {
            "Control vectors must be size nu");
     ctrl_ = var;
     ctrl_sx_ = sym;
-    AddDecisionVariables(var);
+    addDecisionVariables(var);
   }
 
   void AddContactForceVariables(const sym::VariableVector &var,
                                 const casadi::SX &sym) {
     lambda_.push_back(var);
     lambda_sx_.push_back(sym);
-    AddDecisionVariables(var);
+    addDecisionVariables(var);
   }
 
   void AddConstraintForceVariables(const sym::VariableVector &var,
                                    const casadi::SX &sym) {
     lambda_.push_back(var);
     lambda_sx_.push_back(sym);
-    AddDecisionVariables(var);
+    addDecisionVariables(var);
   }
 
   std::vector<sym::VariableVector> &ConstraintForceVariables() {
@@ -193,7 +193,7 @@ class OSC : public opt::Program<Eigen::MatrixXd> {
     assert(par.size() == nq_ && sym.rows() == nq_ &&
            "Generalised position vectors must be size nq");
     qpos_sx_ = sym;
-    AddParameters(par);
+    addParameters(par);
   }
 
   void AddGeneralisedVelocityParameters(const sym::ParameterVector &par,
@@ -201,7 +201,7 @@ class OSC : public opt::Program<Eigen::MatrixXd> {
     assert(par.size() == nv_ && sym.rows() == nv_ &&
            "Generalised velocity vectors must be size nv");
     qvel_sx_ = sym;
-    AddParameters(par);
+    addParameters(par);
   }
 
   /* Optimisation optimisation variables */

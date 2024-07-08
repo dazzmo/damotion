@@ -35,7 +35,7 @@ class QPOASESSolverInstance : public SolverBase {
 
   QPOASESSolverInstance(Program& prog) : Solver(prog) {
     // Create problem
-    int nx = GetCurrentProgram().NumberOfDecisionVariables();
+    int nx = GetCurrentProgram().numberOfDecisionVariables();
     int nc = GetCurrentProgram().NumberOfConstraints();
     qp_ = std::make_unique<qpOASES::SQProblem>(nx, nc);
     lbx_ = Eigen::VectorXd::Zero(nx);
@@ -47,9 +47,9 @@ class QPOASESSolverInstance : public SolverBase {
       // For each variable of the constraint
       const sym::VariableVector& v = binding.x(0);
       for (int i = 0; i < v.size(); ++i) {
-        lbx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
+        lbx_[GetCurrentProgram().getDecisionVariableIndex(v[i])] =
             binding.Get().lowerBound()[i];
-        ubx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
+        ubx_[GetCurrentProgram().getDecisionVariableIndex(v[i])] =
             binding.Get().upperBound()[i];
       }
       // Set updated constraint to false
@@ -74,7 +74,7 @@ class QPOASESSolverInstance : public SolverBase {
   void Solve() {
     common::Profiler profiler("QPOASESSolverInstance::Solve");
     // Number of decision variables in the program
-    int nx = GetCurrentProgram().NumberOfDecisionVariables();
+    int nx = GetCurrentProgram().numberOfDecisionVariables();
     int nc = GetCurrentProgram().NumberOfConstraints();
 
     // Reset costs and gradients
@@ -88,9 +88,9 @@ class QPOASESSolverInstance : public SolverBase {
         // For each variable of the constraint
         const sym::VariableVector& v = binding.x(0);
         for (int i = 0; i < v.size(); ++i) {
-          lbx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
+          lbx_[GetCurrentProgram().getDecisionVariableIndex(v[i])] =
               binding.Get().lowerBound()[i];
-          ubx_[GetCurrentProgram().GetDecisionVariableIndex(v[i])] =
+          ubx_[GetCurrentProgram().getDecisionVariableIndex(v[i])] =
               binding.Get().upperBound()[i];
         }
 

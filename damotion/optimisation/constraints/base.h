@@ -13,31 +13,6 @@
 namespace damotion {
 namespace optimisation {
 
-/**
- * @brief Tests whether the p-norm of the constraint is within
- * the threshold eps.
- *
- * @param p The norm of the constraint (use Eigen::Infinity for the
- * infinity norm)
- * @param eps
- * @return true
- * @return false
- */
-bool checkConstraintViolation(const ConstVectorRef &c, const int &p = 2,
-                              const double &eps = 1e-6) {
-  // Determine if constraint within threshold
-  double c_norm = 0.0;
-  if (p == 1) {
-    c_norm = c.lpNorm<1>();
-  } else if (p == 2) {
-    c_norm = c.lpNorm<2>();
-  } else if (p == Eigen::Infinity) {
-    c_norm = c.lpNorm<Eigen::Infinity>();
-  }
-
-  return c_norm <= eps;
-}
-
 class Constraint {
  public:
   Constraint() = default;
@@ -55,7 +30,7 @@ class Constraint {
    */
   Constraint(const std::string &name, const casadi::SX &f,
              const casadi::SXVector &x, const casadi::SXVector &p,
-             const BoundsType &bounds, bool sparse = false)
+             const Bounds::Type &bounds, bool sparse = false)
       : dim_(f.size1()) {
     // Create concatenated x vector for derivative purposes
     ::casadi::SX xv = ::casadi::SX::vertcat(x);
@@ -105,14 +80,13 @@ class Constraint {
    * @param bounds
    */
   Constraint(const std::string &name, const common::Function::SharedPtr &f,
-             const BoundsType &bounds,
+             const Bounds::Type &bounds,
              const common::Function::SharedPtr &fjac = nullptr,
              const common::Function::SharedPtr &fhes = nullptr)
-      : fc_({std::move(f)}), fj_({std::move(fjac)}), fh_({std::move(fhes)}) {
-    // Get sparsity pattern
-    size_t cols, nnz;
-    std::vector<int> i_row, j_col;
-    fc_->getOutputSparsityInfo(0, dim_, cols, nnz, i_row, j_col);
+      : dim_(f->getOutput(0).asDense().rows()),
+        fc_({std::move(f)}),
+        fj_({std::move(fjac)}),
+        fh_({std::move(fhes)}) {
     // Resize the bounds
     resizeBounds(dim());
     // Update bounds for the constraint
@@ -149,14 +123,12 @@ class Constraint {
    */
   bool hasHessian() const { return fh_ != nullptr; }
 
-  void getOutputSparsityInfo() {}
-
   /**
    * @brief Set the name of the constraint
    *
    * @param name
    */
-  void SetName(const std::string &name) {
+  void setName(const std::string &name) {
     if (name == "") {
       name_ = "constraint_" + std::to_string(createID());
     } else {
@@ -164,68 +136,47 @@ class Constraint {
     }
   }
 
-  void eval(const std::vector<ConstVectorRef> &x,
-            const std::vector<ConstVectorRef> &p, VectorRef &c) {
+  void eval(const common::Function::InputVector &x,
+            const common::Function::InputVector &p, bool jac) {
     // Evaluate the constraints based on the
-    InputDataVector in = {};
-    for (const auto &xi : x) in.push_back(xi.data());
-    for (const auto &pi : p) in.push_back(pi.data());
+    common::Function::InputVector in = {};
+    for (const auto &xi : x) in.push_back(xi);
+    for (const auto &pi : p) in.push_back(pi);
     // Perform evaluation depending on what method is used
-    OutputDataVector out = {c.data()};
-    fc_->eval(in, out);
+    fc_->eval(in);
+    if (jac) fj_->eval(in);
   }
 
-  void eval(const std::vector<ConstVectorRef> &x,
-            const std::vector<ConstVectorRef> &p, VectorRef &c,
-            MatrixRef &jac) {
-    InputDataVector in = {};
-    for (const auto &xi : x) in.push_back(xi.data());
-    for (const auto &pi : p) in.push_back(pi.data());
-    // Perform evaluation depending on what method is used
-    OutputDataVector out = {c.data()};
-    fc_->eval(in, out);
-    out = {jac.data()};
-    fj_->eval(in, out);
-  }
-
-  void eval(const std::vector<ConstVectorRef> &x,
-            const std::vector<ConstVectorRef> &p, VectorRef &c,
-            SparseMatrixRef &jac) {
-    InputDataVector in = {};
-    for (const auto &xi : x) in.push_back(xi.data());
-    for (const auto &pi : p) in.push_back(pi.data());
-    // Perform evaluation depending on what method is used
-    OutputDataVector out = {c.data()};
-    fc_->eval(in, out);
-    out = {jac.valuePtr()};
-    fj_->eval(in, out);
-  }
-
-  void eval_h(const std::vector<ConstVectorRef> &x,
-              const std::vector<ConstVectorRef> &p, const ConstVectorRef &l,
-              MatrixRef &hes) {
+  void eval_h(const common::Function::InputVector &x,
+              const common::Function::InputVector &p, const ConstVectorRef &l) {
     // Evaluate the constraints based on the
-    InputDataVector in = {};
-    for (const auto &xi : x) in.push_back(xi.data());
-    for (const auto &pi : p) in.push_back(pi.data());
-    in.push_back(l.data());
-    // Perform evaluation depending on what method is used
-    OutputDataVector out = {hes.data()};
-    fh_->eval(in, out);
+    common::Function::InputVector in = {};
+    for (const auto &xi : x) in.push_back(xi);
+    for (const auto &pi : p) in.push_back(pi);
+    in.push_back(l);
+    fh_->eval(in);
   }
 
-  void eval_h(const std::vector<ConstVectorRef> &x,
-              const std::vector<ConstVectorRef> &p, const ConstVectorRef &l,
-              SparseMatrixRef &hes) {
-    // Evaluate the constraints based on the
-    InputDataVector in = {};
-    for (const auto &xi : x) in.push_back(xi.data());
-    for (const auto &pi : p) in.push_back(pi.data());
-    in.push_back(l.data());
-    // Perform evaluation depending on what method is used
-    OutputDataVector out = {hes.valuePtr()};
-    fh_->eval(in, out);
-  }
+  /**
+   * @brief Constraint vector
+   *
+   * @return const common::Function::Output&
+   */
+  const common::Function::Output &con() const { return fc_->getOutput(0); }
+
+  /**
+   * @brief Constraint Jacobian
+   *
+   * @return const common::Function::Output&
+   */
+  const common::Function::Output &jac() const { return fj_->getOutput(0); }
+
+  /**
+   * @brief Constraint-multiplier Hessian
+   *
+   * @return const common::Function::Output&
+   */
+  const common::Function::Output &hes() const { return fh_->getOutput(0); }
 
   /**
    * @brief Resizes the bounds the size of the constraint output given by
@@ -244,7 +195,7 @@ class Constraint {
    *
    * @param type
    */
-  void setBounds(const BoundsType &type) {
+  void setBounds(const Bounds::Type &type) {
     bounds_type_ = type;
     setBoundsByType(ub_, lb_, bounds_type_);
   }
@@ -256,7 +207,7 @@ class Constraint {
    * @param ub
    */
   void setBounds(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub) {
-    bounds_type_ = BoundsType::kCustom;
+    bounds_type_ = Bounds::Type::kCustom;
     lb_ = lb;
     ub_ = ub;
 
@@ -267,9 +218,9 @@ class Constraint {
   /**
    * @brief The current type of bounds for the constraint
    *
-   * @return const BoundsType&
+   * @return const Bounds::Type&
    */
-  const BoundsType &getBoundsType() const { return bounds_type_; }
+  const Bounds::Type &getBoundsType() const { return bounds_type_; }
 
   /**
    * @brief Constraint lower bound (dim x 1)
@@ -297,6 +248,30 @@ class Constraint {
   const bool &isUpdated() const { return updated_; }
   bool &isUpdated() { return updated_; }
 
+  /**
+   * @brief Tests whether the p-norm of the constraint is within
+   * the threshold eps.
+   *
+   * @param p The norm of the constraint (use Eigen::Infinity for the
+   * infinity norm)
+   * @param eps
+   * @return true
+   * @return false
+   */
+  bool checkConstraintViolation(const int &p = 2, const double &eps = 1e-6) {
+    // Determine if constraint within threshold
+    double c_norm = 0.0;
+    if (p == 1) {
+      c_norm = fc_->getOutput(0).asDense().lpNorm<1>();
+    } else if (p == 2) {
+      c_norm = fc_->getOutput(0).asDense().lpNorm<2>();
+    } else if (p == Eigen::Infinity) {
+      c_norm = fc_->getOutput(0).asDense().lpNorm<Eigen::Infinity>();
+    }
+
+    return c_norm <= eps;
+  }
+
  protected:
  private:
   // dimension of the constraint
@@ -310,7 +285,7 @@ class Constraint {
   // Name of the constraint
   std::string name_;
 
-  BoundsType bounds_type_ = BoundsType::kUnbounded;
+  Bounds::Type bounds_type_ = Bounds::Type::kUnbounded;
 
   // Constraint lower bound
   Eigen::VectorXd lb_;

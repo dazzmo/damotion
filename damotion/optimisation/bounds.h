@@ -16,18 +16,21 @@
 namespace damotion {
 namespace optimisation {
 
-enum class BoundsType {
-  kEquality,
-  kPositive,
-  kNegative,
-  kStrictlyPositive,
-  kStrictlyNegative,
-  kUnbounded,
-  kCustom
+class Bounds {
+ public:
+  enum class Type {
+    kEquality,
+    kPositive,
+    kNegative,
+    kStrictlyPositive,
+    kStrictlyNegative,
+    kUnbounded,
+    kCustom
+  };
 };
 
 /**
- * @brief Sets the bounds ub and lb based on the BoundsType provided.
+ * @brief Sets the bounds ub and lb based on the Bounds::Type provided.
  *
  * @param ub
  * @param lb
@@ -35,7 +38,7 @@ enum class BoundsType {
  */
 void setBoundsByType(Eigen::Ref<Eigen::VectorXd> ub,
                      Eigen::Ref<Eigen::VectorXd> lb,
-                     const BoundsType type = BoundsType::kUnbounded);
+                     const Bounds::Type type = Bounds::Type::kUnbounded);
 
 }  // namespace optimisation
 }  // namespace damotion

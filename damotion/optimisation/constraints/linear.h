@@ -1,49 +1,42 @@
 #ifndef CONSTRAINTS_LINEAR_H
 #define CONSTRAINTS_LINEAR_H
 
+#include "damotion/common/polynomial_function.h"
 #include "damotion/optimisation/constraints/base.h"
 
 namespace damotion {
 namespace optimisation {
 
-class LinearConstraint : public Constraint {
+class LinearConstraint : public Constraint, public common::PolynomialFunction {
  public:
   using UniquePtr = std::unique_ptr<LinearConstraint>;
   using SharedPtr = std::shared_ptr<LinearConstraint>;
 
   LinearConstraint(const std::string &name,
                    const common::Function::SharedPtr &fcon,
-                   const BoundsType &bounds,
-                   const common::Function::SharedPtr &fcoefs = nullptr)
-      : Constraint(name, fcon, bounds), fcoefs_(std::move(fcoefs)) {
-    // Create constraint based on the function
-  }
+                   const Bounds::Type &bounds)
+      : Constraint(name, fcon, bounds), common::PolynomialFunction(1) {}
 
   LinearConstraint(const std::string &name, const ::casadi::SX &A,
                    const ::casadi::SX &b, const ::casadi::SX &x,
-                   const ::casadi::SXVector &p, const BoundsType &bounds)
-      : Constraint(name, mtimes(A, x) + b, ::casadi::SXVector({x}), p, bounds) {
-    // Create functions for A and b seperately
-    ::casadi::Function f_coefs("lin_coefs", p, {A, b});
-    fcoefs_ = std::make_shared<damotion::casadi::FunctionWrapper>(f_coefs);
+                   const ::casadi::SXVector &p, const Bounds::Type &bounds)
+      : Constraint(name, mtimes(A, x) + b, ::casadi::SXVector({x}), p, bounds),
+        common::PolynomialFunction(1) {
+    // Compute coefficients function
+    common::Function::SharedPtr fc =
+        std::make_shared<damotion::casadi::FunctionWrapper>(
+            ::casadi::Function(name + "linear_coefficients", p, {A, b}));
+    setCoefficientsFunction(fc);
   }
 
-  bool hasCoefficientFunction() { return fcoefs_ != nullptr; }
-
-  /**
-   * @brief Evaluates the coefficients comprising the linear constraint (i.e. A,
-   * b)
-   *
-   * @param p
-   */
-  void evalCoefficients(const std::vector<ConstVectorRef> &p,
-                        std::vector<MatrixRef> &coefs) {
-    fcoefs_->eval(p, coefs);
+  common::Function::Output &A() {
+    return getCoefficientsFunction()->getOutput(0);
+  }
+  common::Function::Output &b() {
+    return getCoefficientsFunction()->getOutput(1);
   }
 
  private:
-  // Optional function to compute constraints individually
-  mutable common::Function::SharedPtr fcoefs_;
 };
 
 }  // namespace optimisation

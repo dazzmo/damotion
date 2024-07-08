@@ -19,10 +19,10 @@ TEST(Program, AddVariables) {
 
   opt::Program program;
 
-  program.AddDecisionVariables(x);
-  program.AddDecisionVariables(y);
+  program.addDecisionVariables(x);
+  program.addDecisionVariables(y);
 
-  program.ListDecisionVariables();
+  program.listDecisionVariables();
 
   EXPECT_TRUE(true);
 }
@@ -35,34 +35,34 @@ TEST(Program, CreateOptimisationVector) {
 
   opt::Program program;
 
-  program.AddDecisionVariables(x);
-  program.AddDecisionVariables(y);
-  program.AddDecisionVariables(z);
+  program.addDecisionVariables(x);
+  program.addDecisionVariables(y);
+  program.addDecisionVariables(z);
 
-  sym::VariableVector opt(program.NumberOfDecisionVariables());
+  sym::VariableVector opt(program.numberOfDecisionVariables());
   opt << x, x, z;
-  EXPECT_FALSE(program.SetDecisionVariableVector(opt));
+  EXPECT_FALSE(program.setDecisionVariableVector(opt));
 
   opt << y, x, z;
-  EXPECT_TRUE(program.SetDecisionVariableVector(opt));
+  EXPECT_TRUE(program.setDecisionVariableVector(opt));
 
   // Check number of variables and parameters
-  EXPECT_EQ(program.NumberOfParameters(), 0);
+  EXPECT_EQ(program.numberOfParameters(), 0);
   EXPECT_EQ(program.NumberOfConstraints(), 0);
-  EXPECT_EQ(program.NumberOfDecisionVariables(), 6);
+  EXPECT_EQ(program.numberOfDecisionVariables(), 6);
 
   // Check indexing
-  EXPECT_EQ(program.GetDecisionVariableIndex(y[0]), 0);
-  EXPECT_EQ(program.GetDecisionVariableIndex(y[1]), 1);
-  EXPECT_EQ(program.GetDecisionVariableIndex(x[0]), 2);
-  EXPECT_EQ(program.GetDecisionVariableIndex(x[1]), 3);
+  EXPECT_EQ(program.getDecisionVariableIndex(y[0]), 0);
+  EXPECT_EQ(program.getDecisionVariableIndex(y[1]), 1);
+  EXPECT_EQ(program.getDecisionVariableIndex(x[0]), 2);
+  EXPECT_EQ(program.getDecisionVariableIndex(x[1]), 3);
 }
 
 TEST(Program, CreateParameters) {
   // Create codegen function
   opt::Program program;
   sym::ParameterVector a = sym::CreateParameterVector("a", 2);
-  program.AddParameters(a);
+  program.addParameters(a);
 
   EXPECT_EQ(a.rows(), 2);
   EXPECT_EQ(a.cols(), 1);
@@ -89,10 +89,10 @@ TEST(Program, AddLinearConstraint) {
 
   std::shared_ptr<opt::LinearConstraint<Eigen::MatrixXd>> con =
       std::make_shared<opt::LinearConstraint<Eigen::MatrixXd>>(
-          "", A, b, opt::BoundsType::kEquality);
+          "", A, b, opt::Bounds::Type::kEquality);
 
-  program.AddDecisionVariables(x);
-  program.AddDecisionVariables(y);
+  program.addDecisionVariables(x);
+  program.addDecisionVariables(y);
 
   sym::VariableVector xy(2);
   xy << x[0], y[1];
@@ -101,7 +101,7 @@ TEST(Program, AddLinearConstraint) {
   LOG(INFO) << "Added Linear Constraint";
 
   sym::ParameterVector a = sym::CreateParameterVector("a", 2);
-  program.AddParameters(a);
+  program.addParameters(a);
   Eigen::Map<Eigen::VectorXd> aref = program.GetParameterRef(a);
 
   LOG(INFO) << "Added Parameter";
@@ -120,7 +120,7 @@ TEST(Program, AddLinearConstraint) {
   LOG(INFO) << "Added Quadratic Cost";
 
   // Create optimisation vector
-  program.SetDecisionVariableVector();
+  program.setDecisionVariableVector();
 
   program.AddBoundingBoxConstraint(-1.0, 1.0, x);
   program.AddBoundingBoxConstraint(-2.0, 2.0, y);
@@ -157,7 +157,7 @@ TEST(Program, SparseProgram) {
 
   opt::LinearConstraint<Eigen::SparseMatrix<double>>::SharedPtr con1 =
       std::make_shared<opt::LinearConstraint<Eigen::SparseMatrix<double>>>(
-          "", A1, b1, opt::BoundsType::kEquality);
+          "", A1, b1, opt::Bounds::Type::kEquality);
   // Create sparse constraint by symbolic expression
   casadi::SX xs = casadi::SX::sym("x", 2);
   sym::VariableVector xcon2(2);
@@ -168,9 +168,9 @@ TEST(Program, SparseProgram) {
 
   opt::LinearConstraint<Eigen::SparseMatrix<double>>::SharedPtr con2 =
       std::make_shared<opt::LinearConstraint<Eigen::SparseMatrix<double>>>(
-          "", expr, opt::BoundsType::kEquality);
+          "", expr, opt::Bounds::Type::kEquality);
 
-  program.AddDecisionVariables(x);
+  program.addDecisionVariables(x);
 
   auto binding1 = program.AddLinearConstraint(con1, {x}, {});
   auto binding2 = program.AddLinearConstraint(con2, {xcon2}, {});
@@ -194,7 +194,7 @@ TEST(Program, SparseProgram) {
   program.AddQuadraticCost(cost, {x}, {});
 
   // Create optimisation vector
-  program.SetDecisionVariableVector();
+  program.setDecisionVariableVector();
 
   program.AddBoundingBoxConstraint(-10.0, 10.0, x);
 

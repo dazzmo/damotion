@@ -24,7 +24,7 @@ LinearisedFrictionConstraint() {
   cone.SetInputs({lambda}, {normal, mu});
 
   return std::make_shared<opt::LinearConstraint<Eigen::MatrixXd>>(
-      "friction_cone", cone, opt::BoundsType::kPositive);
+      "friction_cone", cone, opt::Bounds::Type::kPositive);
 }
 
 OSC::OSC(int nq, int nv, int nu)
@@ -42,8 +42,8 @@ void OSC::AddMotionTask(MotionTask::SharedPtr &task, const casadi::SX &xpos,
                            task->name() + "_motion_task_weighting",
                            task->vdim());
 
-  AddParameters(xaccd);
-  AddParameters(w);
+  addParameters(xaccd);
+  addParameters(w);
 
   // Set references and values
   MotionTaskParameters parameters(GetParameterRef(xaccd), GetParameterRef(w));
@@ -91,10 +91,10 @@ void OSC::AddContactTask(ContactTask::SharedPtr &task, const casadi::SX &xpos,
                        mu = sym::CreateParameterVector(
                            task->name() + "_friction_mu", 1);
 
-  AddParameters(xaccd);
-  AddParameters(w);
-  AddParameters(normal);
-  AddParameters(mu);
+  addParameters(xaccd);
+  addParameters(w);
+  addParameters(normal);
+  addParameters(mu);
 
   // Set parameters
   ContactTaskParameters parameters(GetParameterRef(xaccd), GetParameterRef(w),
@@ -150,7 +150,7 @@ void OSC::AddHolonomicConstraint(const std::string &name, const casadi::SX &c,
   casadi::SX::linear_coeff(d2cdt2, qacc_sx_, A, b, true);
   auto con = std::make_shared<opt::LinearConstraint<Eigen::MatrixXd>>(
       name, A, b, casadi::SXVector({qpos_sx_, qvel_sx_}),
-      opt::BoundsType::kEquality);
+      opt::Bounds::Type::kEquality);
 
   // Add constraint to program
   AddLinearConstraint(con, {qacc_}, {qpos_, qvel_});

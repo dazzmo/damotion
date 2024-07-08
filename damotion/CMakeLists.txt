@@ -21,7 +21,6 @@ common/math/binomial.cc
 common/math/quaternion.cc
 common/trajectory/bezier.cc
 common/trajectory/trajectory.cc
-common/sparsity.cc
 symbolic/variable.cc
 control/osc/tasks/contact.cc
 control/osc/tasks/motion.cc

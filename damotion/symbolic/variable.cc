@@ -3,9 +3,8 @@ namespace damotion {
 namespace symbolic {
 
 // Variable matrix
-VariableMatrix CreateVariableMatrix(const std::string &name, const int m,
-                                    const int n) {
-  VariableMatrix mat(m, n);
+Matrix createMatrix(const std::string &name, const int m, const int n) {
+  Matrix mat(m, n);
   for (int i = 0; i < m; ++i) {
     for (int j = 0; j < n; ++j) {
       mat(i, j) =
@@ -16,8 +15,8 @@ VariableMatrix CreateVariableMatrix(const std::string &name, const int m,
 }
 
 // Variable vector
-VariableVector CreateVariableVector(const std::string &name, const int n) {
-  VariableVector vec(n);
+Vector createVector(const std::string &name, const int n) {
+  Vector vec(n);
   for (int i = 0; i < n; ++i) {
     vec[i] = Variable(name + '_' + std::to_string(i));
   }
@@ -25,19 +24,23 @@ VariableVector CreateVariableVector(const std::string &name, const int n) {
 }
 
 // Create vector of decision variables
-VariableVector ConcatenateVariableRefVector(const VariableRefVector &vars) {
-  int sz = 0;
+Vector concatenateVariables(const VectorRefList &vars) {
+  Vector vec;
   for (const auto &var : vars) {
-    sz += var.size();
+    vec.conservativeResize(vec.size() + var.size());
+    vec.bottomRows(var.size()) = var;
   }
+  return vec;
+}
 
-  VariableVector vec(sz);
-  int cnt = 0;
+Vector concatenateVariables(const MatrixRefList &vars) {
+  Vector vec;
   for (const auto &var : vars) {
-    vec.segment(cnt, var.size()) = var;
-    cnt += var.size();
+    // Flatten variable matrices where applicable
+    Vector tmp = var.reshape(var.rows() * var.cols(), 1);
+    vec.conservativeResize(vec.size() + tmp.size());
+    vec.bottomRows(tmp.size()) = tmp;
   }
-
   return vec;
 }
 
@@ -47,8 +50,7 @@ std::ostream &operator<<(std::ostream &os, damotion::symbolic::Variable var) {
   return os << var.name();
 }
 
-std::ostream &operator<<(std::ostream &os,
-                         damotion::symbolic::VariableVector vector) {
+std::ostream &operator<<(std::ostream &os, damotion::symbolic::Vector vector) {
   std::ostringstream oss;
   for (int i = 0; i < vector.size(); i++) {
     oss << vector[i] << '\n';
@@ -56,8 +58,7 @@ std::ostream &operator<<(std::ostream &os,
   return os << oss.str();
 }
 
-std::ostream &operator<<(std::ostream &os,
-                         damotion::symbolic::VariableMatrix mat) {
+std::ostream &operator<<(std::ostream &os, damotion::symbolic::Matrix mat) {
   std::ostringstream oss;
   oss << "{\n";
   for (int i = 0; i < mat.rows(); i++) {
@@ -71,7 +72,7 @@ std::ostream &operator<<(std::ostream &os,
   return os << oss.str();
 }
 
-void VariableManager::AddVariable(const sym::Variable &var) {
+void VariableManager::addVariable(const sym::Variable &var) {
   if (!IsVariable(var)) {
     // Add to variable vector
     decision_variable_vec_idx_[var.id()] = decision_variables_.size();
@@ -88,23 +89,22 @@ void VariableManager::AddVariable(const sym::Variable &var) {
   }
 }
 
-void VariableManager::AddVariables(
-    const Eigen::Ref<const sym::VariableMatrix> &var) {
+void VariableManager::addVariables(const MatrixRef &var) {
   // Append to our map
   for (int i = 0; i < var.rows(); ++i) {
     for (int j = 0; j < var.cols(); ++j) {
-      AddVariable(var(i, j));
+      addVariable(var(i, j));
     }
   }
 }
 
-bool VariableManager::IsVariable(const sym::Variable &var) {
+bool VariableManager::isVariable(const sym::Variable &var) {
   // Check if variable is already added to the program
   return std::find(decision_variables_.begin(), decision_variables_.end(),
                    var) != decision_variables_.end();
 }
 
-void VariableManager::SetVariableVector() {
+void VariableManager::setVector() {
   // Set indices by order in the decision variable vector
   int idx = 0;
   for (const sym::Variable &xi : decision_variables_) {
@@ -114,9 +114,8 @@ void VariableManager::SetVariableVector() {
   }
 }
 
-bool VariableManager::SetVariableVector(
-    const Eigen::Ref<sym::VariableVector> &var) {
-  assert(var.size() == NumberOfVariables() && "Incorrect input!");
+bool VariableManager::setVector(const Eigen::Ref<sym::Vector> &var) {
+  assert(var.size() == numberOfVariables() && "Incorrect input!");
 
   // Set indices by order in the decision variable vector
   for (sym::Variable &v : decision_variables_) {
@@ -141,12 +140,11 @@ bool VariableManager::SetVariableVector(
   return true;
 }
 
-void VariableManager::RemoveVariables(
-    const Eigen::Ref<sym::VariableMatrix> &var) {
+void VariableManager::removeVariables(const MatrixRef &var) {
   // TODO - Implement
 }
 
-int VariableManager::GetVariableIndex(const sym::Variable &v) {
+int VariableManager::getVariableIndex(const sym::Variable &v) {
   auto it = decision_variable_idx_.find(v.id());
   if (it != decision_variable_idx_.end()) {
     return it->second;
@@ -156,12 +154,11 @@ int VariableManager::GetVariableIndex(const sym::Variable &v) {
   }
 }
 
-std::vector<int> VariableManager::GetVariableIndices(
-    const sym::VariableVector &v) {
+std::vector<int> VariableManager::getVariableIndices(const sym::Vector &v) {
   std::vector<int> indices;
   indices.reserve(v.size());
   for (size_t i = 0; i < v.size(); ++i) {
-    int idx = GetVariableIndex(v[i]);
+    int idx = getVariableIndex(v[i]);
     if (idx >= 0) {
       indices.push_back(idx);
     }
@@ -170,16 +167,15 @@ std::vector<int> VariableManager::GetVariableIndices(
   return indices;
 }
 
-bool VariableManager::IsContinuousInVariableVector(
-    const sym::VariableVector &var) {
-  VLOG(10) << "IsContinuousInVariableVector(), checking " << var;
+bool VariableManager::isContinuousInVector(const sym::Vector &var) {
+  VLOG(10) << "IsContinuousInVector(), checking " << var;
   // Determine the index of the first element within var
-  int idx = GetVariableIndex(var[0]);
+  int idx = getVariableIndex(var[0]);
   // Move through optimisation vector and see if each entry follows one
   // after the other
   for (int i = 1; i < var.size(); ++i) {
     // If not, return false
-    int idx_next = GetVariableIndex(var[i]);
+    int idx_next = getVariableIndex(var[i]);
 
     if (idx_next - idx != 1) {
       VLOG(10) << "false";
@@ -192,7 +188,7 @@ bool VariableManager::IsContinuousInVariableVector(
   return true;
 }
 
-void VariableManager::SetVariableBounds(const sym::Variable &v,
+void VariableManager::setVariableBounds(const sym::Variable &v,
                                         const double &bl, const double &bu) {
   auto it = decision_variable_vec_idx_.find(v.id());
   if (it != decision_variable_vec_idx_.end()) {
@@ -206,15 +202,15 @@ void VariableManager::SetVariableBounds(const sym::Variable &v,
   data.bounds_updated = true;
 }
 
-void VariableManager::SetVariableBounds(const sym::VariableVector &v,
+void VariableManager::setVariableBounds(const sym::Vector &v,
                                         const Eigen::VectorXd &bl,
                                         const Eigen::VectorXd &bu) {
   for (size_t i = 0; i < v.size(); ++i) {
-    SetVariableBounds(v[i], bl[i], bu[i]);
+    setVariableBounds(v[i], bl[i], bu[i]);
   }
 }
 
-void VariableManager::SetVariableInitialValue(const sym::Variable &v,
+void VariableManager::setVariableInitialValue(const sym::Variable &v,
                                               const double &x0) {
   auto it = decision_variable_vec_idx_.find(v.id());
   if (it != decision_variable_vec_idx_.end()) {
@@ -227,14 +223,14 @@ void VariableManager::SetVariableInitialValue(const sym::Variable &v,
   data.initial_value_updated = true;
 }
 
-void VariableManager::SetVariableInitialValue(const sym::VariableVector &v,
+void VariableManager::setVariableInitialValue(const sym::Vector &v,
                                               const Eigen::VectorXd &x0) {
   for (size_t i = 0; i < v.size(); ++i) {
-    SetVariableInitialValue(v[i], x0[i]);
+    setVariableInitialValue(v[i], x0[i]);
   }
 }
 
-void VariableManager::ListVariables() {
+void VariableManager::listVariables() {
   std::cout << "----------------------\n";
   std::cout << "Variable\n";
   std::cout << "----------------------\n";

@@ -18,6 +18,19 @@ class Cost {
 
   Cost(const int &nx, const int &np = 0) {}
 
+  /**
+   * @brief Construct a new Cost object using an existing common::Function
+   * object with the ability to compute the objective.
+   *
+   * @param name
+   * @param f
+   * @param bounds
+   */
+  Cost(const std::string &name, const common::Function::SharedPtr &f,
+       const common::Function::SharedPtr &fgrd = nullptr,
+       const common::Function::SharedPtr &fhes = nullptr)
+      : fc_({std::move(f)}), fg_({std::move(fgrd)}), fh_({std::move(fhes)}) {}
+
   Cost(const casadi::SX &f, const casadi::SXVector &x,
        const casadi::SXVector &p, bool sparse = false) {
     // Create function based on casadi
@@ -37,7 +50,7 @@ class Cost {
     df = ::casadi::SX::gradient(f, xv);
     // Densify if requested
     if (!sparse) df = ::casadi::SX::densify(df);
-    ::casadi::Function fj("df", in, {df});
+    ::casadi::Function fg("df", in, {df});
 
     // Hessian
     ::casadi::SX hf;
@@ -48,7 +61,7 @@ class Cost {
     ::casadi::Function fh("hf", in, {hf});
 
     fc_ = std::make_shared<damotion::casadi::FunctionWrapper>(fc);
-    fj_ = std::make_shared<damotion::casadi::FunctionWrapper>(fj);
+    fj_ = std::make_shared<damotion::casadi::FunctionWrapper>(fg);
     fh_ = std::make_shared<damotion::casadi::FunctionWrapper>(fh);
   }
 
@@ -64,7 +77,7 @@ class Cost {
    *
    * @param name
    */
-  void SetName(const std::string &name) {
+  void setName(const std::string &name) {
     if (name == "") {
       name_ = "cost_" + std::to_string(createID());
     } else {
@@ -73,30 +86,50 @@ class Cost {
   }
 
   void eval(const std::vector<ConstVectorRef> &x,
-            const std::vector<ConstVectorRef> &p, bool check = false) {
+            const std::vector<ConstVectorRef> &p, bool grd) {
     // Evaluate the constraints based on the
-    std::vector<ConstVectorRef> in = {};
-    for (const auto &xi : x) in.push_back(xi);
-    for (const auto &pi : p) in.push_back(pi);
-    Eigen::VectorXd one(1.0);
-    for (size_t i = 0; i < f_->n_out(); ++i) in.push_back(one);
-    // Append flags for evaluating jacobian and hessian
-    Eigen::VectorXd d_flag(1.0), h_flag(0.0);
-    in.push_back(d_flag);
-    in.push_back(h_flag);
-    f_->Eval(in, check);
+    InputDataVector in = {};
+    for (const auto &xi : x) in.push_back(xi.data());
+    for (const auto &pi : p) in.push_back(pi.data());
+    // Perform evaluation depending on what method is used
+    fc_->eval(in);
+    if (jac) fj_->eval(in);
   }
 
-  const GenericEigenMatrix &Value() { return f_->GetOutput(0); }
-  const GenericEigenMatrix &Gradient() { return f_->GetOutput(1); }
-  const GenericEigenMatrix &Hessian() { return f_->GetOutput(2); }
+  bool hasGradient() const { return fg_ != nullptr; }
+  bool hasHessian() const { return fh_ != nullptr; }
+
+  /**
+   * @brief Objective
+   *
+   * @return const Function::Output&
+   */
+  const Function::Output &obj() const { return fc_->GetOutput(0); }
+
+  /**
+   * @brief Objective gradient
+   *
+   * @return const Function::Output&
+   */
+  const Function::Output &grd() const { return fg_->GetOutput(0); }
+
+  /**
+   * @brief Objective Hessian
+   *
+   * @return const Function::Output&
+   */
+  const Function::Output &hes() const { return fh_->GetOutput(0); }
 
  private:
   // Name of the cost
   std::string name_;
 
-  // Function to evaluate the cost
-  common::Function::SharedPtr f_;
+  // Objective function
+  common::Function::SharedPtr fc_;
+  // Objective gradient
+  common::Function::SharedPtr fg_;
+  // Objective hessian
+  common::Function::SharedPtr fh_;
 
   /**
    * @brief Creates a unique id for each cost

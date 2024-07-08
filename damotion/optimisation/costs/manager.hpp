@@ -1,0 +1,5 @@
+#ifndef COSTS_MANAGER_HPP
+#define COSTS_MANAGER_HPP
+
+
+#endif/* COSTS_MANAGER_HPP */

@@ -26,7 +26,7 @@ TEST(IpoptTest, IpoptSolverCreation) {
 
   opt::LinearConstraint<Eigen::SparseMatrix<double>>::SharedPtr con1 =
       std::make_shared<opt::LinearConstraint<Eigen::SparseMatrix<double>>>(
-          "", A1, b1, opt::BoundsType::kEquality);
+          "", A1, b1, opt::Bounds::Type::kEquality);
   // Create sparse constraint by symbolic expression
   casadi::SX xs = casadi::SX::sym("x", 2);
   sym::VariableVector xcon2(2);
@@ -37,9 +37,9 @@ TEST(IpoptTest, IpoptSolverCreation) {
 
   opt::LinearConstraint<Eigen::SparseMatrix<double>>::SharedPtr con2 =
       std::make_shared<opt::LinearConstraint<Eigen::SparseMatrix<double>>>(
-          "", expr, opt::BoundsType::kEquality);
+          "", expr, opt::Bounds::Type::kEquality);
 
-  program.AddDecisionVariables(x);
+  program.addDecisionVariables(x);
 
   program.AddLinearConstraint(con1, {x}, {});
   program.AddLinearConstraint(con2, {xcon2}, {});
@@ -54,7 +54,7 @@ TEST(IpoptTest, IpoptSolverCreation) {
   program.AddQuadraticCost(cost, {x}, {});
 
   // Create optimisation vector
-  program.SetDecisionVariableVector();
+  program.setDecisionVariableVector();
 
   program.AddBoundingBoxConstraint(-10.0, 10.0, x);
 

@@ -28,7 +28,7 @@ TEST(Program, SparseProgram) {
 
   opt::LinearConstraint<MatType>::SharedPtr con1 =
       std::make_shared<opt::LinearConstraint<MatType>>(
-          "", A1, b1, opt::BoundsType::kEquality);
+          "", A1, b1, opt::Bounds::Type::kEquality);
   // Create sparse constraint by symbolic expression
   casadi::SX xs = casadi::SX::sym("x", 2);
   sym::VariableVector xcon2(2);
@@ -39,7 +39,7 @@ TEST(Program, SparseProgram) {
 
   opt::LinearConstraint<MatType>::SharedPtr con2 =
       std::make_shared<opt::LinearConstraint<MatType>>(
-          "", expr, opt::BoundsType::kEquality);
+          "", expr, opt::Bounds::Type::kEquality);
 
   // Create bindings
   auto binding1 = opt::Binding<opt::LinearConstraint<MatType>>(con1, {x}, {});
@@ -47,8 +47,8 @@ TEST(Program, SparseProgram) {
       opt::Binding<opt::LinearConstraint<MatType>>(con2, {xcon2}, {});
 
   opt::SparseProgram program;
-  program.AddDecisionVariables(x);
-  program.SetDecisionVariableVector();
+  program.addDecisionVariables(x);
+  program.setDecisionVariableVector();
 
   // Create matrix for this constraints
   opt::BlockMatrixFunction block(2, 10,

@@ -15,7 +15,7 @@ TEST(Constraint, ConstructByExpression) {
   // c(1) = 2.0 * x(0) * x(1);
   // c.SetInputs({x}, {});
 
-  // opt::Constraint constraint("con", c, opt::BoundsType::kEquality);
+  // opt::Constraint constraint("con", c, opt::Bounds::Type::kEquality);
 
   // // Test constraint by evaluation
   // Eigen::VectorXd xt(2);

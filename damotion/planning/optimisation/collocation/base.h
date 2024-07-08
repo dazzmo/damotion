@@ -21,7 +21,7 @@ class CollocationConstraintBase {
   // CollocationConstraintBase(const &model)
   std::shared_ptr<damotion::optimisation::ConstraintBase> GetConstraint() {
     auto c = std::make_shared<damotion::optimisation::ConstraintBase>(
-        "collocation", con_, damotion::optimisation::BoundsType::kEquality,
+        "collocation", con_, damotion::optimisation::Bounds::Type::kEquality,
         true, true);
     return c;
   }

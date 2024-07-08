@@ -6,44 +6,29 @@
 namespace damotion {
 namespace optimisation {
 
-/**
- * @brief Represents the function for the constraint lb < f(x, p) < ub
- *
- */
-class BoundingBoxFunction : public common::Function {
-  // Override the function and include derivative data
- public:
-  BoundingBoxFunction(const size_t &n) {
-    // Create constraint vector
-    out_.push_back(GenericEigenMatrix(n, 1));
-    // Create jacobian matrix
-    Eigen::SparseMatrix<double> I(n, n);
-    I.setIdentity();
-    out_.push_back(GenericEigenMatrix(I));
-  }
-
-  void evalImpl(const std::vector<ConstVectorRef> &input, bool check = false) {
-    // Adjust constraint vector
-    out_[0].toVectorXdRef() << input[0];
-    // Jacobian is constant
-  }
-
-  const GenericEigenMatrix &GetOutputImpl(const size_t &i) { return out_[i]; }
-
- private:
-  std::vector<GenericEigenMatrix> out_;
-};
-
 class BoundingBoxConstraint : public Constraint {
  public:
   BoundingBoxConstraint(const std::string &name, const int &nx,
-                        const Eigen::VectorXd &lb, const Eigen::VectorXd &ub)
+                        const ::casadi::SX &lb, const ::casadi::SX &ub,
+                        const ::casadi::SX &x, const ::casadi::SX &p)
       : Constraint("bb", std::make_shared<BoundingBoxFunction>(),
-                   BoundsType::kCustom) {
+                   Bounds::Type::kCustom) {
     assert(lb.rows() == ub.rows() && "lb and ub must be same dimension!");
     // Create output vector and derivative
     this->setBounds(lb, ub);
   }
+
+  void eval(const common::Function::InputVector &x,
+            const common::Function::InputVector &p, bool jac) {
+    // Evaluate the constraints based on the
+    common::Function::InputVector in = {};
+    for (const auto &xi : x) in.push_back(xi);
+    for (const auto &pi : p) in.push_back(pi);
+    // Perform evaluation depending on what method is used
+    // TODO - Evaluate the constraint within the provided bounds
+  }
+
+ private:
 };
 
 }  // namespace optimisation

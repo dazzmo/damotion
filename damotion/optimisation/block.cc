@@ -16,7 +16,7 @@ void BlockMatrixFunction::AddBinding(const BindingBase &binding,
                                      Program &program) {
   // Get indices of all variables within the program
   const sym::VariableVector &v = binding.GetConcatenatedVariableVector();
-  std::vector<int> indices = program.GetDecisionVariableIndices(v);
+  std::vector<int> indices = program.getDecisionVariableIndices(v);
 
   // Add binding's data non-zero entry indices to a vector look-up
   binding_idx_[binding.id()].resize(data.nnz());

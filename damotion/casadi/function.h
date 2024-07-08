@@ -18,10 +18,6 @@ namespace casadi {
  *
  */
 class FunctionWrapper : public common::Function {
-  // Forward declarations
- protected:
-  struct FunctionWrapperData;
-
  public:
   using SharedPtr = std::shared_ptr<FunctionWrapper>;
   using UniquePtr = std::unique_ptr<FunctionWrapper>;
@@ -72,6 +68,36 @@ class FunctionWrapper : public common::Function {
     // TODO - See if this has a negative effect
     f_ = std::move(f);
 
+    // Create outputs for the system
+    out_.resize(f.n_out());
+
+    // Create Function::Output objects for each input, paying attention to
+    // matrix densities
+    for (casadi_int i = 0; i < f.n_out(); ++i) {
+      const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
+
+      size_t rows = sparsity.rows();
+      size_t cols = sparsity.columns();
+      size_t nnz = sparsity.nnz();
+
+      // Create output based on density of matrix
+      if (nnz < rows * cols) {
+        // Sparse output, get i_row and j_col pointers
+        std::vector<casadi_int> r, c;
+        sparsity.get_triplet(r, c);
+        std::vector<int> i_row = std::vector<int>(r.begin(), r.end());
+        std::vector<int> j_col = std::vector<int>(c.begin(), c.end());
+        // Create sparse output
+        out_[i] = Function::Output(rows, cols, nnz, i_row, j_col);
+      } else {
+        // Create dense output
+        out_[i] = Function::Output(rows, cols);
+      }
+
+      // Register data with output vector
+      out_data_ptr_.push_back(out_[i].data());
+    }
+
     // Checkout memory object for function
     mem_ = f.checkout();
 
@@ -83,44 +109,29 @@ class FunctionWrapper : public common::Function {
    * @brief Calls the function with the current inputs
    *
    */
-  void evalImpl(const InputDataVector &in, OutputDataVector &out) override {
-    // Call the function
-    f_(in_data_ptr.data(), out_data_ptr.data(), iw_.data(), dw_.data(), mem_);
-  }
-
-  void getOutputSparsityInfoImpl(const size_t &i, size_t &rows, size_t &cols,
-                                 size_t &nnz, std::vector<int> &i_row,
-                                 std::vector<int> &j_col) override {
-    // Determine which function it is referring to
-    const ::casadi::Sparsity &sparsity = f_.sparsity_out(i);
-
-    rows = sparsity.rows();
-    cols = sparsity.columns();
-    nnz = sparsity.nnz();
-
-    i_row = {};
-    j_col = {};
-    if (nnz < rows * cols) {
-      // Sparse output, get i_row and j_col pointers
-      std::vector<casadi_int> r, c;
-      sparsity.get_triplet(r, c);
-      i_row = std::vector<int>(r.begin(), r.end());
-      j_col = std::vector<int>(c.begin(), c.end());
+  void evalImpl(const common::Function::InputVector &input) override {
+    std::vector<const Scalar *> in_data_ptr = {};
+    for (const auto &in : input) {
+      in_data_ptr.push_back(in.data());
     }
+    // Call the function
+    f_(in_data_ptr.data(), out_data_ptr_.data(), iw_.data(), dw_.data(), mem_);
   }
 
  protected:
+  // Functions
+  mutable ::casadi::Function f_;
+
+  // Vector of data pointers for each output
+  std::vector<Scalar *> out_data_ptr_;
+
+ private:
   // Memory allocated for function evaluations
   int mem_;
   // Integer working vectors
   std::vector<casadi_int> iw_;
   // Double working vectors
   std::vector<double> dw_;
-
-  // Functions
-  mutable ::casadi::Function f_;
-
- private:
 };
 
 }  // namespace casadi

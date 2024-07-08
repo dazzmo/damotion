@@ -11,7 +11,7 @@ namespace optimisation {
 
 class BindingBase {
  public:
-  typedef int Id;
+  typedef size_t Id;
 
   BindingBase() = default;
   ~BindingBase() = default;
@@ -25,26 +25,10 @@ class BindingBase {
    * @param x
    * @param p
    */
-  BindingBase(const sym::VariableRefVector &x,
-              const sym::VariableRefVector &p = {}) {
-    // Set variable vector
-    x_.reserve(x.size());
-    for (auto xi : x) {
-      x_.push_back(std::make_shared<sym::VariableVector>(xi));
-    }
-
-    // Create vector of Variables
-    p_.reserve(p.size());
-    for (auto pi : p) {
-      p_.push_back(std::make_shared<sym::VariableVector>(pi));
-    }
-
+  BindingBase(const sym::VectorRefList &x, const sym::VectorRefList &p = {})
+      : x_(x), p_(p) {
     // Create a concatenated variable vector
-    xc_ = std::make_shared<sym::VariableVector>(
-        sym::ConcatenateVariableRefVector(x));
-
-    nx_ = x.size();
-    np_ = p.size();
+    xc_ = std::make_shared<sym::Vector>(sym::concatenateVariables(x));
 
     static Id next_id = 0;
     id_ = next_id++;
@@ -52,60 +36,33 @@ class BindingBase {
   }
 
   /**
-   * @brief Number of inputs x for the binding
+   * @brief Variable vectors x for the binding
    *
-   * @return const int&
+   * @return sym::VectorRefList
    */
-  const int &nx() const { return nx_; }
+  const sym::VectorRefList &x() const { return x_; }
 
   /**
-   * @brief Number of Variables p for the binding
+   * @brief Variable parameters p for the binding
    *
-   * @return const int&
+   * @return sym::VectorRefList
    */
-  const int &np() const { return np_; }
-
-  /**
-   * @brief The i-th input x_i for the binding
-   *
-   * @param i
-   * @return const sym::VariableVector&
-   */
-  const sym::VariableVector &x(const int i) const {
-    assert(i < 0 && i >= nx() && "Out of range for binding inputs");
-    return *x_[i];
-  }
+  const sym::VectorRefList &p() const { return p_; }
 
   /**
    * @brief Returns the vector of concatenated inputs x
    *
-   * @return const sym::VariableVector&
+   * @return const sym::Vector&
    */
-  const sym::VariableVector &GetConcatenatedVariableVector() const {
-    return *xc_;
-  }
-
-  /**
-   * @brief The i-th Variable p_i for the binding
-   *
-   * @param i
-   * @return const sym::VariableVector&
-   */
-  const sym::VariableVector &p(const int &i) const {
-    assert(i < 0 && i >= np() && "Out of range for binding Variables");
-    return *p_[i];
-  }
+  const sym::Vector &getConcatenatedVector() const { return *xc_; }
 
  protected:
   Id id_;
 
-  int nx_ = 0;
-  int np_ = 0;
-
   // Vector of variables bound to the constraint
-  std::vector<std::shared_ptr<sym::VariableVector>> x_ = {};
-  std::vector<std::shared_ptr<sym::VariableVector>> p_ = {};
-  std::shared_ptr<sym::VariableVector> xc_ = nullptr;
+  sym::VectorRefList x_;
+  sym::VectorRefList p_;
+  std::shared_ptr<sym::Vector> xc_ = nullptr;
 };
 
 template <typename T>
@@ -124,8 +81,8 @@ class Binding : public BindingBase {
    * @param x
    * @param p
    */
-  Binding(const std::shared_ptr<T> &c, const sym::VariableRefVector &x,
-          const sym::VariableRefVector &p = {})
+  Binding(const std::shared_ptr<T> &c, const sym::VectorRefList &x,
+          const sym::VectorRefList &p = {})
       : BindingBase(x, p) {
     c_ = c;
   }
@@ -144,14 +101,13 @@ class Binding : public BindingBase {
       : Binding() {
     // Maintain the same binding id
     id_ = b.id();
-    // Copy all data
+    
     c_ = b.c_;
-
-    nx_ = b.nx_;
-    x_ = b.x_;
+    
+    // Copy all data
     xc_ = b.xc_;
-
-    np_ = b.np_;
+    
+    x_ = b.x_;
     p_ = b.p_;
   }
 
@@ -160,10 +116,10 @@ class Binding : public BindingBase {
    *
    * @return T&
    */
-  T &Get() { return *c_; }
-  const T &Get() const { return *c_; }
+  T &get() { return *c_; }
+  const T &get() const { return *c_; }
 
-  const std::shared_ptr<T> &GetPtr() const { return c_; }
+  const std::shared_ptr<T> &getPtr() const { return c_; }
 
  private:
   // Pointer to bound class T
@@ -173,4 +129,4 @@ class Binding : public BindingBase {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* OPTIMISATION_BINDING_H */
+#endif/* OPTIMISATION_BINDING_H */
