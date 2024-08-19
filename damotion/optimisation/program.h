@@ -5,9 +5,9 @@
 
 #include "damotion/casadi/codegen.h"
 #include "damotion/casadi/eigen.h"
-#include "damotion/casadi/function.h"
-#include "damotion/common/logging.h"
-#include "damotion/common/profiler.h"
+#include "damotion/casadi/function.hpp"
+#include "damotion/core/logging.hpp"
+#include "damotion/core/profiler.hpp"
 #include "damotion/optimisation/binding.h"
 #include "damotion/optimisation/constraints/constraints.h"
 #include "damotion/optimisation/costs/costs.h"

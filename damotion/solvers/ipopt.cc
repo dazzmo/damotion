@@ -23,7 +23,7 @@ bool IpoptSolverInstance::get_nlp_info(Index& n, Index& m, Index& nnz_jac_g,
 
 bool IpoptSolverInstance::eval_f(Index n, const Number* x, bool new_x,
                                  Number& obj_value) {
-  common::Profiler profiler("IpoptSolverInstance::eval_f");
+  core::Profiler profiler("IpoptSolverInstance::eval_f");
   VLOG(10) << "eval_f()";
 
   if (new_x) {
@@ -41,7 +41,7 @@ bool IpoptSolverInstance::eval_f(Index n, const Number* x, bool new_x,
 
 bool IpoptSolverInstance::eval_grad_f(Index n, const Number* x, bool new_x,
                                       Number* grad_f) {
-  common::Profiler profiler("IpoptSolverInstance::eval_grad_f");
+  core::Profiler profiler("IpoptSolverInstance::eval_grad_f");
   VLOG(10) << "eval_grad_f()";
 
   if (new_x) {
@@ -59,7 +59,7 @@ bool IpoptSolverInstance::eval_grad_f(Index n, const Number* x, bool new_x,
 
 bool IpoptSolverInstance::eval_g(Index n, const Number* x, bool new_x, Index m,
                                  Number* g) {
-  common::Profiler profiler("IpoptSolverInstance::eval_g");
+  core::Profiler profiler("IpoptSolverInstance::eval_g");
   VLOG(10) << "eval_g()";
   if (new_x) {
     decision_variable_cache_ =
@@ -76,7 +76,7 @@ bool IpoptSolverInstance::eval_g(Index n, const Number* x, bool new_x, Index m,
 bool IpoptSolverInstance::eval_jac_g(Index n, const Number* x, bool new_x,
                                      Index m, Index nele_jac, Index* iRow,
                                      Index* jCol, Number* values) {
-  common::Profiler profiler("IpoptSolverInstance::eval_jac_g");
+  core::Profiler profiler("IpoptSolverInstance::eval_jac_g");
   VLOG(10) << "eval_jac_g()";
   if (values == NULL) {
     // Return the sparsity of the constraint Jacobian
@@ -113,7 +113,7 @@ bool IpoptSolverInstance::eval_h(Index n, const Number* x, bool new_x,
                                  const Number* lambda, bool new_lambda,
                                  Index nele_hess, Index* iRow, Index* jCol,
                                  Number* values) {
-  common::Profiler profiler("IpoptSolverInstance::eval_h");
+  core::Profiler profiler("IpoptSolverInstance::eval_h");
   VLOG(10) << "eval_h()";
   if (values == NULL) {
     // Return the sparsity of the constraint Jacobian

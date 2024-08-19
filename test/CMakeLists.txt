@@ -8,25 +8,15 @@ enable_testing()
 
 # Create list of files
 SET(TEST_FILES
-common/function.cc
-utils/codegen.cc
-utils/eigen_wrapper.cc
-utils/pinocchio_model.cc
-utils/log.cc
-utils/expression.cc
-common/profiler.cc
-control/osc.cc
-optimisation/block.cc
-optimisation/program.cc
-planning/collocation.cc
-solvers/cost.cc
-solvers/ipopt.cc
+core/function.cc
+casadi/function.cc
 )
 
 include(GoogleTest)
 
 foreach(current_file IN LISTS TEST_FILES)
-get_filename_component(current_name ${current_file} NAME_WE)
-    add_executable("${current_name}_unit_test" ${current_file})
-    target_link_libraries("${current_name}_unit_test" damotion::damotion GTest::gtest_main glog gflags)
+    get_filename_component(current_folder ${current_file} DIRECTORY)
+    get_filename_component(current_name ${current_file} NAME_WE)
+    add_executable("${current_folder}_${current_name}_unit_test" ${current_file})
+    target_link_libraries("${current_folder}_${current_name}_unit_test" damotion GTest::gtest_main glog gflags)
 endforeach()

@@ -4,8 +4,8 @@
 #include <coin-or/IpIpoptApplication.hpp>
 #include <coin-or/IpTNLP.hpp>
 
-#include "damotion/common/logging.h"
-#include "damotion/common/profiler.h"
+#include "damotion/core/logging.h"
+#include "damotion/core/profiler.h"
 #include "damotion/optimisation/program.h"
 #include "damotion/solvers/sparse.h"
 

@@ -9,9 +9,9 @@
 
 #include "damotion/casadi/codegen.h"
 #include "damotion/casadi/eigen.h"
-#include "damotion/casadi/function.h"
+#include "damotion/casadi/function.hpp"
 #include "damotion/casadi/pinocchio_model.h"
-#include "damotion/common/profiler.h"
+#include "damotion/core/profiler.h"
 #include "damotion/control/fwd.h"
 #include "damotion/optimisation/constraints/constraints.h"
 #include "damotion/optimisation/costs/costs.h"
@@ -167,7 +167,7 @@ class Task {
    *
    * @param f
    */
-  void SetFunction(const common::Function<Eigen::VectorXd>::SharedPtr &f) {
+  void SetFunction(const core::Function<Eigen::VectorXd>::SharedPtr &f) {
     f_ = f;
   }
 
@@ -189,7 +189,7 @@ class Task {
   std::string name_;
 
   // Wrapper for the function of the symbolic function
-  common::Function<Eigen::VectorXd>::SharedPtr f_;
+  core::Function<Eigen::VectorXd>::SharedPtr f_;
 };
 
 }  // namespace osc

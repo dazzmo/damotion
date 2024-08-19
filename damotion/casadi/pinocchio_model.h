@@ -9,8 +9,8 @@
  *
  *
  */
-#ifndef UTILS_PINOCCHIO_MODEL_H
-#define UTILS_PINOCCHIO_MODEL_H
+#ifndef CASADI_PINOCCHIO_MODEL_H
+#define CASADI_PINOCCHIO_MODEL_H
 
 #include <pinocchio/algorithm/aba.hpp>
 #include <pinocchio/algorithm/center-of-mass.hpp>
@@ -27,7 +27,7 @@
 #include <pinocchio/algorithm/centroidal.hpp>
 
 #include "damotion/casadi/eigen.h"
-#include "damotion/common/math/log.h"
+#include "damotion/core/math/log.h"
 
 namespace damotion {
 namespace casadi {
@@ -119,4 +119,4 @@ class PinocchioModelWrapper {
 }  // namespace casadi
 }  // namespace damotion
 
-#endif /* UTILS_PINOCCHIO_MODEL_H */
+#endif/* CASADI_PINOCCHIO_MODEL_H */

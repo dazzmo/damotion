@@ -15,8 +15,7 @@
 namespace damotion {
 namespace optimisation {
 namespace sym = damotion::symbolic;
-// Set true namespace of casadi unless otherwise stated
-namespace casadi = ::casadi;
+
 }  // namespace optimisation
 }  // namespace damotion
 

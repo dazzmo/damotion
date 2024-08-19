@@ -9,10 +9,10 @@
 
 #include "damotion/casadi/codegen.h"
 #include "damotion/casadi/eigen.h"
-#include "damotion/casadi/function.h"
+#include "damotion/casadi/function.hpp"
 #include "damotion/casadi/pinocchio_model.h"
-#include "damotion/common/math/quaternion.h"
-#include "damotion/common/profiler.h"
+#include "damotion/core/math/quaternion.h"
+#include "damotion/core/profiler.h"
 #include "damotion/control/fwd.h"
 #include "damotion/control/osc/tasks/contact.h"
 #include "damotion/control/osc/tasks/motion.h"

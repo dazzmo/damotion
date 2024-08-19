@@ -1,21 +1,28 @@
-#ifndef SOLVERS_VARIABLE_H
-#define SOLVERS_VARIABLE_H
+#ifndef SYMBOLIC_VARIABLE_H
+#define SYMBOLIC_VARIABLE_H
 
 #include <Eigen/Core>
 #include <casadi/casadi.hpp>
 #include <ostream>
 
+#include "damotion/optimisation/bounds.hpp"
+#include "damotion/optimisation/initial_value.hpp"
+
 namespace damotion {
 namespace symbolic {
 
-class Variable {
+class Variable : public optimisation::BoundedObject<double>,
+                 public optimisation::InitialiseableObject<double> {
  public:
   // ID type for the variables
-  typedef size_t Id;
+  typedef std::size_t Id;
+
+  enum class Type { CONTINUOUS = 0, DISCRETE };
 
   Variable() = default;
 
-  Variable(const std::string &name) {
+  Variable(const std::string &name)
+      : BoundedObject<double>(), InitialiseableObject<double>() {
     static int next_id_ = 0;
     next_id_++;
     // Set ID for variable
@@ -25,8 +32,6 @@ class Variable {
   }
 
   ~Variable() = default;
-
-  // enum class Type : uint8_t { kContinuous };
 
   const Id &id() const { return id_; }
   const std::string &name() const { return name_; }
@@ -66,50 +71,59 @@ std::ostream &operator<<(std::ostream &os, Matrix mat);
  * vector
  *
  */
-class VariableManager {
+class VariableVector
+    : public optimisation::BoundedObject<Eigen::VectorXd>,
+      public optimisation::InitialiseableObject<Eigen::VectorXd> {
  public:
-  using SharedPtr = std::shared_ptr<VariableManager>;
-  using UniquePtr = std::unique_ptr<VariableManager>;
+  using Index = std::size_t;
+  using IndexVector = std::vector<Index>;
 
-  VariableManager() : n_variables_(0) {}
-  ~VariableManager() = default;
+  using SharedPtr = std::shared_ptr<VariableVector>;
+  using UniquePtr = std::unique_ptr<VariableVector>;
+
+  VariableVector()
+      : optimisation::BoundedObject<Eigen::VectorXd>(0),
+        optimisation::InitialiseableObject<Eigen::VectorXd>(0),
+        sz_(0) {}
+        
+  ~VariableVector() = default;
 
   /**
-   * @brief Number of decision variables currently in the program
+   * @brief Number of variables comprising the vector
    *
    * @return const int&
    */
-  const int &numberOfVariables() const { return n_variables_; }
+  const Index &size() const { return sz_; }
 
   /**
    * @brief Adds a decision variable
    *
    * @param var
    */
-  void addVariable(const Variable &var);
+  void add(const Variable &var);
 
   /**
-   * @brief Add decision variables
+   * @brief Add decision variables to the vector
    *
    * @param var
    */
-  void addVariables(const MatrixRef &var);
+  void add(const MatrixRef &var);
 
   /**
    * @brief Removes variables currently considered by the program.
    *
    * @param var
    */
-  void removeVariables(const MatrixRef &var);
+  void remove(const MatrixRef &var);
 
   /**
-   * @brief Whether a variable var is a decision variable within the program
+   * @brief Whether a variable var is contained within the vector
    *
    * @param var
    * @return true
    * @return false
    */
-  bool isVariable(const Variable &var);
+  bool contains(const Variable &var);
 
   /**
    * @brief Returns the index of the given variable within the created
@@ -118,148 +132,42 @@ class VariableManager {
    * @param v
    * @return int
    */
-  int getVariableIndex(const Variable &v);
+  const Index &getIndex(const Variable &v) const;
 
   /**
    * @brief Returns a vector of indices for the position of each entry in v in
-   * the current decision variable vector.
+   * the current variable vector.
    *
    * @param v
-   * @return std::vector<int>
+   * @return IndexVector
    */
-  std::vector<int> getVariableIndices(const Vector &v);
-
-  /**
-   * @brief Set the vector of decision variables to the default ordering of
-   * variables (ordered by when they were added)
-   *
-   */
-  void setVector();
+  IndexVector getIndices(const Vector &v);
 
   /**
    * @brief Sets the optimisation vector with the given ordering of variables
    *
    * @param var
    */
-  bool setVector(const VectorRef &var);
-
-  /**
-   * @brief Returns a vector of the values of each variable entry in the manager
-   * in the current order provided
-   *
-   * @return const Eigen::VectorXd&
-   */
-  const Eigen::VectorXd &getVariableValueVector() const { return x_; }
-
-  /**
-   * @brief Determines whether a vector of variables var is continuous within
-   * the optimisation vector of the program.
-   *
-   * @param var
-   * @return true
-   * @return false
-   */
-  bool isContinuousInVector(const Vector &var);
-
-  /**
-   * @brief Updates the decision variable bound vectors with all the current
-   * values set for the decision variables.
-   *
-   */
-  void updateVariableBoundVectors() {
-    for (size_t i = 0; i < decision_variables_.size(); ++i) {
-      VariableData &data = decision_variables_data_[i];
-      if (data.bounds_updated) {
-        int idx = getVariableIndex(decision_variables_[i]);
-        xbl_[idx] = data.bl;
-        xbu_[idx] = data.bu;
-      }
-    }
-  }
-
-  /**
-   * @brief Updates the initial value vector for the decision variables with all
-   * the current values set for the decision variables.
-   *
-   */
-  void updateInitialValueVector() {
-    for (size_t i = 0; i < decision_variables_.size(); ++i) {
-      VariableData &data = decision_variables_data_[i];
-      if (data.initial_value_updated) {
-        int idx = getVariableIndex(decision_variables_[i]);
-        x0_[idx] = data.x0;
-      }
-    }
-  }
-
-  /**
-   * @brief Vector of initial values for the decision variables within the
-   * program.
-   *
-   * @return const Eigen::VectorXd&
-   */
-  const Eigen::VectorXd &variableInitialValues() const { return x0_; }
-
-  /**
-   * @brief Upper bound for decision variables within the current program.
-   *
-   * @return const Eigen::VectorXd&
-   */
-  const Eigen::VectorXd &variableupperBounds() const { return xbu_; }
-
-  /**
-   * @brief Upper bound for decision variables within the current program.
-   *
-   * @return const Eigen::VectorXd&
-   */
-  const Eigen::VectorXd &variablelowerBounds() const { return xbl_; }
-
-  void setVariableBounds(const Variable &v, const double &lb, const double &ub);
-  void setVariableBounds(const Vector &v, const Eigen::VectorXd &lb,
-                         const Eigen::VectorXd &ub);
-
-  void setVariableInitialValue(const Variable &v, const double &x0);
-  void setVariableInitialValue(const Vector &v, const Eigen::VectorXd &x0);
+  bool reorder(const VectorRef &var);
 
   /**
    * @brief Prints the current set of parameters for the program to the
    * screen
    *
    */
-  void listVariables();
+  void list();
 
  private:
   // Number of decision variables
-  int n_variables_;
-
-  // Decision variable upper bounds
-  Eigen::VectorXd xbu_;
-  // Decision variable lower bounds
-  Eigen::VectorXd xbl_;
-  // Initial values for decision variables
-  Eigen::VectorXd x0_;
-  // Vector of variable values
-  Eigen::VectorXd x_;
+  Index sz_;
 
   // Location of each decision variable within the optimisation vector
-  std::unordered_map<Variable::Id, int> decision_variable_idx_;
-  // Index locations for data related to each variable
-  std::unordered_map<Variable::Id, int> decision_variable_vec_idx_;
+  std::unordered_map<Variable::Id, Index> variable_idx_;
   // Vector of all decision variables used
-  std::vector<Variable> decision_variables_;
-
-  struct VariableData {
-    bool bounds_updated = false;
-    bool initial_value_updated = false;
-    double bl = -std::numeric_limits<double>::infinity();
-    double bu = std::numeric_limits<double>::infinity();
-    double x0 = 0.0;
-  };
-
-  std::vector<VariableData> decision_variables_data_;
+  std::vector<Variable> variables_;
 };
 
 }  // namespace symbolic
 }  // namespace damotion
 
-#endif /* SOLVERS_VARIABLE_H */
+#endif/* SYMBOLIC_VARIABLE_H */

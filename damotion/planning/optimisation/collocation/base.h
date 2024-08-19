@@ -3,7 +3,7 @@
 
 #include <casadi/casadi.hpp>
 
-#include "damotion/common/logging.h"
+#include "damotion/core/logging.h"
 #include "damotion/optimisation/constraints/base.h"
 #include "damotion/symbolic/expression.h"
 

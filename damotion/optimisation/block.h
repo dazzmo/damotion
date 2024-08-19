@@ -14,7 +14,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "damotion/common/eigen.h"
+#include "damotion/core/eigen.h"
 #include "damotion/optimisation/binding.h"
 #include "damotion/optimisation/fwd.h"
 #include "damotion/optimisation/program.h"

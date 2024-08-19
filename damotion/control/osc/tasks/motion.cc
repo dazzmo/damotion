@@ -5,14 +5,14 @@ namespace control {
 namespace osc {
 
 void PositionTask::ComputeMotionError() {
-  damotion::common::Profiler profiler("PositionTask::ComputeMotionError");
+  damotion::core::Profiler profiler("PositionTask::ComputeMotionError");
 
   e_ = pos() - GetReference().x;
   de_ = vel() - GetReference().v;
 }
 
 void OrientationTask::ComputeMotionError() {
-  damotion::common::Profiler profiler("OrientationTask::ComputeMotionError");
+  damotion::core::Profiler profiler("OrientationTask::ComputeMotionError");
 
   // Get rotational component
   Eigen::Quaterniond q;
@@ -38,7 +38,7 @@ void OrientationTask::ComputeMotionError() {
 }
 
 void PoseTask::ComputeMotionError() {
-  damotion::common::Profiler profiler("PoseTask::ComputeMotionError");
+  damotion::core::Profiler profiler("PoseTask::ComputeMotionError");
 
   // Convert to 6D pose
   Eigen::Vector3d x = pos().topRows(3);

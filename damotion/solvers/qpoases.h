@@ -5,8 +5,8 @@
 
 #include <qpOASES.hpp>
 
-#include "damotion/common/logging.h"
-#include "damotion/common/profiler.h"
+#include "damotion/core/logging.h"
+#include "damotion/core/profiler.h"
 #include "damotion/optimisation/program.h"
 #include "damotion/solvers/solver.h"
 
@@ -72,7 +72,7 @@ class QPOASESSolverInstance : public SolverBase {
   }
 
   void Solve() {
-    common::Profiler profiler("QPOASESSolverInstance::Solve");
+    core::Profiler profiler("QPOASESSolverInstance::Solve");
     // Number of decision variables in the program
     int nx = GetCurrentProgram().numberOfDecisionVariables();
     int nc = GetCurrentProgram().NumberOfConstraints();

@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "damotion/common/logging.h"
+#include "damotion/core/logging.hpp"
 #include "damotion/optimisation/fwd.h"
 
 namespace damotion {
@@ -11,7 +11,7 @@ namespace optimisation {
 
 class BindingBase {
  public:
-  typedef size_t Id;
+  typedef std::size_t Id;
 
   BindingBase() = default;
   ~BindingBase() = default;
@@ -65,7 +65,7 @@ class BindingBase {
   std::shared_ptr<sym::Vector> xc_ = nullptr;
 };
 
-template <typename T>
+template <class T>
 class Binding : public BindingBase {
  public:
   template <typename U>

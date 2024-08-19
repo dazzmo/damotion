@@ -5,14 +5,14 @@ namespace control {
 namespace osc {
 
 void ContactTask3D::ComputeMotionError() {
-  damotion::common::Profiler profiler("ContactTask3D::ComputeMotionError");
+  damotion::core::Profiler profiler("ContactTask3D::ComputeMotionError");
 
   e_ = pos() - GetReference().x;
   de_ = vel();
 }
 
 void ContactTask6D::ComputeMotionError() {
-  damotion::common::Profiler profiler("ContactTask6D::ComputeMotionError");
+  damotion::core::Profiler profiler("ContactTask6D::ComputeMotionError");
 
   throw std::runtime_error(
       "ContactTask6D::ComputeMotionError() is not currently implemented!");

@@ -1,4 +1,4 @@
-# Common editor-specific files
+# core editor-specific files
 *.idea
 *.autosave
 *.log

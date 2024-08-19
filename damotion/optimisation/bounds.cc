@@ -1,50 +1,44 @@
-#include "damotion/optimisation/bounds.h"
+#include "damotion/optimisation/bounds.hpp"
 namespace damotion {
 namespace optimisation {
 
-void setBoundsByType(Eigen::Ref<Eigen::VectorXd> ub,
-                     Eigen::Ref<Eigen::VectorXd> lb, const Bounds::Type type) {
-  const double inf = 1e19;
-  const double eps = 1e-8;
+template <>
+void BoundedObject<Eigen::VectorXd>::setBoundsFromType(const BoundType &type) {
+  constexpr double inf = std::numeric_limits<Scalar>::infinity();
+  constexpr double eps = std::numeric_limits<Scalar>::epsilon();
 
   switch (type) {
-    case Bounds::Type::kEquality: {
+    case BoundType::EQUALITY: {
       ub.setConstant(0.0);
       lb.setConstant(0.0);
       break;
     }
 
-    case Bounds::Type::kPositive: {
+    case BoundType::POSITIVE: {
       ub.setConstant(inf);
       lb.setConstant(0.0);
       break;
     }
 
-    case Bounds::Type::kNegative: {
+    case BoundType::NEGATIVE: {
       ub.setConstant(0.0);
       lb.setConstant(-inf);
       break;
     }
 
-    case Bounds::Type::kStrictlyPositive: {
+    case BoundType::STRICTLY_POSITIVE: {
       ub.setConstant(inf);
       lb.setConstant(eps);
       break;
     }
 
-    case Bounds::Type::kStrictlyNegative: {
+    case BoundType::STRICTLY_NEGATIVE: {
       ub.setConstant(-eps);
       lb.setConstant(-inf);
       break;
     }
 
-    case Bounds::Type::kUnbounded: {
-      ub.setConstant(inf);
-      lb.setConstant(-inf);
-      break;
-    }
-
-    case Bounds::Type::kCustom: {
+    case BoundType::UNBOUNDED: {
       ub.setConstant(inf);
       lb.setConstant(-inf);
       break;
@@ -57,5 +51,56 @@ void setBoundsByType(Eigen::Ref<Eigen::VectorXd> ub,
     }
   }
 }
+
+template <>
+void BoundedObject<double>::setBoundsFromType(const BoundType &type) {
+  constexpr double inf = std::numeric_limits<Scalar>::infinity();
+  constexpr double eps = std::numeric_limits<Scalar>::epsilon();
+
+  switch (type) {
+    case BoundType::EQUALITY: {
+      ub = 0.0;
+      lb = 0.0;
+      break;
+    }
+
+    case BoundType::POSITIVE: {
+      ub = inf;
+      lb = 0.0;
+      break;
+    }
+
+    case BoundType::NEGATIVE: {
+      ub = 0.0;
+      lb = -inf;
+      break;
+    }
+
+    case BoundType::STRICTLY_POSITIVE: {
+      ub = inf;
+      lb = eps;
+      break;
+    }
+
+    case BoundType::STRICTLY_NEGATIVE: {
+      ub = -eps;
+      lb = -inf;
+      break;
+    }
+
+    case BoundType::UNBOUNDED: {
+      ub = inf;
+      lb = -inf;
+      break;
+    }
+
+    default: {
+      ub = inf;
+      lb = -inf;
+      break;
+    }
+  }
+}
+
 }  // namespace optimisation
 }  // namespace damotion

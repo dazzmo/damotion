@@ -1,45 +1,35 @@
 #ifndef CONSTRAINTS_LINEAR_H
 #define CONSTRAINTS_LINEAR_H
 
-#include "damotion/common/polynomial_function.h"
 #include "damotion/optimisation/constraints/base.h"
 
 namespace damotion {
 namespace optimisation {
 
-class LinearConstraint : public Constraint, public common::PolynomialFunction {
+class LinearConstraint : public Constraint {
  public:
   using UniquePtr = std::unique_ptr<LinearConstraint>;
   using SharedPtr = std::shared_ptr<LinearConstraint>;
 
-  LinearConstraint(const std::string &name,
-                   const common::Function::SharedPtr &fcon,
-                   const Bounds::Type &bounds)
-      : Constraint(name, fcon, bounds), common::PolynomialFunction(1) {}
+  virtual void coeffs(OptionalMatrix A = nullptr, OptionalVector b = nullptr) const {}
 
-  LinearConstraint(const std::string &name, const ::casadi::SX &A,
-                   const ::casadi::SX &b, const ::casadi::SX &x,
-                   const ::casadi::SXVector &p, const Bounds::Type &bounds)
-      : Constraint(name, mtimes(A, x) + b, ::casadi::SXVector({x}), p, bounds),
-        common::PolynomialFunction(1) {
-    // Compute coefficients function
-    common::Function::SharedPtr fc =
-        std::make_shared<damotion::casadi::FunctionWrapper>(
-            ::casadi::Function(name + "linear_coefficients", p, {A, b}));
-    setCoefficientsFunction(fc);
-  }
+  LinearConstraint(const std::string &name) : Constraint() {}
 
-  common::Function::Output &A() {
-    return getCoefficientsFunction()->getOutput(0);
-  }
-  common::Function::Output &b() {
-    return getCoefficientsFunction()->getOutput(1);
+  ReturnType evaluate(const InputVectorType &x, OptionalMatrix J = nullptr) const {
+    // Compute A and b
+    coeffs(A_, b_);
+    // Copy jacobian
+    if (J) J = A_;
+    // Compute linear constraint
+    return A_ * x + b_;
   }
 
  private:
+  mutable Eigen::MatrixXd A_;
+  mutable Eigen::VectorXd b_;
 };
 
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* CONSTRAINTS_LINEAR_H */
+#endif/* CONSTRAINTS_LINEAR_H */

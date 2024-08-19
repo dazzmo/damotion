@@ -6,32 +6,40 @@
 namespace damotion {
 namespace optimisation {
 
-class BoundingBoxConstraint : public Constraint {
- public:
-  BoundingBoxConstraint(const std::string &name, const int &nx,
-                        const ::casadi::SX &lb, const ::casadi::SX &ub,
-                        const ::casadi::SX &x, const ::casadi::SX &p)
-      : Constraint("bb", std::make_shared<BoundingBoxFunction>(),
-                   Bounds::Type::kCustom) {
-    assert(lb.rows() == ub.rows() && "lb and ub must be same dimension!");
-    // Create output vector and derivative
-    this->setBounds(lb, ub);
-  }
+// class BoundingBoxConstraint : public Constraint {
+//  public:
+//   BoundingBoxConstraint(const std::string &name) {}
 
-  void eval(const common::Function::InputVector &x,
-            const common::Function::InputVector &p, bool jac) {
-    // Evaluate the constraints based on the
-    common::Function::InputVector in = {};
-    for (const auto &xi : x) in.push_back(xi);
-    for (const auto &pi : p) in.push_back(pi);
-    // Perform evaluation depending on what method is used
-    // TODO - Evaluate the constraint within the provided bounds
-  }
+//   /**
+//    * @brief Provides the bounds for the bounding box constraint. On default, it
+//    * returns the bounds set with setLowerBound() and setUpperBound()
+//    * respectively.
+//    *
+//    * @param xl
+//    * @param xu
+//    */
+//   virtual void bounds(OptionalVector xl = nullptr,
+//                       OptionalVector xu = nullptr) {
+//     if (xl) *xl = this->lb();
+//     if (xu) *xu = this->ub();
+//   }
 
- private:
-};
+//   ReturnType eval(const InputVectorType &x, OptionalJacobianType J = nullptr) {
+//     // Perform evaluation depending on what method is used
+//     bounds(xl_, xu_);
+//     if (J) {
+//       // J->topRows().setIdentity();
+//       // J->bottomRows().setIdentity();
+//     }
+//     return x - xl_;  // todo (damian) - add xu and xl as single vector
+//   }
+
+//  private:
+//   Eigen::VectorXd xl_;
+//   Eigen::VectorXd xu_;
+// };
 
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif /* CONSTRAINTS_BOUNDING_BOX_H */
+#endif/* CONSTRAINTS_BOUNDING_BOX_H */

@@ -1,7 +1,6 @@
 #ifndef COSTS_LINEAR_H
 #define COSTS_LINEAR_H
 
-#include "damotion/common/polynomial_function.h"
 #include "damotion/optimisation/costs/base.h"
 
 namespace damotion {
@@ -11,36 +10,32 @@ namespace optimisation {
  * @brief Cost of the form \f$ c^T x + b \f$
  *
  */
-class LinearCost : public Cost, public common::PolynomialFunction {
+class LinearCost : public Cost {
  public:
-  LinearCost(const std::string &name, const casadi::SX &c, const casadi::SX &b,
-             const casadi::SX &x, const casadi::SXVector &p)
-      : Cost(mtimes(c.T(), x) + b, {x}, p, false),
-        common::PolynomialFunction(1) {
-    // Compute coefficients function
-    common::Function::SharedPtr fc =
-        std::make_shared<damotion::casadi::FunctionWrapper>(
-            ::casadi::Function(name + "linear_coefficients", p, {A, b}));
-    setCoefficientsFunction(fc);
+  using UniquePtr = std::unique_ptr<LinearCost>;
+  using SharedPtr = std::shared_ptr<LinearCost>;
+
+  virtual void coeffs(OptionalJacobianType c = nullptr, const double &b = 0.0) {
   }
 
-  LinearCost(const std::string &name, const common::Function::SharedPtr &fcon,
-             const Bounds::Type &bounds)
-      : Constraint(name, fcon, bounds), common::PolynomialFunction(2) {}
+  LinearCost(const std::string &name) : Cost(name) {}
 
-  common::Function::Output &A() {
-    return getCoefficientsFunction()->getOutput(0);
-  }
-
-  common::Function::Output &b() {
-    return getCoefficientsFunction()->getOutput(1);
+  ReturnType evaluate(const InputVectorType &x,
+                      OptionalJacobianType g = nullptr) {
+    // Compute A and b
+    coeffs(c_, b_);
+    // Copy jacobian
+    if (g) g = c_;
+    // Compute linear cost
+    return c_.dot(x) + b_;
   }
 
  private:
+  JacobianType c_;
+  double b_;
 };
 
 }  // namespace optimisation
-
 }  // namespace damotion
 
-#endif /* COSTS_LINEAR_H */
+#endif/* COSTS_LINEAR_H */

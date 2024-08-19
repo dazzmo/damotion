@@ -11,7 +11,7 @@ namespace casadi {
   // Change to new path
   std::filesystem::current_path(dir);
 
-  // Throw warning if it doesn't exist
+  // TODO - Throw warning if it doesn't exist
 
   // Create hash
   std::string f_str = f.serialize();
