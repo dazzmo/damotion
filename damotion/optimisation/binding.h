@@ -53,6 +53,13 @@ class BindingBase {
   sym::Vector p_;
 };
 
+/**
+ * @brief A binding allows a constraint or cost to be bound to a set of
+ * associated variables, representing a constraint or cost that uses those
+ * specific variables.
+ *
+ * @tparam ObjectType
+ */
 template <class ObjectType>
 class Binding : public BindingBase {
  public:
@@ -96,14 +103,12 @@ class Binding : public BindingBase {
   }
 
   /**
-   * @brief Returns the bounded object
+   * @brief Returns the shared pointer to the bounded object
    *
-   * @return T&
+   * @return std::shared_ptr<ObjectType>&
    */
-  ObjectType &get() { return *obj_; }
-  const ObjectType &get() const { return *obj_; }
-
-  const std::shared_ptr<ObjectType> &getPtr() const { return obj_; }
+  std::shared_ptr<ObjectType> &get() { return obj_; }
+  const std::shared_ptr<ObjectType> &get() const { return obj_; }
 
  private:
   std::shared_ptr<ObjectType> obj_;

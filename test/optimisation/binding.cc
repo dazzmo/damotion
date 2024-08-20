@@ -67,13 +67,13 @@ TEST(Optimisation, CastBindingCost) {
   dopt::Binding<dopt::Cost> base_binding(linear_binding);
 
   // Evaluate as base class binding
-  double res = base_binding.get().evaluate(in);
+  double res = base_binding.get()->evaluate(in);
   EXPECT_EQ(res, c->at(0) * in[0] + b->at(0));
 
   // Check coeffcients from original binding
   Eigen::VectorXd a1(1);
   double a2 = 0.0;
-  linear_binding.get().coeffs(a1, a2);
+  linear_binding.get()->coeffs(a1, a2);
 
   EXPECT_EQ(a1[0], c->at(0));
   EXPECT_EQ(a2, b->at(0));

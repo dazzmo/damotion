@@ -55,9 +55,6 @@ typedef std::list<VectorRef> MatrixRefList;
 Matrix createMatrix(const std::string &name, const int m, const int n);
 // Variable vector
 Vector createVector(const std::string &name, const int n);
-// Create vector of decision variables
-Vector concatenateVariables(const VectorRefList &vars);
-Vector concatenateVariables(const MatrixRefList &vars);
 
 // Operator overloading
 std::ostream &operator<<(std::ostream &os, Variable var);
@@ -110,11 +107,20 @@ class VariableVector
   bool add(const MatrixRef &var);
 
   /**
-   * @brief Removes variables currently considered by the program.
+   * @brief Removes variable currently considered by the program. True on
+   * success and false otherwise.
    *
    * @param var
    */
-  void remove(const MatrixRef &var);
+  bool remove(const Variable &var);
+
+  /**
+   * @brief Removes multiple variables currently considered by the program. True
+   * on success and false otherwise.
+   *
+   * @param var
+   */
+  bool remove(const MatrixRef &var);
 
   /**
    * @brief Whether a variable var is contained within the vector
@@ -144,7 +150,7 @@ class VariableVector
   IndexVector getIndices(const Vector &v);
 
   /**
-   * @brief Sets the optimisation vector with the given ordering of variables
+   * @brief Sets the optimisation vector using the given ordering of variables
    *
    * @param var
    */

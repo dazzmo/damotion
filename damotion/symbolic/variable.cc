@@ -52,20 +52,18 @@ std::ostream &operator<<(std::ostream &os, damotion::symbolic::Matrix mat) {
 }
 
 bool VariableVector::add(const Variable &var) {
-  if (!contains(var)) {
-    // Add to variable vector
-    variable_idx_[var.id()] = sz_;
-    variables_.push_back(var);
-    // Increase count of decision variables
-    sz_++;
-    lb().conservativeResize(sz_);
-    ub().conservativeResize(sz_);
-    initialValue().conservativeResize(sz_);
-  } else {
-    // Variable already added to program!
+  if (contains(var)) {
     LOG(ERROR) << var << " is already added to program!";
     return false;
   }
+  // Add to variable vector to index map
+  variable_idx_[var.id()] = sz_++;
+  // Add variable to vector
+  variables_.push_back(var);
+  // Update bounds and initial value
+  lb().conservativeResize(sz_);
+  ub().conservativeResize(sz_);
+  initialValue().conservativeResize(sz_);
   return true;
 }
 
@@ -85,39 +83,52 @@ bool VariableVector::contains(const Variable &var) {
          variables_.end();
 }
 
+bool VariableVector::remove(const Variable &var) {
+  // Determine if entry is in the vector
+  auto p = std::find(variables_.begin(), variables_.end(), var);
+  if (p == variables_.end()) return false;
+
+  // Remove entry from the vector
+  variables_.erase(p);
+  sz_--;
+  return true;
+}
+
+bool VariableVector::remove(const MatrixRef &var) {
+  for (Index i = 0; i < var.rows(); ++i) {
+    for (Index j = 0; j < var.cols(); ++j) {
+      if (remove(var(i, j)) == false) return false;
+    }
+  }
+  return true;
+}
+
 bool VariableVector::reorder(const VectorRef &var) {
   assert(var.size() == size() && "Incorrect input size!");
 
-  // Set indices by order in the decision variable vector
+  // For each variable, determine its new location
   for (const Variable &v : variables_) {
-    // Find starting point of v within var
     int idx = 0;
-    Variable::Id id = v.id();
-    for (int i = 0; i < var.size(); ++i) {
-      if (var[idx].id() == id) break;
+    for (Index i = 0; i < var.size(); ++i) {
+      if (var(idx).id() == v.id()) break;
       idx++;
     }
 
-    if (idx == var.size()) {
-      std::cout << v
-                << " is not included within the provided decision "
-                   "variable vector!\n";
+    // If variable not found, create error
+    if (idx >= var.size()) {
+      LOG(ERROR) << v << " was not included within the provided reordering";
       return false;
-    } else {
-      variable_idx_[id] = idx;
     }
+
+    variable_idx_[v.id()] = idx;
   }
 
   return true;
 }
 
-void VariableVector::remove(const MatrixRef &var) {
-  // TODO - Implement
-}
-
 const VariableVector::Index &VariableVector::getIndex(const Variable &v) const {
   auto it = variable_idx_.find(v.id());
-  assert(it == variable_idx_.end() && "Variable does not exist");
+  assert(it != variable_idx_.end() && "Variable does not exist");
   return it->second;
 }
 

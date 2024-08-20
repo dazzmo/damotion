@@ -106,9 +106,11 @@ class BoundedObject<Eigen::VectorXd> {
  public:
   BoundedObject() : sz_(0) {}
   BoundedObject(const Index &sz, const BoundType &type = BoundType::CUSTOM)
-      : sz_(sz) {}
+      : sz_(sz), type_(type) {}
 
   const Index &size() const { return sz_; }
+
+  const BoundType &getBoundsType() const { return type_; }
 
   /**
    * @brief Lower bound for the object
@@ -154,6 +156,8 @@ class BoundedObject<Eigen::VectorXd> {
 
  private:
   std::size_t sz_;
+
+  BoundType type_;
 
   Eigen::VectorXd lb_;
   Eigen::VectorXd ub_;
