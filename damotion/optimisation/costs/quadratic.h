@@ -15,14 +15,18 @@ class QuadraticCost : public Cost {
   using UniquePtr = std::unique_ptr<QuadraticCost>;
   using SharedPtr = std::shared_ptr<QuadraticCost>;
 
-  virtual void coeffs(OptionalHessianType A = nullptr,
-                      OptionalJacobianType b = nullptr, const double &c = 0.0) {
+  virtual void coeffs(OptionalHessianType A, OptionalVectorType b,
+                      double &c) const = 0;
+
+  QuadraticCost(const String &name, const Index &nx, const Index &np = 0)
+      : Cost(name, nx, np) {
+    A_ = HessianType::Zero(nx, nx);
+    b_ = JacobianType::Zero(1, nx);
+    c_ = 0.0;
   }
 
-  QuadraticCost(const std::string &name) : Cost(name) {}
-
   ReturnType evaluate(const InputVectorType &x,
-                      OptionalJacobianType g = nullptr) {
+                      OptionalJacobianType g = nullptr) const {
     // Compute A and b
     coeffs(A_, b_, c_);
     // Copy jacobian
@@ -32,9 +36,9 @@ class QuadraticCost : public Cost {
   }
 
  private:
-  HessianType A_;
-  JacobianType b_;
-  double c_;
+  mutable HessianType A_;
+  mutable VectorType b_;
+  mutable double c_;
 };
 
 }  // namespace optimisation

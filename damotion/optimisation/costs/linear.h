@@ -7,7 +7,8 @@ namespace damotion {
 namespace optimisation {
 
 /**
- * @brief Cost of the form \f$ c^T x + b \f$
+ * @brief Linear cost of the form \f$ c(x, p) = c^T(p) x + b(p) \in \mathbb{R}
+ * \f$.
  *
  */
 class LinearCost : public Cost {
@@ -15,27 +16,31 @@ class LinearCost : public Cost {
   using UniquePtr = std::unique_ptr<LinearCost>;
   using SharedPtr = std::shared_ptr<LinearCost>;
 
-  virtual void coeffs(OptionalJacobianType c = nullptr, const double &b = 0.0) {
+  virtual void coeffs(OptionalVector c, double &b) const = 0;
+
+  LinearCost(const String &name, const Index &nx, const Index &np = 0)
+      : Cost(name, nx, np) {
+    // Initialise coefficient matrices
+    c_ = Eigen::VectorXd::Zero(this->nx());
+    b_ = 0.0;
   }
 
-  LinearCost(const std::string &name) : Cost(name) {}
-
   ReturnType evaluate(const InputVectorType &x,
-                      OptionalJacobianType g = nullptr) {
+                      OptionalJacobianType grd = nullptr) const {
     // Compute A and b
     coeffs(c_, b_);
     // Copy jacobian
-    if (g) g = c_;
-    // Compute linear cost
+    if (grd) grd = c_;
+    // Compute linear constraint
     return c_.dot(x) + b_;
   }
 
  private:
-  JacobianType c_;
-  double b_;
+  mutable Eigen::VectorXd c_;
+  mutable double b_;
 };
 
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* COSTS_LINEAR_H */
+#endif /* COSTS_LINEAR_H */

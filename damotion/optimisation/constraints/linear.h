@@ -6,16 +6,27 @@
 namespace damotion {
 namespace optimisation {
 
+/**
+ * @brief Linear constraint of the form \f$ c(x, p) = A(p) x + b(p) \f$.
+ *
+ */
 class LinearConstraint : public Constraint {
  public:
   using UniquePtr = std::unique_ptr<LinearConstraint>;
   using SharedPtr = std::shared_ptr<LinearConstraint>;
 
-  virtual void coeffs(OptionalMatrix A = nullptr, OptionalVector b = nullptr) const {}
+  virtual void coeffs(OptionalMatrix A = nullptr,
+                      OptionalVector b = nullptr) const {}
 
-  LinearConstraint(const std::string &name) : Constraint() {}
+  LinearConstraint(const String &name, const Index &nc, const Index &nx)
+      : Constraint(name, nc, nx) {
+    // Initialise coefficient matrices
+    A_ = Eigen::MatrixXd::Zero(this->nc(), this->nx());
+    b_ = Eigen::VectorXd::Zero(this->nc());
+  }
 
-  ReturnType evaluate(const InputVectorType &x, OptionalMatrix J = nullptr) const {
+  ReturnType evaluate(const InputVectorType &x,
+                      OptionalMatrix J = nullptr) const {
     // Compute A and b
     coeffs(A_, b_);
     // Copy jacobian
@@ -32,4 +43,4 @@ class LinearConstraint : public Constraint {
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* CONSTRAINTS_LINEAR_H */
+#endif /* CONSTRAINTS_LINEAR_H */

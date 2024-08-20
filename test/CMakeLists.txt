@@ -9,6 +9,7 @@ enable_testing()
 # Create list of files
 SET(TEST_FILES
 core/function.cc
+casadi/eigen.cc
 casadi/function.cc
 )
 

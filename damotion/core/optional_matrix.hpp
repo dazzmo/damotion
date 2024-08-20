@@ -42,6 +42,10 @@ class OptionalMatrixData {
     new (&map_) Eigen::Map<MatrixType>(M->data(), M->rows(), M->cols());
   }
 
+  OptionalMatrixData(double& val) : map_(nullptr, Rows, Cols) {
+    new (&map_) Eigen::Map<MatrixType>(&val, 1, 1);
+  }
+
   operator bool() const { return map_.data() != nullptr; }
 
   Eigen::Map<MatrixType>* operator->() { return &map_; }

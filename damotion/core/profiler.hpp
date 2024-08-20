@@ -40,14 +40,14 @@ class Profiler {
    */
   Profiler() {
 #ifdef DAMOTION_USE_PROFILING
-    LOG(INFO) << "Calls\tMean (secs)\tStdDev\tMin (sec)\tMax (secs)\n";
+    std::cout << "Calls\tMean (secs)\tStdDev\tMin (sec)\tMax (secs)\n";
     for (std::map<std::string, acc_t>::iterator p = map_.begin();
          p != map_.end(); p++) {
       double av = mean(p->second);
       double stdev = sqrt(((double)variance(p->second)));
       double max = boost::accumulators::extract::max(p->second);
       double min = boost::accumulators::extract::min(p->second);
-      LOG(INFO) << p->first.c_str() << '\t'
+      std::cout << p->first.c_str() << '\t'
                 << boost::accumulators::count(p->second) << '\t' << av << '\t'
                 << stdev << '\t' << min << '\t' << max;
     }

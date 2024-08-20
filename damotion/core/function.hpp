@@ -34,9 +34,12 @@ template <typename ReturnValue, std::size_t... InputSequence,
 class FunctionBaseImpl<ReturnValue, std::index_sequence<InputSequence...>,
                        std::index_sequence<HessianSequence...>> {
  public:
+  using Index = std::size_t;
+
   using ReturnType = ReturnValue;
-  using InputVectorType = Eigen::VectorXd;
   using LagrangeMultiplierType = ReturnValue;
+
+  using VectorType = Eigen::VectorXd;
 
   using JacobianType =
       std::conditional_t<std::is_same<ReturnValue, double>::value,
@@ -44,13 +47,19 @@ class FunctionBaseImpl<ReturnValue, std::index_sequence<InputSequence...>,
 
   using HessianType = Eigen::MatrixXd;
 
+  // Input types
+
+  using InputVectorType = VectorType;
+
+  // Optional input types
+
+  using OptionalVectorType = OptionalVector;
+
   using OptionalJacobianType =
       std::conditional_t<std::is_same<ReturnValue, double>::value,
                          OptionalRowVector, OptionalMatrix>;
 
   using OptionalHessianType = OptionalMatrix;
-
-  using OptionalVectorType = OptionalVector;
 
   FunctionBaseImpl() = default;
   ~FunctionBaseImpl() = default;

@@ -58,16 +58,16 @@ class FunctionWrapperImpl<std::index_sequence<Is...>,
   }
 
   void call(const alwaysT<Is, Eigen::VectorXd> &...in,
-            alwaysT<Os, OptionalMatrix> ...out) {
+            alwaysT<Os, OptionalMatrix>... out) {
     std::size_t cnt = 0;
     for (const Eigen::VectorXd &xi : {in...}) {
       in_data_ptr_[cnt++] = xi.data();
     }
 
     cnt = 0;
-    for (OptionalMatrix oi : {out...}) {
+    for (const OptionalMatrix &oi : {out...}) {
       if (oi) {
-        out_data_ptr_[cnt++] = oi->data();
+        out_data_ptr_[cnt++] = const_cast<double *>(oi->data());
       } else {
         out_data_ptr_[cnt++] = nullptr;
       }
@@ -99,126 +99,81 @@ using FunctionWrapper =
     FunctionWrapperImpl<std::make_index_sequence<InputSize>,
                         std::make_index_sequence<OutputSize>>;
 
-// template <typename Seq>
-// class computeJacobianImpl;
-
-// // Templated functions to compute jacobians and hessians
-// template <class... InputSequence>
-// ::casadi::Function
-// computeJacobiansImpl<std::index_sequence<InputSequence...>>(
-//     const ::casadi::SX &ex, const alwaysT<InputSequence, ::casadi::SX> &...x,
-//     const ::casadi::SX &p = ::casadi::SX()) {
-//   std::vector<SymbolicVector> xv = {};
-//   // Add variables
-//   for (const SymbolicVector &xi : {x...}) {
-//     xv.push_back(xi);
-//   }
-//   // Add parameters
-//   if (!p.isNull()) {
-//     xv.push_back(p);
-//   }
-
-//   // Create function for ex
-//   ::casadi::Function f("ex", {ex}, xv);
-//   f_ = std::make_unique<FunctionWrapper<N>>(f);
-
-//   std::size_t cnt = 0;
-//   std::vector<SymbolicExpression> grd = {};
-
-//   for (const SymbolicVector &xi : {x...}) {
-//     // Compute jacobian and hessian, if applicable
-//     grd.push_back(::casadi::SX::gradient(ex, xi));
-//   }
-//   // Create function
-//   fjac_.push_back(std::make_unique<FunctionWrapper<N>>(
-//       ::casadi::Function("fgrd", grd, xv)));
-
-//   return ::casadi::Function();
-// }
-
-// // template<std::size_t N>
-// // using computeJacobians()
-
-// // ::casadi::Function computeHessians() {}
-
-// // Constraint construction through Casadi
-
 class LinearConstraint : public optimisation::LinearConstraint {
  public:
   // Override method
-  LinearConstraint(const ::casadi::SX &ex, const ::casadi::SX &x,
+  LinearConstraint(const String &name, const ::casadi::SX &ex,
+                   const ::casadi::SX &x,
                    const ::casadi::SX &p = ::casadi::SX())
-      : optimisation::LinearConstraint(""), coeffs_(nullptr) {
+      : optimisation::LinearConstraint(name, ex.size1(), x.size1()),
+        coeffs_(nullptr) {
     // Create coefficients
     ::casadi::SX A, b;
     ::casadi::SX::linear_coeff(ex, x, A, b, true);
     // Create function
     coeffs_ = std::make_unique<FunctionWrapper<1, 2>>(
-        ::casadi::Function("", {A, b}, {p}));
+        ::casadi::Function("linear_coeffs", {p}, {densify(A), densify(b)}));
   }
 
   void coeffs(OptionalJacobianType A = nullptr,
               OptionalVectorType b = nullptr) const override {
-    OptionalMatrix btmp(b);
-    coeffs_->call(get_parameters(), A, btmp);
+    coeffs_->call(get_parameters(), A, b);
   }
 
  private:
-  JacobianType A_;
-  InputVectorType b_;
-
   FunctionWrapper<1, 2>::UniquePtr coeffs_;
 };
 
-// class LinearCost : public optimisation::LinearCost {
-//  public:
-//   // Override method
-//   LinearCost(const ::casadi::SX &ex, const ::casadi::SX &x,
-//              const ::casadi::SX &p = ::casadi::SX())
-//       : coeffs_(nullptr) {
-//     // Create coefficients
-//     ::casadi::SX A, b;
-//     ::casadi::SX::linear_coeffs(ex, x, A, b);
-//     // Create function
-//     coeffs_ =
-//         std::make_unique<FunctionWrapper>(::casadi::Function("", {A, b},
-//         {p}));
-//   }
+class LinearCost : public optimisation::LinearCost {
+ public:
+  // Override method
+  LinearCost(const String &name, const ::casadi::SX &ex, const ::casadi::SX &x,
+             const ::casadi::SX &p = ::casadi::SX())
+      : optimisation::LinearCost(name, x.size1(), p.size1()), coeffs_(nullptr) {
+    // Create coefficients
+    ::casadi::SX c, b;
+    ::casadi::SX::linear_coeff(ex, x, c, b, true);
+    // Create function
+    coeffs_ = std::make_unique<FunctionWrapper<1, 2>>(
+        ::casadi::Function("linear_coeffs", {p}, {densify(c), densify(b)}));
+  }
 
-//   void coeffs(OptionalJacobianType A = nullptr,
-//               OptionalVector b = nullptr) override {
-//     coeffs_->call(get_parameters(), {A, b});
-//   }
+  void coeffs(OptionalVector c, double &b) const override {
+    coeffs_->call(get_parameters(), c, b);
+  }
 
-//  private:
-//   FunctionWrapper::UniquePtr coeffs_;
-// };
+ private:
+  FunctionWrapper<1, 2>::UniquePtr coeffs_;
+};
 
-// class QuadraticCost : public optimisation::QuadraticCost {
-//  public:
-//   // Override method
-//   QuadraticCost(const ::casadi::SX &ex, const ::casadi::SX &x,
-//                 const ::casadi::SX &p = ::casadi::SX())
-//       : coeffs_(nullptr) {
-//     // Create coefficients
-//     ::casadi::SX A, b, c;
-//     ::casadi::SX::quadratic_coeffs(ex, x, A, b, c);
-//     // Create function
-//     coeffs_ = std::make_unique<FunctionWrapper>(
-//         ::casadi::Function("", {A, b, c}, {p}));
-//   }
+class QuadraticCost : public optimisation::QuadraticCost {
+ public:
+  // Override method
+  QuadraticCost(const String &name, const ::casadi::SX &ex,
+                const ::casadi::SX &x, const ::casadi::SX &p = ::casadi::SX())
+      : optimisation::QuadraticCost(name, x.size1(), p.size1()),
+        coeffs_(nullptr) {
+    // Create coefficients
+    ::casadi::SX A, b, c;
+    ::casadi::SX::quadratic_coeff(ex, x, A, b, c, true);
+    // Create function
+    // todo - check compile time that these number of outputs are correct for
+    // todo - the function
+    coeffs_ = std::make_unique<FunctionWrapper<1, 3>>(::casadi::Function(
+        "quadratic_coeffs", {p},
+        {::casadi::SX::densify(A), ::casadi::SX::densify(b), ::casadi::SX::densify(c)}));
+  }
 
-//   void coeffs(OptionalHessianType A = nullptr, OptionalJacobianType b =
-//   nullptr,
-//               const double &c = 0.0) override {
-//     coeffs_->call(get_parameters(), {A, b, c});
-//   }
+  void coeffs(OptionalHessianType A, OptionalVectorType b,
+              double &c) const override {
+    coeffs_->call(get_parameters(), A, b, c);
+  }
 
-//  private:
-//   FunctionWrapper::UniquePtr coeffs_;
-// };
+ private:
+  FunctionWrapper<1, 3>::UniquePtr coeffs_;
+};
 
 }  // namespace casadi
 }  // namespace damotion
 
-#endif/* DAMOTION_CASADI_FUNCTION_HPP */
+#endif /* DAMOTION_CASADI_FUNCTION_HPP */
