@@ -11,6 +11,8 @@ SET(TEST_FILES
 core/function.cc
 casadi/eigen.cc
 casadi/function.cc
+optimisation/binding.cc
+symbolic/variable.cc
 )
 
 include(GoogleTest)

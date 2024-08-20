@@ -42,6 +42,9 @@ class Cost : public FunctionBase<1, double> {
    */
   const Index &np() const { return np_; }
 
+  virtual double evaluate(const InputVectorType &x,
+                          OptionalJacobianType grd = nullptr) const = 0;
+
  protected:
   void set_nx(const Index &nx) { nx_ = nx; }
   void set_np(const Index &np) { np_ = np; }

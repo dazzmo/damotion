@@ -23,27 +23,6 @@ Vector createVector(const std::string &name, const int n) {
   return vec;
 }
 
-// Create vector of decision variables
-Vector concatenateVariables(const VectorRefList &vars) {
-  Vector vec;
-  for (const auto &var : vars) {
-    vec.conservativeResize(vec.size() + var.size());
-    vec.bottomRows(var.size()) = var;
-  }
-  return vec;
-}
-
-Vector concatenateVariables(const MatrixRefList &vars) {
-  Vector vec;
-  for (const auto &var : vars) {
-    // Flatten variable matrices where applicable
-    Vector tmp = var.reshape(var.rows() * var.cols(), 1);
-    vec.conservativeResize(vec.size() + tmp.size());
-    vec.bottomRows(tmp.size()) = tmp;
-  }
-  return vec;
-}
-
 // Operator overloading
 
 std::ostream &operator<<(std::ostream &os, damotion::symbolic::Variable var) {
@@ -72,7 +51,7 @@ std::ostream &operator<<(std::ostream &os, damotion::symbolic::Matrix mat) {
   return os << oss.str();
 }
 
-void VariableVector::add(const Variable &var) {
+bool VariableVector::add(const Variable &var) {
   if (!contains(var)) {
     // Add to variable vector
     variable_idx_[var.id()] = sz_;
@@ -84,17 +63,20 @@ void VariableVector::add(const Variable &var) {
     initialValue().conservativeResize(sz_);
   } else {
     // Variable already added to program!
-    std::cout << var << " is already added to program!\n";
+    LOG(ERROR) << var << " is already added to program!";
+    return false;
   }
+  return true;
 }
 
-void VariableVector::add(const MatrixRef &var) {
+bool VariableVector::add(const MatrixRef &var) {
   // Append to our map
   for (Index i = 0; i < var.rows(); ++i) {
     for (Index j = 0; j < var.cols(); ++j) {
-      add(var(i, j));
+      if (add(var(i, j)) == false) return false;
     }
   }
+  return true;
 }
 
 bool VariableVector::contains(const Variable &var) {

@@ -20,7 +20,7 @@ casadi/codegen.cc
 # core/math/quaternion.cc
 # core/trajectory/bezier.cc
 # core/trajectory/trajectory.cc
-# symbolic/variable.cc
+symbolic/variable.cc
 # control/osc/tasks/contact.cc
 # control/osc/tasks/motion.cc
 # control/osc/osc.cc

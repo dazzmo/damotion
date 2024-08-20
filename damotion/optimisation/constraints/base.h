@@ -67,6 +67,9 @@ class Constraint : public FunctionBase<1, Eigen::VectorXd>,
 
   static bool isSatisfied(const ReturnType &c) { return true; }
 
+  virtual Eigen::VectorXd evaluate(
+      const InputVectorType &x, OptionalJacobianType jac = nullptr) const = 0;
+
  protected:
   void set_nc(const Index &nc) { nc_ = nc; }
   void set_nx(const Index &nx) { nx_ = nx; }

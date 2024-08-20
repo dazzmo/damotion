@@ -22,13 +22,11 @@ class Variable : public optimisation::BoundedObject<double>,
   Variable() = default;
 
   Variable(const std::string &name)
-      : BoundedObject<double>(), InitialiseableObject<double>() {
-    static int next_id_ = 0;
-    next_id_++;
-    // Set ID for variable
-    id_ = next_id_;
-
-    name_ = name;
+      : optimisation::BoundedObject<double>(),
+        optimisation::InitialiseableObject<double>(),
+        name_(name) {
+    static int next_id_ = Id(0);
+    id_ = next_id_++;
   }
 
   ~Variable() = default;
@@ -75,7 +73,7 @@ class VariableVector
     : public optimisation::BoundedObject<Eigen::VectorXd>,
       public optimisation::InitialiseableObject<Eigen::VectorXd> {
  public:
-  using Index = std::size_t;
+  using Index = Eigen::Index;
   using IndexVector = std::vector<Index>;
 
   using SharedPtr = std::shared_ptr<VariableVector>;
@@ -85,7 +83,7 @@ class VariableVector
       : optimisation::BoundedObject<Eigen::VectorXd>(0),
         optimisation::InitialiseableObject<Eigen::VectorXd>(0),
         sz_(0) {}
-        
+
   ~VariableVector() = default;
 
   /**
@@ -96,18 +94,20 @@ class VariableVector
   const Index &size() const { return sz_; }
 
   /**
-   * @brief Adds a decision variable
+   * @brief Adds a decision variable, returns true if added, false if it is
+   * already included.
    *
    * @param var
    */
-  void add(const Variable &var);
+  bool add(const Variable &var);
 
   /**
-   * @brief Add decision variables to the vector
+   * @brief Add decision variables to the vector. Returns true if added, false
+   * if it is already included.
    *
    * @param var
    */
-  void add(const MatrixRef &var);
+  bool add(const MatrixRef &var);
 
   /**
    * @brief Removes variables currently considered by the program.
@@ -170,4 +170,4 @@ class VariableVector
 }  // namespace symbolic
 }  // namespace damotion
 
-#endif/* SYMBOLIC_VARIABLE_H */
+#endif /* SYMBOLIC_VARIABLE_H */

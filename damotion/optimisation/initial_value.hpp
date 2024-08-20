@@ -29,6 +29,9 @@ class InitialiseableObject<Eigen::VectorXd> {
   InitialiseableObject(const std::size_t &sz)
       : initial_value_(Eigen::VectorXd::Zero(sz)) {}
 
+  Eigen::VectorXd &initialValue() { return initial_value_; }
+  const Eigen::VectorXd &initialValue() const { return initial_value_; }
+
  private:
   Eigen::VectorXd initial_value_;
 };

@@ -25,11 +25,7 @@ class BindingBase {
    * @param x
    * @param p
    */
-  BindingBase(const sym::VectorRefList &x, const sym::VectorRefList &p = {})
-      : x_(x), p_(p) {
-    // Create a concatenated variable vector
-    xc_ = std::make_shared<sym::Vector>(sym::concatenateVariables(x));
-
+  BindingBase(const sym::Vector &x, const sym::Vector &p = {}) : x_(x), p_(p) {
     static Id next_id = 0;
     id_ = next_id++;
     VLOG(10) << "Created binding with ID " << id_;
@@ -38,34 +34,26 @@ class BindingBase {
   /**
    * @brief Variable vectors x for the binding
    *
-   * @return sym::VectorRefList
+   * @return sym::Vector
    */
-  const sym::VectorRefList &x() const { return x_; }
+  const sym::Vector &x() const { return x_; }
 
   /**
    * @brief Variable parameters p for the binding
    *
-   * @return sym::VectorRefList
+   * @return sym::Vector
    */
-  const sym::VectorRefList &p() const { return p_; }
-
-  /**
-   * @brief Returns the vector of concatenated inputs x
-   *
-   * @return const sym::Vector&
-   */
-  const sym::Vector &getConcatenatedVector() const { return *xc_; }
+  const sym::Vector &p() const { return p_; }
 
  protected:
   Id id_;
 
   // Vector of variables bound to the constraint
-  sym::VectorRefList x_;
-  sym::VectorRefList p_;
-  std::shared_ptr<sym::Vector> xc_ = nullptr;
+  sym::Vector x_;
+  sym::Vector p_;
 };
 
-template <class T>
+template <class ObjectType>
 class Binding : public BindingBase {
  public:
   template <typename U>
@@ -81,11 +69,9 @@ class Binding : public BindingBase {
    * @param x
    * @param p
    */
-  Binding(const std::shared_ptr<T> &c, const sym::VectorRefList &x,
-          const sym::VectorRefList &p = {})
-      : BindingBase(x, p) {
-    c_ = c;
-  }
+  Binding(const std::shared_ptr<ObjectType> &f, const sym::Vector &x,
+          const sym::Vector &p = {})
+      : BindingBase(x, p), obj_(std::move(f)) {}
 
   /**
    * @brief Cast a binding of type U to a Binding of type T, if convertible.
@@ -95,18 +81,16 @@ class Binding : public BindingBase {
    */
   template <typename U>
   Binding(const Binding<U> &b,
-          typename std::enable_if_t<
-              std::is_convertible_v<std::shared_ptr<U>, std::shared_ptr<T>>> * =
-              nullptr)
+          typename std::enable_if_t<std::is_convertible_v<
+              std::shared_ptr<U>, std::shared_ptr<ObjectType>>> * = nullptr)
       : Binding() {
     // Maintain the same binding id
     id_ = b.id();
-    
-    c_ = b.c_;
-    
-    // Copy all data
-    xc_ = b.xc_;
-    
+
+    // Convert to new pointer type
+    obj_ = static_cast<std::shared_ptr<ObjectType>>(b.obj_);
+
+    // Copy vectors
     x_ = b.x_;
     p_ = b.p_;
   }
@@ -116,17 +100,16 @@ class Binding : public BindingBase {
    *
    * @return T&
    */
-  T &get() { return *c_; }
-  const T &get() const { return *c_; }
+  ObjectType &get() { return *obj_; }
+  const ObjectType &get() const { return *obj_; }
 
-  const std::shared_ptr<T> &getPtr() const { return c_; }
+  const std::shared_ptr<ObjectType> &getPtr() const { return obj_; }
 
  private:
-  // Pointer to bound class T
-  std::shared_ptr<T> c_;
+  std::shared_ptr<ObjectType> obj_;
 };
 
 }  // namespace optimisation
 }  // namespace damotion
 
-#endif/* OPTIMISATION_BINDING_H */
+#endif /* OPTIMISATION_BINDING_H */

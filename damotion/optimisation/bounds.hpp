@@ -84,7 +84,7 @@ template <>
 class BoundedObject<double> {
  public:
   BoundedObject() {}
-  BoundedObject(const BoundType &type = BoundType::CUSTOM) : lb_(), ub_() {}
+  BoundedObject(const BoundType &type) : lb_(), ub_() {}
 
   void setLowerBound(const double &lb) { lb_ = lb; }
   void setUpperBound(const double &ub) { ub_ = ub; }
@@ -110,6 +110,20 @@ class BoundedObject<Eigen::VectorXd> {
 
   const Index &size() const { return sz_; }
 
+  /**
+   * @brief Lower bound for the object
+   *
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &lb() const { return lb_; }
+
+  /**
+   * @brief Upper bound for the object
+   *
+   * @return const Eigen::VectorXd&
+   */
+  const Eigen::VectorXd &ub() const { return ub_; }
+
   void setLowerBound(const Eigen::Ref<const Eigen::VectorXd> &lb) { lb_ = lb; }
   void setLowerBound(const double &lb) { ub_.setConstant(lb); }
 
@@ -122,6 +136,21 @@ class BoundedObject<Eigen::VectorXd> {
    * @param type
    */
   void setBoundsFromType(const BoundType &type);
+
+ protected:
+  /**
+   * @brief Lower bound for the object
+   *
+   * @return  Eigen::VectorXd&
+   */
+  Eigen::VectorXd &lb() { return lb_; }
+
+  /**
+   * @brief Upper bound for the object
+   *
+   * @return  Eigen::VectorXd&
+   */
+  Eigen::VectorXd &ub() { return ub_; }
 
  private:
   std::size_t sz_;
