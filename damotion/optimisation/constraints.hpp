@@ -106,14 +106,81 @@ class Constraint : public FunctionBase<1, Eigen::VectorXd>,
   void set_name(const String &name) { name_ = name; }
 
  private:
+  Index sz_;
   Index nx_;
   Index np_;
-  Index sz_;
 
   String name_ = "";
 };
 
-// TODO - Create constraint violation function
+/**
+ * @brief Linear constraint of the form \f$ c(x, p) = A(p) x + b(p) \f$.
+ *
+ */
+class LinearConstraint : public Constraint {
+ public:
+  using UniquePtr = std::unique_ptr<LinearConstraint>;
+  using SharedPtr = std::shared_ptr<LinearConstraint>;
+
+  virtual void coeffs(OptionalMatrix A = nullptr,
+                      OptionalVector b = nullptr) const {}
+
+  LinearConstraint(const String &name, const Index &sz, const Index &nx)
+      : Constraint(name, sz, nx) {
+    // Initialise coefficient matrices
+    A_ = Eigen::MatrixXd::Zero(this->size(), this->nx());
+    b_ = Eigen::VectorXd::Zero(this->size());
+  }
+
+  ReturnType evaluate(const InputVectorType &x,
+                      OptionalMatrix J = nullptr) const {
+    // Compute A and b
+    coeffs(A_, b_);
+    // Copy jacobian
+    if (J) J = A_;
+    // Compute linear constraint
+    return A_ * x + b_;
+  }
+
+ private:
+  mutable Eigen::MatrixXd A_;
+  mutable Eigen::VectorXd b_;
+};
+
+// class BoundingBoxConstraint : public Constraint {
+//  public:
+//   BoundingBoxConstraint(const std::string &name) {}
+
+//   /**
+//    * @brief Provides the bounds for the bounding box constraint. On default,
+//    it
+//    * returns the bounds set with setLowerBound() and setUpperBound()
+//    * respectively.
+//    *
+//    * @param xl
+//    * @param xu
+//    */
+//   virtual void bounds(OptionalVector xl = nullptr,
+//                       OptionalVector xu = nullptr) {
+//     if (xl) *xl = this->lb();
+//     if (xu) *xu = this->ub();
+//   }
+
+//   ReturnType eval(const InputVectorType &x, OptionalJacobianType J = nullptr)
+//   {
+//     // Perform evaluation depending on what method is used
+//     bounds(xl_, xu_);
+//     if (J) {
+//       // J->topRows().setIdentity();
+//       // J->bottomRows().setIdentity();
+//     }
+//     return x - xl_;  // todo (damian) - add xu and xl as single vector
+//   }
+
+//  private:
+//   Eigen::VectorXd xl_;
+//   Eigen::VectorXd xu_;
+// };
 
 }  // namespace optimisation
 }  // namespace damotion

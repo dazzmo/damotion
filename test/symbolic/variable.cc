@@ -1,6 +1,6 @@
 #define DAMOTION_USE_PROFILING
 
-#include "damotion/symbolic/variable.h"
+#include "damotion/symbolic/variable.hpp"
 
 #include <gflags/gflags.h>
 #include <gtest/gtest.h>
@@ -23,7 +23,6 @@ TEST(VariableVector, AddVariable) {
 
   EXPECT_EQ(vv.getIndex(x), 0);
   EXPECT_EQ(vv.getIndex(y), 1);
-
 }
 
 TEST(VariableVector, AddSameVariable) {
@@ -95,15 +94,23 @@ TEST(VariableVector, CustomReordering) {
   vv.add(d);
   vv.add(e);
 
+  // Regular ordering
+  EXPECT_EQ(vv.getIndex(a), 0);
+  EXPECT_EQ(vv.getIndex(b), 1);
+  EXPECT_EQ(vv.getIndex(c), 2);
+  EXPECT_EQ(vv.getIndex(d), 3);
+  EXPECT_EQ(vv.getIndex(e), 4);
+
   ds::Vector reordering(5);
   reordering << b, a, d, e, c;
   vv.reorder(reordering);
 
-  // EXPECT_EQ(vv.getIndex(a), 1);
+  // Custom ordering
+  EXPECT_EQ(vv.getIndex(a), 1);
   EXPECT_EQ(vv.getIndex(b), 0);
-  // EXPECT_EQ(vv.getIndex(c), 4);
-  // EXPECT_EQ(vv.getIndex(d), 2);
-  // EXPECT_EQ(vv.getIndex(e), 3);
+  EXPECT_EQ(vv.getIndex(c), 4);
+  EXPECT_EQ(vv.getIndex(d), 2);
+  EXPECT_EQ(vv.getIndex(e), 3);
 }
 
 int main(int argc, char **argv) {

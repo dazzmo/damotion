@@ -8,8 +8,8 @@
 #include "damotion/casadi/function.hpp"
 #include "damotion/core/logging.hpp"
 #include "damotion/core/profiler.hpp"
-#include "damotion/optimisation/costs/costs.h"
-#include "damotion/symbolic/variable.h"
+#include "damotion/optimisation/costs.hpp"
+#include "damotion/symbolic/variable.hpp"
 
 using sym = ::casadi::SX;
 using dm = ::casadi::DM;

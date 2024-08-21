@@ -6,8 +6,8 @@
 #include <pinocchio/autodiff/casadi.hpp>
 
 #include "damotion/core/function.hpp"
-#include "damotion/optimisation/constraints/constraints.h"
-#include "damotion/optimisation/costs/costs.h"
+#include "damotion/optimisation/constraints.hpp"
+#include "damotion/optimisation/costs.hpp"
 
 namespace damotion {
 namespace casadi {
@@ -99,6 +99,43 @@ using FunctionWrapper =
     FunctionWrapperImpl<std::make_index_sequence<InputSize>,
                         std::make_index_sequence<OutputSize>>;
 
+/**
+ * @brief Generic constraint function
+ *
+ */
+class Constraint : public optimisation::Constraint {
+ public:
+  // Override method
+  Constraint(const String &name, const ::casadi::SX &ex, const ::casadi::SX &x,
+             const ::casadi::SX &p = ::casadi::SX())
+      : optimisation::Constraint(name, ex.size1(), x.size1()),
+        function_(nullptr),
+        jacobian_(nullptr) {
+    // Compute Jacobian
+    ::casadi::SX jac = ::casadi::SX::jacobian(ex, x);
+
+    // Create function
+    function_ = std::make_unique<FunctionWrapper<2, 1>>(
+        ::casadi::Function("function", {x, p}, {densify(ex)}));
+    jacobian_ = std::make_unique<FunctionWrapper<2, 1>>(
+        ::casadi::Function("jacobian", {x, p}, {densify(jac)}));
+
+    // TODO - Hessian calculations
+  }
+
+  Eigen::VectorXd evaluate(const InputVectorType &x,
+                           OptionalJacobianType jac = nullptr) const override {
+    VectorType out(this->size());
+    function_->call(x, get_parameters(), out);
+    if (jac) jacobian_->call(x, get_parameters(), jac);
+    return out;
+  }
+
+ private:
+  FunctionWrapper<2, 1>::UniquePtr function_;
+  FunctionWrapper<2, 1>::UniquePtr jacobian_;
+};
+
 class LinearConstraint : public optimisation::LinearConstraint {
  public:
   // Override method
@@ -159,9 +196,10 @@ class QuadraticCost : public optimisation::QuadraticCost {
     // Create function
     // todo - check compile time that these number of outputs are correct for
     // todo - the function
-    coeffs_ = std::make_unique<FunctionWrapper<1, 3>>(::casadi::Function(
-        "quadratic_coeffs", {p},
-        {::casadi::SX::densify(A), ::casadi::SX::densify(b), ::casadi::SX::densify(c)}));
+    coeffs_ = std::make_unique<FunctionWrapper<1, 3>>(
+        ::casadi::Function("quadratic_coeffs", {p},
+                           {::casadi::SX::densify(A), ::casadi::SX::densify(b),
+                            ::casadi::SX::densify(c)}));
   }
 
   void coeffs(OptionalHessianType A, OptionalVectorType b,

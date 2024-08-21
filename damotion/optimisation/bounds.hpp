@@ -140,19 +140,19 @@ class BoundedObject<Eigen::VectorXd> {
   void setBoundsFromType(const BoundType &type);
 
  protected:
-  /**
-   * @brief Lower bound for the object
-   *
-   * @return  Eigen::VectorXd&
-   */
-  Eigen::VectorXd &lb() { return lb_; }
+  // /**
+  //  * @brief Lower bound for the object
+  //  *
+  //  * @return  Eigen::VectorXd&
+  //  */
+  // Eigen::VectorXd &lb() { return lb_; }
 
-  /**
-   * @brief Upper bound for the object
-   *
-   * @return  Eigen::VectorXd&
-   */
-  Eigen::VectorXd &ub() { return ub_; }
+  // /**
+  //  * @brief Upper bound for the object
+  //  *
+  //  * @return  Eigen::VectorXd&
+  //  */
+  // Eigen::VectorXd &ub() { return ub_; }
 
  private:
   std::size_t sz_;

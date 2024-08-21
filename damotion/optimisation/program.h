@@ -4,14 +4,13 @@
 #include <casadi/casadi.hpp>
 
 #include "damotion/casadi/codegen.h"
-#include "damotion/casadi/eigen.h"
+#include "damotion/casadi/eigen.hpp"
 #include "damotion/casadi/function.hpp"
 #include "damotion/core/logging.hpp"
 #include "damotion/core/profiler.hpp"
 #include "damotion/optimisation/binding.h"
-#include "damotion/optimisation/constraints/constraints.h"
-#include "damotion/optimisation/costs/costs.h"
-#include "damotion/optimisation/fwd.h"
+#include "damotion/optimisation/constraints.hpp"
+#include "damotion/optimisation/costs.hpp"
 
 namespace damotion {
 namespace optimisation {
@@ -21,57 +20,133 @@ namespace solvers {
 class SolverBase;
 }
 
-class MathematicalProgram {
+/**
+ * @brief Vector of constraint bindings for a system of the form \f$ c(x, p) =
+ * [c_0(x, p), c_1(x, p), \hdots , c_n(x, p)]
+ *
+ */
+class ConstraintVector {
  public:
-  friend class solvers::SolverBase;
-
   using Index = std::size_t;
-  using String = std::string;
 
-  MathematicalProgram() = default;
+  ConstraintVector() : sz_(0) {}
+  ~ConstraintVector() {}
 
-  MathematicalProgram(const String &name)
-      : name_(name), nx_(0), ng_(0), np_(0) {}
+  const Index &size() const { return sz_; }
 
   /**
-   * @brief Name of the program
+   * @brief Add a generic constraint to the program that uses the variables
+   * and parameters given by x and p respectively.
    *
-   * @return const String&
+   * @param c
+   * @param x
+   * @param p
+   * @return Binding<Constraint>
    */
-  const String &name() const { return name_; }
+  Binding<Constraint> add(const Constraint::SharedPtr &con,
+                          const symbolic::Vector &x,
+                          const symbolic::Vector &p) {
+    // Create a binding for the constraint
+    constraints_.push_back(Binding<Constraint>(con, x, p));
+    sz_ += con->size();
+    return constraints_.back();
+  }
 
-  const Index &nx() const { return nx_; }
-  const Index &ng() const { return ng_; }
-  const Index &np() const { return np_; }
+  /**
+   * @brief Add a generic constraint to the program that uses the variables
+   * and parameters given by x and p respectively.
+   *
+   * @param con
+   * @param x
+   * @param p
+   * @return Binding<LinearConstraint>
+   */
+  Binding<LinearConstraint> add(const LinearConstraint::SharedPtr &con,
+                                const symbolic::Vector &x,
+                                const symbolic::Vector &p) {
+    linear_constraints_.push_back(Binding<LinearConstraint>(con, x, p));
+    sz_ += con->size();
+    return linear_constraints_.back();
+  }
 
-  Binding<Cost> addCost(const Cost::SharedPtr &cost, const sym::Vector &x,
-                        const sym::Vector &p) {
+  // Binding<BoundingBoxConstraint> addBoundingBoxConstraint(
+  //     const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
+  //     const symbolic::VariableVector &x) {
+  //   std::shared_ptr<BoundingBoxConstraint> con =
+  //       std::make_shared<BoundingBoxConstraint>("", lb, ub);
+  //   bounding_box_constraints_.push_back(
+  //       Binding<BoundingBoxConstraint>(con, {x}));
+  //   return bounding_box_constraints_.back();
+  // }
+
+  std::vector<Binding<Constraint>> all() const {
+    std::vector<Binding<Constraint>> constraints;
+    constraints.insert(constraints.begin(), constraints_.begin(),
+                       constraints_.end());
+    constraints.insert(constraints.begin(), linear_constraints_.begin(),
+                       linear_constraints_.end());
+    // Return vector of all constraints
+    return constraints;
+  }
+
+  // TODO - Ordering of the constraints
+
+ private:
+  Index sz_;
+
+  // Constraint collections
+  std::vector<Binding<Constraint>> constraints_;
+  std::vector<Binding<LinearConstraint>> linear_constraints_;
+};
+
+std::ostream &operator<<(std::ostream &os, const ConstraintVector &cv) {
+  std::ostringstream oss;
+  oss << "Constraint\tSize\tLower Bound\tUpper Bound\n";
+  // Get all constraints
+  for (const Binding<Constraint> &b : cv.all()) {
+    oss << b.get()->name() << "\t[" << b.get()->size() << ",1]\n";
+    for (size_t i = 0; i < b.get()->size(); ++i) {
+      oss << b.get()->name() << "_" + std::to_string(i) << "\t\t"
+          << b.get()->lb()[i] << "\t" << b.get()->ub()[i] << "\n";
+    }
+  }
+
+  return os << oss.str();
+}
+
+/**
+ * @brief Construct the dense constraint Jacobian for the constraint vector g
+ * with values x and the ordering of the variable vector v.
+ *
+ * @param x
+ * @param g
+ * @param v
+ * @return Eigen::MatrixXd
+ */
+Eigen::MatrixXd constraintJacobian(const Eigen::VectorXd &x,
+                                   const ConstraintVector &g,
+                                   const symbolic::VariableVector &v);
+
+
+class ObjectiveFunction {
+ public:
+  Binding<Cost> add(const Cost::SharedPtr &cost, const symbolic::Vector &x,
+                    const symbolic::Vector &p) {
     Binding<Cost> binding(cost, x, p);
     costs_.push_back(binding);
     return costs_.back();
   }
 
-  Binding<LinearCost> addLinearCost(const LinearCost::SharedPtr &cost,
-                                    const sym::Vector &x,
-                                    const sym::Vector &p) {
+  Binding<LinearCost> add(const LinearCost::SharedPtr &cost,
+                          const symbolic::Vector &x,
+                          const symbolic::Vector &p) {
     linear_costs_.push_back(Binding<LinearCost>(cost, x, p));
     return linear_costs_.back();
   }
 
-  /**
-   * @brief Get the vector of current LinearCost objects within the
-   * program.
-   *
-   * @return std::vector<Binding<LinearCost>>&
-   */
-  std::vector<Binding<LinearCost>> &getLinearCostBindings() {
-    // Create constraints
-    return linear_costs_;
-  }
-
-  Binding<QuadraticCost> addQuadraticCost(const QuadraticCost::SharedPtr &cost,
-                                          const sym::Vector &x,
-                                          const sym::Vector &p) {
+  Binding<QuadraticCost> add(const QuadraticCost::SharedPtr &cost,
+                             const symbolic::Vector &x,
+                             const symbolic::Vector &p) {
     quadratic_costs_.push_back(Binding<QuadraticCost>(cost, x, p));
     return quadratic_costs_.back();
   }
@@ -88,12 +163,23 @@ class MathematicalProgram {
   }
 
   /**
+   * @brief Get the vector of current LinearCost objects within the
+   * program.
+   *
+   * @return std::vector<Binding<LinearCost>>&
+   */
+  std::vector<Binding<LinearCost>> &getLinearCostBindings() {
+    // Create constraints
+    return linear_costs_;
+  }
+
+  /**
    * @brief Returns a vector of all costs, as bindings to the generic Cost base
    * class.
    *
    * @return std::vector<Binding<Cost>>
    */
-  std::vector<Binding<Cost>> getAllCostBindings() {
+  std::vector<Binding<Cost>> all() const {
     std::vector<Binding<Cost>> costs = {};
     costs.insert(costs.begin(), costs_.begin(), costs_.end());
     costs.insert(costs.begin(), linear_costs_.begin(), linear_costs_.end());
@@ -104,124 +190,91 @@ class MathematicalProgram {
     return costs;
   }
 
-  /**
-   * @brief Prints the current set of costs for the program to the
-   * screen
-   *
-   */
-  void listCosts() {
-    std::cout << "----------------------\n";
-    std::cout << "Cost\n";
-    std::cout << "----------------------\n";
-    std::vector<Binding<Cost>> costs = GetAllCostBindings();
-    for (Binding<Cost> &b : costs) {
-      std::cout << b.Get().name() << '\n';
-    }
-  }
-
-  /**
-   * @brief Add a constraint to the program that uses the variables
-   * and parameters given by x and p respectively.
-   *
-   * @param c
-   * @param x
-   * @param p
-   * @return Binding<Constraint>
-   */
-  Binding<Constraint> addConstraint(const Constraint::SharedPtr &con,
-                                    const sym::Vector &x,
-                                    const sym::Vector &p) {
-    // Create a binding for the constraint
-    constraints_.push_back(Binding<Constraint>(con, x, p));
-    return constraints_.back();
-  }
-
-  Binding<LinearConstraint> addLinearConstraint(
-      const LinearConstraint::SharedPtr &con, const sym::Vector &x,
-      const sym::Vector &p) {
-    linear_constraints_.push_back(Binding<LinearConstraint>(con, x, p));
-    return linear_constraints_.back();
-  }
-
-  // Binding<BoundingBoxConstraint> addBoundingBoxConstraint(
-  //     const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
-  //     const sym::VariableVector &x) {
-  //   std::shared_ptr<BoundingBoxConstraint> con =
-  //       std::make_shared<BoundingBoxConstraint>("", lb, ub);
-  //   bounding_box_constraints_.push_back(
-  //       Binding<BoundingBoxConstraint>(con, {x}));
-  //   return bounding_box_constraints_.back();
-  // }
-
-  std::vector<Binding<Constraint>> getAllConstraintBindings() {
-    std::vector<Binding<Constraint>> constraints;
-    constraints.insert(constraints.begin(), constraints_.begin(),
-                       constraints_.end());
-    constraints.insert(constraints.begin(), linear_constraints_.begin(),
-                       linear_constraints_.end());
-    // Return vector of all constraints
-    return constraints;
-  }
-
-  void ListConstraints() {
-    std::cout << "----------------------\n";
-    std::cout << "Constraint\tSize\tLower Bound\tUpper Bound\n";
-    std::cout << "----------------------\n";
-    // Get all constraints
-    std::vector<Binding<Constraint>> constraints = getAllConstraintBindings();
-    for (Binding<Constraint> &b : constraints) {
-      std::cout << b.get()->name() << "\t[" << b.get()->dim() << ",1]\n";
-      for (size_t i = 0; i < b.get()->dim(); ++i) {
-        std::cout << b.get()->name() << "_" + std::to_string(i) << "\t\t"
-                  << b.get()->lb()[i] << "\t" << b.get()->ub()[i] << "\n";
-      }
-    }
-    for (Binding<BoundingBoxConstraint> &b :
-         getBoundingBoxConstraintBindings()) {
-      std::cout << b.get()->name() << "\t[" << b.get()->dim() << ",1]\n";
-      for (size_t i = 0; i < b.get()->dim(); ++i) {
-        std::cout << b.get()->name() << "_" + std::to_string(i) << "\t\t"
-                  << b.get()->lb()[i] << "\t" << b.get()->ub()[i] << "\n";
-      }
-    }
-  }
-
-  /**
-   * @brief Decision variables of the mathematical program
-   * 
-   * @return sym::VariableVector& 
-  */
-  sym::VariableVector &x() { return x_; }
-
-  /**
-   * @brief Parameters for the mathematical program 
-   * 
-   * @return sym::VariableVector& 
-  */
-  sym::VariableVector &p() { return p_; }
-
  private:
-  // Consider programs with different spaces for their state and derivative
-  // (e.g. quaternions)
-
-  Index ng_;
-
-  String name_;
-
-  // Optimisation vector
-  sym::VariableVector x_;
-
-  // Parameter vector
-  sym::VariableVector p_;
-
   // Cost collections
   std::vector<Binding<Cost>> costs_;
   std::vector<Binding<LinearCost>> linear_costs_;
   std::vector<Binding<QuadraticCost>> quadratic_costs_;
+};
 
-  // Constraint collections
-  std::vector<Binding<Constraint>> constraints_;
-  std::vector<Binding<LinearConstraint>> linear_constraints_;
+std::ostream &operator<<(std::ostream &os, const ObjectiveFunction &obj) {
+  std::ostringstream oss;
+  // Get all costs
+  for (const Binding<Cost> &b : obj.all()) {
+    oss << b.get()->name() << "\n";
+  }
+
+  return os << oss.str();
+}
+
+/**
+ * @brief Represents a generic mathematical program of the form \f$ \min f(x, p)
+ * s.t. g_l \le g(x) \le q_u, x_l \le x \le x_u \f$
+ *
+ */
+class MathematicalProgram {
+ public:
+  friend class solvers::SolverBase;
+
+  using Index = std::size_t;
+  using String = std::string;
+
+  MathematicalProgram() = default;
+
+  MathematicalProgram(const String &name) : name_(name) {}
+
+  /**
+   * @brief Name of the program
+   *
+   * @return const String&
+   */
+  const String &name() const { return name_; }
+
+  /**
+   * @brief Objective function for the mathematical program
+   *
+   * @return ObjectiveFunction&
+   */
+  ObjectiveFunction &f() { return f_; }
+
+  /**
+   * @brief Constraint vector for the program
+   *
+   * @return ConstraintVector&
+   */
+  ConstraintVector &g() { return g_; }
+
+  /**
+   * @brief Decision variables of the mathematical program
+   *
+   * @return symbolic::VariableVector&
+   */
+  symbolic::VariableVector &x() { return x_; }
+
+  /**
+   * @brief Parameters for the mathematical program
+   *
+   * @return symbolic::VariableVector&
+   */
+  symbolic::VariableVector &p() { return p_; }
+
+ private:
+  // todo - Consider programs with different spaces for their state and
+  // todo - derivative (e.g. quaternions)
+
+  // Name
+  String name_;
+
+  // Optimisation vector
+  symbolic::VariableVector x_;
+  // Parameter vector
+  symbolic::VariableVector p_;
+
+  // Objective function
+  ObjectiveFunction f_;
+
+  // Constraint vector
+  ConstraintVector g_;
 };
 
 }  // namespace optimisation

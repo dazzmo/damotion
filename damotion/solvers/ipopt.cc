@@ -11,8 +11,9 @@ bool IpoptSolverInstance::get_nlp_info(Index& n, Index& m, Index& nnz_jac_g,
                                        Index& nnz_h_lag,
                                        IndexStyleEnum& index_style) {
   VLOG(10) << "get_nlp_info()";
-  n = GetCurrentProgram().numberOfDecisionVariables();
-  m = GetCurrentProgram().NumberOfConstraints();
+  n = getCurrentProgram().x().size();
+  m = getCurrentProgram().g().size();
+  // TODO - Determine the sparsity of the hessians and jacobians
   nnz_jac_g = GetSparseConstraintJacobian().nonZeros();
   nnz_h_lag = GetSparseLagrangianHessian().nonZeros();
 
@@ -27,15 +28,19 @@ bool IpoptSolverInstance::eval_f(Index n, const Number* x, bool new_x,
   VLOG(10) << "eval_f()";
 
   if (new_x) {
-    decision_variable_cache_ =
+    cache_.decision_variables =
         Eigen::Map<Eigen::VectorXd>(const_cast<double*>(x), n);
   }
   // Update caches
-  EvaluateCosts(decision_variable_cache_, false, false);
+  for (auto& binding : getCurrentProgram().f().all()) {
+    cache_.objective += binding.get()->evaluate(cache_.decision_variables);
+  }
+
   // Set objective to most recently cached value
   obj_value = objective_cache_;
-  VLOG(10) << "x : " << decision_variable_cache_.transpose();
+
   VLOG(10) << "f : " << obj_value;
+
   return true;
 }
 
@@ -45,14 +50,20 @@ bool IpoptSolverInstance::eval_grad_f(Index n, const Number* x, bool new_x,
   VLOG(10) << "eval_grad_f()";
 
   if (new_x) {
-    decision_variable_cache_ =
+    cache_.decision_variables =
         Eigen::Map<Eigen::VectorXd>(const_cast<double*>(x), n);
   }
+
   // Update caches
-  EvaluateCosts(decision_variable_cache_, true, false);
+  for (auto& binding : getCurrentProgram().f().all()) {
+    Eigen::RowVectorXd grd(binding.x().size());
+    binding.get()->evaluate(cache_.decision_variables, grd);
+    cache_.objective_gradient(getCurrentProgram().x().getIndices(binding.x())) =
+        grd;
+  }
+
   // TODO - See about mapping these
   std::copy_n(objective_gradient_cache_.data(), n, grad_f);
-  VLOG(10) << "x : " << decision_variable_cache_.transpose();
   VLOG(10) << "grad f : " << objective_gradient_cache_.transpose();
   return true;
 }
@@ -62,12 +73,16 @@ bool IpoptSolverInstance::eval_g(Index n, const Number* x, bool new_x, Index m,
   core::Profiler profiler("IpoptSolverInstance::eval_g");
   VLOG(10) << "eval_g()";
   if (new_x) {
-    decision_variable_cache_ =
+    cache_.decision_variables =
         Eigen::Map<Eigen::VectorXd>(const_cast<double*>(x), n);
   }
+
   // Update caches
-  EvaluateConstraints(decision_variable_cache_, false, false);
-  VLOG(10) << "x : " << decision_variable_cache_.transpose();
+  for (auto& binding : getCurrentProgram().g().all()) {
+    Eigen::VectorXd g = binding.get()->evaluate(cache_.decision_variables);
+    cache_.constraint_vector(getCurrentProgram().x().getIndices(binding.x())) =
+        g;
+  }
   VLOG(10) << "c : " << constraint_cache_.transpose();
   std::copy_n(constraint_cache_.data(), m, g);
   return true;
@@ -96,12 +111,12 @@ bool IpoptSolverInstance::eval_jac_g(Index n, const Number* x, bool new_x,
 
   } else {
     if (new_x) {
-      decision_variable_cache_ =
+      cache_.decision_variables =
           Eigen::Map<Eigen::VectorXd>(const_cast<double*>(x), n);
     }
     // Update caches
-    EvaluateConstraints(decision_variable_cache_, true, false);
-    VLOG(10) << "x : " << decision_variable_cache_.transpose();
+    EvaluateConstraints(cache_.decision_variables, true, false);
+    VLOG(10) << "x : " << cache_.decision_variables.transpose();
     VLOG(10) << "jac : " << constraint_jacobian_cache_;
     std::copy_n(constraint_jacobian_cache_.valuePtr(), nele_jac, values);
   }
@@ -133,7 +148,7 @@ bool IpoptSolverInstance::eval_h(Index n, const Number* x, bool new_x,
 
   } else {
     if (new_x) {
-      decision_variable_cache_ =
+      cache_.decision_variables =
           Eigen::Map<Eigen::VectorXd>(const_cast<double*>(x), n);
     }
     if (new_lambda) {
@@ -143,8 +158,8 @@ bool IpoptSolverInstance::eval_h(Index n, const Number* x, bool new_x,
     // Reset cache for hessian
     lagrangian_hes_cache_ *= 0.0;
     // Update caches
-    EvaluateCosts(decision_variable_cache_, false, true);
-    EvaluateConstraints(decision_variable_cache_, false, true);
+    EvaluateCosts(cache_.decision_variables, false, true);
+    EvaluateConstraints(cache_.decision_variables, false, true);
     VLOG(10) << "hes\n" << lagrangian_hes_cache_;
     std::copy_n(lagrangian_hes_cache_.valuePtr(), nele_hess, values);
   }
@@ -156,26 +171,26 @@ bool IpoptSolverInstance::get_bounds_info(Index n, Number* x_l, Number* x_u,
                                           Index m, Number* g_l, Number* g_u) {
   VLOG(10) << "get_bounds_info()";
   // Convert any bounding box constraints
-  for (auto& binding : GetCurrentProgram().GetBoundingBoxConstraintBindings()) {
+  for (auto& binding : getCurrentProgram().GetBoundingBoxConstraintBindings()) {
     const sym::VariableVector& v = binding.x(0);
     for (int i = 0; i < v.size(); ++i) {
-      GetCurrentProgram().setDecisionVariableBounds(
+      getCurrentProgram().setDecisionVariableBounds(
           v[i], binding.Get().lowerBound()[i], binding.Get().upperBound()[i]);
     }
   }
 
-  GetCurrentProgram().updateDecisionVariableBoundVectors();
-  GetCurrentProgram().UpdateConstraintBoundVectors();
-  VLOG(10) << GetCurrentProgram().decisionVariableupperBounds();
-  VLOG(10) << GetCurrentProgram().decisionVariablelowerBounds();
-  VLOG(10) << GetCurrentProgram().ConstraintupperBounds();
-  VLOG(10) << GetCurrentProgram().ConstraintlowerBounds();
+  getCurrentProgram().updateDecisionVariableBoundVectors();
+  getCurrentProgram().UpdateConstraintBoundVectors();
+  VLOG(10) << getCurrentProgram().decisionVariableupperBounds();
+  VLOG(10) << getCurrentProgram().decisionVariablelowerBounds();
+  VLOG(10) << getCurrentProgram().ConstraintupperBounds();
+  VLOG(10) << getCurrentProgram().ConstraintlowerBounds();
   // Decision variable bounds
-  std::copy_n(GetCurrentProgram().decisionVariableupperBounds().data(), n, x_u);
-  std::copy_n(GetCurrentProgram().decisionVariablelowerBounds().data(), n, x_l);
+  std::copy_n(getCurrentProgram().decisionVariableupperBounds().data(), n, x_u);
+  std::copy_n(getCurrentProgram().decisionVariablelowerBounds().data(), n, x_l);
   // Constraint bounds
-  std::copy_n(GetCurrentProgram().ConstraintupperBounds().data(), m, g_u);
-  std::copy_n(GetCurrentProgram().ConstraintlowerBounds().data(), m, g_l);
+  std::copy_n(getCurrentProgram().ConstraintupperBounds().data(), m, g_u);
+  std::copy_n(getCurrentProgram().ConstraintlowerBounds().data(), m, g_l);
 
   return true;
 }
@@ -186,9 +201,9 @@ bool IpoptSolverInstance::get_starting_point(Index n, bool init_x, Number* x,
                                              bool init_lambda, Number* lambda) {
   VLOG(10) << "get_starting_point()";
   if (init_x) {
-    GetCurrentProgram().UpdateInitialValueVector();
-    VLOG(10) << GetCurrentProgram().decisionVariableInitialValues();
-    std::copy_n(GetCurrentProgram().decisionVariableInitialValues().data(), n,
+    getCurrentProgram().UpdateInitialValueVector();
+    VLOG(10) << getCurrentProgram().decisionVariableInitialValues();
+    std::copy_n(getCurrentProgram().decisionVariableInitialValues().data(), n,
                 x);
   }
 

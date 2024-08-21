@@ -12,7 +12,7 @@ SET(${PROJECT_NAME}_SOURCES
 # solvers/base.cc
 casadi/codegen.cc
 # casadi/pinocchio_model.cc
-# optimisation/program.cc
+optimisation/program.cc
 # optimisation/bounds.cc
 # optimisation/block.cc
 # core/math/log.cc

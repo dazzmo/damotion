@@ -4,7 +4,8 @@
 #include <memory>
 
 #include "damotion/core/logging.hpp"
-#include "damotion/optimisation/fwd.h"
+
+#include "damotion/symbolic/variable.hpp"
 
 namespace damotion {
 namespace optimisation {
@@ -25,7 +26,8 @@ class BindingBase {
    * @param x
    * @param p
    */
-  BindingBase(const sym::Vector &x, const sym::Vector &p = {}) : x_(x), p_(p) {
+  BindingBase(const symbolic::Vector &x, const symbolic::Vector &p = {})
+      : x_(x), p_(p) {
     static Id next_id = 0;
     id_ = next_id++;
     VLOG(10) << "Created binding with ID " << id_;
@@ -34,23 +36,23 @@ class BindingBase {
   /**
    * @brief Variable vectors x for the binding
    *
-   * @return sym::Vector
+   * @return symbolic::Vector
    */
-  const sym::Vector &x() const { return x_; }
+  const symbolic::Vector &x() const { return x_; }
 
   /**
    * @brief Variable parameters p for the binding
    *
-   * @return sym::Vector
+   * @return symbolic::Vector
    */
-  const sym::Vector &p() const { return p_; }
+  const symbolic::Vector &p() const { return p_; }
 
  protected:
   Id id_;
 
   // Vector of variables bound to the constraint
-  sym::Vector x_;
-  sym::Vector p_;
+  symbolic::Vector x_;
+  symbolic::Vector p_;
 };
 
 /**
@@ -76,8 +78,8 @@ class Binding : public BindingBase {
    * @param x
    * @param p
    */
-  Binding(const std::shared_ptr<ObjectType> &f, const sym::Vector &x,
-          const sym::Vector &p = {})
+  Binding(const std::shared_ptr<ObjectType> &f, const symbolic::Vector &x,
+          const symbolic::Vector &p = {})
       : BindingBase(x, p), obj_(std::move(f)) {}
 
   /**

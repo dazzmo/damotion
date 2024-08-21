@@ -1,4 +1,4 @@
-#include "damotion/symbolic/variable.h"
+#include "damotion/symbolic/variable.hpp"
 namespace damotion {
 namespace symbolic {
 
@@ -51,6 +51,12 @@ std::ostream &operator<<(std::ostream &os, damotion::symbolic::Matrix mat) {
   return os << oss.str();
 }
 
+std::ostream &operator<<(std::ostream &os,
+                         const damotion::symbolic::VariableVector &v) {
+  std::ostringstream oss;
+  return os << oss.str();
+}
+
 bool VariableVector::add(const Variable &var) {
   if (contains(var)) {
     LOG(ERROR) << var << " is already added to program!";
@@ -60,10 +66,6 @@ bool VariableVector::add(const Variable &var) {
   variable_idx_[var.id()] = sz_++;
   // Add variable to vector
   variables_.push_back(var);
-  // Update bounds and initial value
-  lb().conservativeResize(sz_);
-  ub().conservativeResize(sz_);
-  initialValue().conservativeResize(sz_);
   return true;
 }
 
@@ -132,14 +134,11 @@ const VariableVector::Index &VariableVector::getIndex(const Variable &v) const {
   return it->second;
 }
 
-VariableVector::IndexVector VariableVector::getIndices(const Vector &v) {
+VariableVector::IndexVector VariableVector::getIndices(const Vector &v) const {
   IndexVector indices;
   indices.reserve(v.size());
   for (Index i = 0; i < v.size(); ++i) {
-    Index idx = getIndex(v[i]);
-    if (idx >= 0) {
-      indices.push_back(idx);
-    }
+    indices.push_back(getIndex(v[i]));
   }
   // Return vector of indices
   return indices;
@@ -186,15 +185,6 @@ VariableVector::IndexVector VariableVector::getIndices(const Vector &v) {
 //     setVariableInitialValue(v[i], x0[i]);
 //   }
 // }
-
-void VariableVector::list() {
-  std::cout << "----------------------\n";
-  std::cout << "Variable\n";
-  std::cout << "----------------------\n";
-  for (Variable &v : variables_) {
-    std::cout << v << '\n';
-  }
-}
 
 }  // namespace symbolic
 }  // namespace damotion

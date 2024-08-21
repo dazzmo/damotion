@@ -11,8 +11,7 @@
 namespace damotion {
 namespace symbolic {
 
-class Variable : public optimisation::BoundedObject<double>,
-                 public optimisation::InitialiseableObject<double> {
+class Variable {
  public:
   // ID type for the variables
   typedef std::size_t Id;
@@ -21,10 +20,7 @@ class Variable : public optimisation::BoundedObject<double>,
 
   Variable() = default;
 
-  Variable(const std::string &name)
-      : optimisation::BoundedObject<double>(),
-        optimisation::InitialiseableObject<double>(),
-        name_(name) {
+  Variable(const std::string &name) : name_(name) {
     static int next_id_ = Id(0);
     id_ = next_id_++;
   }
@@ -66,9 +62,7 @@ std::ostream &operator<<(std::ostream &os, Matrix mat);
  * vector
  *
  */
-class VariableVector
-    : public optimisation::BoundedObject<Eigen::VectorXd>,
-      public optimisation::InitialiseableObject<Eigen::VectorXd> {
+class VariableVector {
  public:
   using Index = Eigen::Index;
   using IndexVector = std::vector<Index>;
@@ -76,10 +70,7 @@ class VariableVector
   using SharedPtr = std::shared_ptr<VariableVector>;
   using UniquePtr = std::unique_ptr<VariableVector>;
 
-  VariableVector()
-      : optimisation::BoundedObject<Eigen::VectorXd>(0),
-        optimisation::InitialiseableObject<Eigen::VectorXd>(0),
-        sz_(0) {}
+  VariableVector() : sz_(0) {}
 
   ~VariableVector() = default;
 
@@ -91,7 +82,7 @@ class VariableVector
   const Index &size() const { return sz_; }
 
   /**
-   * @brief Adds a decision variable, returns true if added, false if it is
+   * @brief Adds a decision variable/ returns true if added, false if it is
    * already included.
    *
    * @param var
@@ -147,7 +138,7 @@ class VariableVector
    * @param v
    * @return IndexVector
    */
-  IndexVector getIndices(const Vector &v);
+  IndexVector getIndices(const Vector &v) const;
 
   /**
    * @brief Sets the optimisation vector using the given ordering of variables
@@ -172,6 +163,8 @@ class VariableVector
   // Vector of all decision variables used
   std::vector<Variable> variables_;
 };
+
+std::ostream &operator<<(std::ostream &os, const VariableVector &vec);
 
 }  // namespace symbolic
 }  // namespace damotion

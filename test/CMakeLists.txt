@@ -12,6 +12,7 @@ core/function.cc
 casadi/eigen.cc
 casadi/function.cc
 optimisation/binding.cc
+optimisation/constraint_vector.cc
 symbolic/variable.cc
 )
 

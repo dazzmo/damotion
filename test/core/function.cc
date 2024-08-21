@@ -112,6 +112,10 @@ class BiVectorFunction : public damotion::FunctionBase<2, Eigen::VectorXd> {
   }
 };
 
+void foo(const Eigen::VectorXd &in) {
+  const_cast<Eigen::VectorXd &>(in) << 1.0, 1.0, 1.0;
+}
+
 TEST(Function, BiVectorFunctionEvaluate) {
   BiVectorFunction nf;
 
