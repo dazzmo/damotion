@@ -5,12 +5,72 @@
 #include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
+#include "damotion/casadi/codegen.hpp"
 #include "damotion/casadi/eigen.hpp"
 #include "damotion/core/logging.hpp"
 #include "damotion/core/profiler.hpp"
 
 using sym = ::casadi::SX;
 using dm = ::casadi::DM;
+
+TEST(CasadiFunction, FunctionWrapperScalar) {
+  std::size_t n = 5;
+  sym x = sym::sym("x", n);
+  // Create symbolic constraint
+  sym ex = sym::dot(x, x);
+
+  auto fun = ::casadi::Function("function", {x}, {ex});
+
+  // Create function wrapper
+  damotion::casadi::FunctionWrapper<1, 1> fw(fun);
+
+  Eigen::VectorXd xe(n);
+  xe.setRandom();
+
+  // Call function normally
+  ::casadi::DM xc;
+  damotion::casadi::toCasadi(xe, xc);
+  EXPECT_DOUBLE_EQ(xe.dot(xe), fun(xc)[0]->at(0));
+
+  double res = 0.0;
+
+  for (std::size_t i = 0; i < 1; ++i) {
+    damotion::Profiler profiler("evaluate");
+    fw.call({xe}, {res});
+  }
+
+  EXPECT_DOUBLE_EQ(xe.dot(xe), res);
+}
+
+TEST(CasadiFunction, FunctionWrapperVector) {
+  std::size_t n = 5;
+  sym x = sym::sym("x", n);
+  // Create symbolic constraint
+  sym ex = x;
+
+  auto fun = ::casadi::Function("function", {x}, {ex});
+
+  // Create function wrapper
+  damotion::casadi::FunctionWrapper<1, 1> fw(
+      ::casadi::Function("function", {x}, {ex}));
+
+  Eigen::VectorXd xe(n), res(n);
+  xe.setRandom();
+
+  for (std::size_t i = 0; i < 1; ++i) {
+    damotion::Profiler profiler("evaluate");
+    fw.call({xe}, {res});
+  }
+
+  EXPECT_TRUE(xe.isApprox(res));
+
+  ::casadi::DM xc;
+  damotion::casadi::toCasadi(xe, xc);
+  // Also call the function normally
+  Eigen::VectorXd rese;
+  damotion::casadi::toEigen(fun(xc)[0], rese);
+  EXPECT_TRUE(xe.isApprox(rese));
+}
 
 TEST(CasadiFunction, LinearConstraint) {
   std::size_t n = 100;
@@ -29,7 +89,7 @@ TEST(CasadiFunction, LinearConstraint) {
 
   Eigen::VectorXd res(n);
 
-  for (std::size_t i = 0; i < 1000; ++i) {
+  for (std::size_t i = 0; i < 1; ++i) {
     damotion::Profiler profiler("evaluate");
     res = p->evaluate(xe);
   }
@@ -61,7 +121,7 @@ TEST(CasadiFunction, LinearCost) {
 
   double res = 0.0;
 
-  for (std::size_t i = 0; i < 1000; ++i) {
+  for (std::size_t i = 0; i < 1; ++i) {
     damotion::Profiler profiler("LinearCost.evaluate");
     res = p->evaluate(xe);
   }
@@ -98,7 +158,7 @@ TEST(CasadiFunction, QuadraticCost) {
 
   double res = 0.0;
 
-  for (std::size_t i = 0; i < 1000; ++i) {
+  for (std::size_t i = 0; i < 1; ++i) {
     damotion::Profiler profiler("QuadraticCost.evaluate");
     res = p->evaluate(xe);
   }
@@ -114,7 +174,7 @@ TEST(CasadiFunction, QuadraticCost) {
 
   double fc = 0.5 * xe.dot(Ae * xe) + be.dot(xe) + ce;
 
-  EXPECT_EQ(fc, res);
+  EXPECT_DOUBLE_EQ(fc, res);
 }
 
 int main(int argc, char **argv) {

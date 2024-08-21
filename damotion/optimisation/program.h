@@ -3,7 +3,7 @@
 
 #include <casadi/casadi.hpp>
 
-#include "damotion/casadi/codegen.h"
+#include "damotion/casadi/codegen.hpp"
 #include "damotion/casadi/eigen.hpp"
 #include "damotion/casadi/function.hpp"
 #include "damotion/core/logging.hpp"
@@ -119,6 +119,7 @@ std::ostream &operator<<(std::ostream &os, const ConstraintVector &cv) {
  * with values x and the ordering of the variable vector v.
  *
  * @param x
+ * @param lam
  * @param g
  * @param v
  * @return Eigen::MatrixXd
@@ -127,6 +128,10 @@ Eigen::MatrixXd constraintJacobian(const Eigen::VectorXd &x,
                                    const ConstraintVector &g,
                                    const symbolic::VariableVector &v);
 
+Eigen::MatrixXd constraintHessian(const Eigen::VectorXd &x,
+                                  const Eigen::VectorXd &lam,
+                                  const ConstraintVector &g,
+                                  const symbolic::VariableVector &v);
 
 class ObjectiveFunction {
  public:
@@ -196,6 +201,19 @@ class ObjectiveFunction {
   std::vector<Binding<LinearCost>> linear_costs_;
   std::vector<Binding<QuadraticCost>> quadratic_costs_;
 };
+
+/**
+ * @brief Construct the dense objective Hessian for the objective function f
+ * with values x and the ordering of the variable vector v.
+ *
+ * @param x
+ * @param g
+ * @param v
+ * @return Eigen::MatrixXd
+ */
+Eigen::MatrixXd objectiveHessian(const Eigen::VectorXd &x,
+                                 const ObjectiveFunction &f,
+                                 const symbolic::VariableVector &v);
 
 std::ostream &operator<<(std::ostream &os, const ObjectiveFunction &obj) {
   std::ostringstream oss;

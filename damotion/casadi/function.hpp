@@ -12,32 +12,27 @@
 namespace damotion {
 namespace casadi {
 
-template <typename InSeq, typename OutSeq>
-class FunctionWrapperImpl;
-
-template <std::size_t... Is, std::size_t... Os>
-class FunctionWrapperImpl<std::index_sequence<Is...>,
-                          std::index_sequence<Os...>> {
+template <std::size_t InputSize, std::size_t OutputSize>
+class FunctionWrapper {
  public:
-  using UniquePtr = std::unique_ptr<FunctionWrapperImpl>;
-  using SharedPtr = std::shared_ptr<FunctionWrapperImpl>;
+  using UniquePtr = std::unique_ptr<FunctionWrapper>;
+  using SharedPtr = std::shared_ptr<FunctionWrapper>;
 
-  FunctionWrapperImpl() = default;
-  FunctionWrapperImpl(const ::casadi::Function &f) { *this = f; }
+  FunctionWrapper() = default;
+  FunctionWrapper(const ::casadi::Function &f) { *this = f; }
 
-  ~FunctionWrapperImpl() {
+  ~FunctionWrapper() {
     // Release memory for casadi function
     if (!f_.is_null()) f_.release(mem_);
   }
 
-  FunctionWrapperImpl<std::index_sequence<Is...>, std::index_sequence<Os...>> &
-  operator=(const FunctionWrapperImpl &other) {
+  FunctionWrapper<InputSize, OutputSize> &operator=(
+      const FunctionWrapper &other) {
     *this = other.f_;
     return *this;
   }
 
-  FunctionWrapperImpl<std::index_sequence<Is...>, std::index_sequence<Os...>> &
-  operator=(::casadi::Function f) {
+  FunctionWrapper<InputSize, OutputSize> &operator=(::casadi::Function f) {
     if (f.is_null()) {
       return *this;
     }
@@ -45,10 +40,10 @@ class FunctionWrapperImpl<std::index_sequence<Is...>,
     f_ = f;
 
     // Checkout memory object for function
-    mem_ = f.checkout();
+    mem_ = f_.checkout();
 
     // Resize work vectors
-    in_data_ptr_.assign(f_.sz_arg(), nullptr);
+    in_data_ptr_.assign(f_.n_in(), nullptr);
     out_data_ptr_.assign(f_.n_out(), nullptr);
 
     iw_.assign(f_.sz_iw(), 0);
@@ -57,21 +52,20 @@ class FunctionWrapperImpl<std::index_sequence<Is...>,
     return *this;
   }
 
-  void call(const alwaysT<Is, Eigen::VectorXd> &...in,
-            alwaysT<Os, OptionalMatrix>... out) {
-    std::size_t cnt = 0;
-    for (const Eigen::VectorXd &xi : {in...}) {
-      in_data_ptr_[cnt++] = xi.data();
+  void call(const std::array<Eigen::Ref<const Eigen::VectorXd>, InputSize> &in,
+            const std::array<OptionalMatrix, OutputSize> &out) {
+    for (std::size_t i = 0; i < InputSize; ++i) {
+      in_data_ptr_[i] = in[i].data();
     }
 
-    cnt = 0;
-    for (const OptionalMatrix &oi : {out...}) {
-      if (oi) {
-        out_data_ptr_[cnt++] = const_cast<double *>(oi->data());
+    for (std::size_t i = 0; i < OutputSize; ++i) {
+      if (out[i]) {
+        out_data_ptr_[i] = const_cast<double *>(out[i]->data());
       } else {
-        out_data_ptr_[cnt++] = nullptr;
+        out_data_ptr_[i] = nullptr;
       }
     }
+
     // Call the function
     f_(in_data_ptr_.data(), out_data_ptr_.data(), iw_.data(), dw_.data(), mem_);
   }
@@ -94,46 +88,56 @@ class FunctionWrapperImpl<std::index_sequence<Is...>,
   ::casadi::Function f_;
 };
 
-template <std::size_t InputSize, std::size_t OutputSize>
-using FunctionWrapper =
-    FunctionWrapperImpl<std::make_index_sequence<InputSize>,
-                        std::make_index_sequence<OutputSize>>;
-
 /**
  * @brief Generic constraint function
  *
  */
 class Constraint : public optimisation::Constraint {
  public:
-  // Override method
   Constraint(const String &name, const ::casadi::SX &ex, const ::casadi::SX &x,
              const ::casadi::SX &p = ::casadi::SX())
       : optimisation::Constraint(name, ex.size1(), x.size1()),
         function_(nullptr),
-        jacobian_(nullptr) {
+        jacobian_(nullptr),
+        hessian_(nullptr) {
     // Compute Jacobian
     ::casadi::SX jac = ::casadi::SX::jacobian(ex, x);
 
-    // Create function
+    // Function
     function_ = std::make_unique<FunctionWrapper<2, 1>>(
         ::casadi::Function("function", {x, p}, {densify(ex)}));
+    // Jacobian
     jacobian_ = std::make_unique<FunctionWrapper<2, 1>>(
         ::casadi::Function("jacobian", {x, p}, {densify(jac)}));
 
-    // TODO - Hessian calculations
+    // Hessian
+    ::casadi::SX l = ::casadi::SX::sym("l", ex.size1());
+    ::casadi::SX lc = ::casadi::SX::mtimes(l.T(), ex);
+    ::casadi::SX hes = ::casadi::SX::hessian(lc, x);
+
+    hessian_ = std::make_unique<FunctionWrapper<3, 1>>(
+        ::casadi::Function("hessian", {x, l, p}, {densify(hes)}));
   }
 
   Eigen::VectorXd evaluate(const InputVectorType &x,
                            OptionalJacobianType jac = nullptr) const override {
     VectorType out(this->size());
-    function_->call(x, get_parameters(), out);
-    if (jac) jacobian_->call(x, get_parameters(), jac);
+    function_->call({x, get_parameters()}, {out});
+    if (jac) jacobian_->call({x, get_parameters()}, {jac});
     return out;
+  }
+
+  void hessian(const InputVectorType &x, const ReturnType &lam,
+               OptionalHessianType hes = nullptr) const override {
+    if (hes) {
+      hessian_->call({x, lam, get_parameters()}, {hes});
+    }
   }
 
  private:
   FunctionWrapper<2, 1>::UniquePtr function_;
   FunctionWrapper<2, 1>::UniquePtr jacobian_;
+  FunctionWrapper<3, 1>::UniquePtr hessian_;
 };
 
 class LinearConstraint : public optimisation::LinearConstraint {
@@ -154,11 +158,56 @@ class LinearConstraint : public optimisation::LinearConstraint {
 
   void coeffs(OptionalJacobianType A = nullptr,
               OptionalVectorType b = nullptr) const override {
-    coeffs_->call(get_parameters(), A, b);
+    coeffs_->call({get_parameters()}, {A, b});
   }
 
  private:
   FunctionWrapper<1, 2>::UniquePtr coeffs_;
+};
+
+class Cost : public optimisation::Cost {
+ public:
+  // Override method
+  Cost(const String &name, const ::casadi::SX &ex, const ::casadi::SX &x,
+       const ::casadi::SX &p = ::casadi::SX())
+      : optimisation::Cost(name, ex.size1(), x.size1()),
+        function_(nullptr),
+        gradient_(nullptr),
+        hessian_(nullptr) {
+    // Compute Jacobian
+    ::casadi::SX grd = ::casadi::SX::jacobian(ex, x);
+    // Compute Hessian
+    ::casadi::SX hes = ::casadi::SX::hessian(ex, x);
+
+    // Create function
+    function_ = std::make_unique<FunctionWrapper<2, 1>>(
+        ::casadi::Function("function", {x, p}, {densify(ex)}));
+    gradient_ = std::make_unique<FunctionWrapper<2, 1>>(
+        ::casadi::Function("jacobian", {x, p}, {densify(grd)}));
+    hessian_ = std::make_unique<FunctionWrapper<2, 1>>(
+        ::casadi::Function("hessian", {x, p}, {densify(hes)}));
+  }
+
+  ReturnType evaluate(const InputVectorType &x,
+                      OptionalJacobianType grd = nullptr) const override {
+    ReturnType out;
+    function_->call({x, get_parameters()}, {out});
+    if (grd) gradient_->call({x, get_parameters()}, {grd});
+    return out;
+  }
+
+  void hessian(const InputVectorType &x, const double &lam = 1.0,
+               OptionalHessianType hes = nullptr) const override {
+    if (hes) {
+      hessian_->call({x, get_parameters()}, {hes});
+      (*hes) *= lam;
+    }
+  }
+
+ private:
+  FunctionWrapper<2, 1>::UniquePtr function_;
+  FunctionWrapper<2, 1>::UniquePtr gradient_;
+  FunctionWrapper<2, 1>::UniquePtr hessian_;
 };
 
 class LinearCost : public optimisation::LinearCost {
@@ -176,7 +225,7 @@ class LinearCost : public optimisation::LinearCost {
   }
 
   void coeffs(OptionalVector c, double &b) const override {
-    coeffs_->call(get_parameters(), c, b);
+    coeffs_->call({get_parameters()}, {c, b});
   }
 
  private:
@@ -204,7 +253,7 @@ class QuadraticCost : public optimisation::QuadraticCost {
 
   void coeffs(OptionalHessianType A, OptionalVectorType b,
               double &c) const override {
-    coeffs_->call(get_parameters(), A, b, c);
+    coeffs_->call({get_parameters()}, {A, b, c});
   }
 
  private:

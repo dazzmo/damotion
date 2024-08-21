@@ -45,6 +45,9 @@ class Cost : public FunctionBase<1, double> {
   virtual double evaluate(const InputVectorType &x,
                           OptionalJacobianType grd = nullptr) const = 0;
 
+  virtual void hessian(const InputVectorType &x, const double &lam = 1.0,
+                       OptionalHessianType hes = nullptr) const {}
+
  protected:
   void set_nx(const Index &nx) { nx_ = nx; }
   void set_np(const Index &np) { np_ = np; }

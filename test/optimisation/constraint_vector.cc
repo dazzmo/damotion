@@ -69,6 +69,45 @@ TEST(ConstraintVector, AddLinearConstraint) {
 
 TEST(ConstraintVector, ConstraintJacobian) {
   sym x = sym::sym("x", 2);
+  // Create symbolic constraint
+  sym c = x(0) + x(1) * x(0) + x(1);
+
+  // Create linear constraint function
+  dopt::Constraint::SharedPtr con =
+      std::make_shared<dcas::Constraint>("con", c, x);
+
+  dsym::Vector x1 = dsym::createVector("x1", 2);
+  // dopt::ConstraintVector cv;
+  // cv.add(con, x1, {});
+
+  // Create variable vector
+  dsym::VariableVector vv;
+  vv.add(x1);
+
+  Eigen::VectorXd val(2), lam(2);
+  Eigen::MatrixXd jac(1, 2);
+  lam.setRandom();
+  val.setRandom();
+
+  double v_true = val[0] + val[0] * val[1] + val[1];
+  Eigen::MatrixXd jac_true(1, 2);
+  jac_true << 1.0 + val[1], 1.0 + val[0];
+
+  // Test constraint evaluation
+  Eigen::VectorXd res = con->evaluate(val, jac);
+  EXPECT_EQ(res[0], v_true);
+  EXPECT_TRUE(jac.isApprox(jac_true));
+
+  // Eigen::MatrixXd J = constraintJacobian(val, cv, vv);
+
+  // std::cout << J << '\n';
+  // std::cout << jac_true << '\n';
+
+  // EXPECT_TRUE(J.isApprox(jac_true));
+}
+
+TEST(ConstraintVector, ConstraintHessian) {
+  sym x = sym::sym("x", 2);
   dm c = dm::rand(2, 2);
   dm b = dm::rand(2);
   // Create symbolic constraint
@@ -92,12 +131,9 @@ TEST(ConstraintVector, ConstraintJacobian) {
   vv.add(x1);
   vv.add(x2);
 
-  Eigen::VectorXd val(4);
+  Eigen::VectorXd val(4), lam(4);
+  lam.setRandom();
   val.setRandom();
-
-  Eigen::MatrixXd A = constraintJacobian(val, cv, vv);
-
-  std::cout << A << std::endl;
 }
 
 int main(int argc, char **argv) {

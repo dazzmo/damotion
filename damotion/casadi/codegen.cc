@@ -1,4 +1,4 @@
-#include "damotion/casadi/codegen.h"
+#include "damotion/casadi/codegen.hpp"
 
 namespace damotion {
 namespace casadi {

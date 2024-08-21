@@ -7,7 +7,7 @@
 #include <map>
 #include <string>
 
-#include "damotion/casadi/codegen.h"
+#include "damotion/casadi/codegen.hpp"
 #include "damotion/casadi/eigen.h"
 #include "damotion/casadi/function.hpp"
 #include "damotion/casadi/pinocchio_model.h"
