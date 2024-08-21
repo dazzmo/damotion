@@ -5,10 +5,10 @@
 
 #include <qpOASES.hpp>
 
-#include "damotion/core/logging.h"
-#include "damotion/core/profiler.h"
+#include "damotion/core/logging.hpp"
+#include "damotion/core/profiler.hpp"
 #include "damotion/optimisation/program.h"
-#include "damotion/solvers/solver.h"
+#include "damotion/solvers/base.h"
 
 namespace damotion {
 namespace optimisation {
@@ -38,30 +38,30 @@ class QPOASESSolverInstance : public SolverBase {
 
   QPOASESSolverInstance() = default;
 
-  QPOASESSolverInstance(Program& prog) : Solver(prog) {
+  QPOASESSolverInstance(MathematicalProgram& prog) : SolverBase(prog) {
     // Create problem
     int nx = getCurrentProgram().x().size();
     int ng = getCurrentProgram().g().size();
 
-    qp_ = std::make_unique<qpOASES::SQProblem>(nx, nc);
+    qp_ = std::make_unique<qpOASES::SQProblem>(nx, ng);
     lbx_ = Vector::Zero(nx);
     ubx_ = Vector::Zero(nx);
 
-    // Create variable bounds from bounding box constraints
-    for (Binding<BoundingBoxConstraint<Eigen::MatrixXd>>& binding :
-         getCurrentProgram().GetBoundingBoxConstraintBindings()) {
-      // For each variable of the constraint
-      const sym::VariableVector& v = binding.x(0);
-      for (int i = 0; i < v.size(); ++i) {
-        std::size_t idx = getCurrentProgram().x().getIndex(v[i]);
-        lbx_[idx] = 0.0;  // binding.get()->lowerBound()[i];
-        ubx_[idx] = 0.0;  // binding.get()->upperBound()[i];
-      }
-    }
+    // // Create variable bounds from bounding box constraints
+    // for (Binding<BoundingBoxConstraint<Eigen::MatrixXd>>& binding :
+    //      getCurrentProgram().GetBoundingBoxConstraintBindings()) {
+    //   // For each variable of the constraint
+    //   const sym::VariableVector& v = binding.x(0);
+    //   for (int i = 0; i < v.size(); ++i) {
+    //     std::size_t idx = getCurrentProgram().x().getIndex(v[i]);
+    //     lbx_[idx] = binding.get()->lb()[i];
+    //     ubx_[idx] = binding.get()->ub()[i];
+    //   }
+    // }
 
     // Constraint bounds
-    ubA_ = Eigen::VectorXd::Zero(nc);
-    lbA_ = Eigen::VectorXd::Zero(nc);
+    ubA_ = Eigen::VectorXd::Zero(ng);
+    lbA_ = Eigen::VectorXd::Zero(ng);
 
     H_ = Eigen::MatrixXd::Zero(nx, nx);
     g_ = Eigen::VectorXd::Zero(nx);
@@ -75,7 +75,7 @@ class QPOASESSolverInstance : public SolverBase {
   }
 
   void solve() {
-    core::Profiler profiler("QPOASESSolverInstance::Solve");
+    Profiler profiler("QPOASESSolverInstance::Solve");
     // Number of decision variables in the program
     int nx = getCurrentProgram().x().size();
     int nc = getCurrentProgram().g().size();
@@ -84,17 +84,17 @@ class QPOASESSolverInstance : public SolverBase {
     g_.setZero();
     H_.setZero();
 
-    // Create variable bounds from bounding box constraints
-    for (Binding<BoundingBoxConstraint<Eigen::MatrixXd>>& binding :
-         getCurrentProgram().GetBoundingBoxConstraintBindings()) {
-      // For each variable of the constraint
-      const sym::VariableVector& v = binding.x(0);
-      for (int i = 0; i < v.size(); ++i) {
-        std::size_t idx = getCurrentProgram().x().getIndex(v[i]);
-        lbx_[idx] = 0.0;  // binding.get()->lowerBound()[i];
-        ubx_[idx] = 0.0;  // binding.get()->upperBound()[i];
-      }
-    }
+    // // Create variable bounds from bounding box constraints
+    // for (Binding<BoundingBoxConstraint<Eigen::MatrixXd>>& binding :
+    //      getCurrentProgram().GetBoundingBoxConstraintBindings()) {
+    //   // For each variable of the constraint
+    //   const sym::VariableVector& v = binding.x(0);
+    //   for (int i = 0; i < v.size(); ++i) {
+    //     std::size_t idx = getCurrentProgram().x().getIndex(v[i]);
+    //     lbx_[idx] = 0.0;  // binding.get()->lowerBound()[i];
+    //     ubx_[idx] = 0.0;  // binding.get()->upperBound()[i];
+    //   }
+    // }
 
     // Linear costs
     for (const Binding<LinearCost>& binding :
@@ -113,9 +113,8 @@ class QPOASESSolverInstance : public SolverBase {
     // Quadratic costs
     for (Binding<QuadraticCost>& binding :
          getCurrentProgram().f().getQuadraticCostBindings()) {
-      BindingInputData& data = GetBindingInputData(binding);
-
       auto indices = getCurrentProgram().x().getIndices(binding.x());
+      // Create coefficients
       Matrix A(binding.x().size(), binding.x().size());
       Vector b(binding.x().size());
       double c = 0.0;
@@ -140,7 +139,7 @@ class QPOASESSolverInstance : public SolverBase {
       // Get indices
       auto indices = getCurrentProgram().x().getIndices(binding.x());
 
-      A_.middleRows(cnt, binding.get()->size())(indices) = A;
+      A_.middleRows(cnt, binding.get()->size())(Eigen::all, indices) = A;
       A_.middleRows(cnt, binding.get()->size()) = b;
 
       // Adapt bounds for the linear constraints
@@ -179,8 +178,6 @@ class QPOASESSolverInstance : public SolverBase {
                     lbA_.data(), ubA_.data(), nWSR);
     }
 
-    // Get solver information
-
     // Get primal solution
     n_solves_++;
   }
@@ -200,9 +197,9 @@ class QPOASESSolverInstance : public SolverBase {
    */
   const Eigen::VectorXd& GetPrimalSolution() {
     if (GetProblemStatus() == qpOASES::QProblemStatus::QPS_SOLVED) {
-      qp_->getPrimalSolution(primal_solution_x_.data());
+      qp_->getPrimalSolution(context_.primal.data());
     }
-    return primal_solution_x_;
+    return context_.primal;
   }
 
  private:
@@ -223,40 +220,6 @@ class QPOASESSolverInstance : public SolverBase {
 
   Eigen::VectorXd lbA_;
   Eigen::VectorXd ubA_;
-};
-
-class QPOASESSolver {
- public:
-  QPOASESSolver() = default;
-  ~QPOASESSolver() = default;
-
-  QPOASESSolver(Program& program) {
-    // Create new instance
-    qp_ = std::make_unique<QPOASESSolverInstance>(program);
-  }
-
-  // Update program // TODO - Throw warning if program sizes don't match?
-  void UpdateProgram(Program& program) { qp_->UpdateProgram(program); }
-
-  /**
-   * @brief Resets the solver
-   *
-   */
-  void Reset() { qp_->Reset(); }
-
-  /**
-   * @brief Solves the current program
-   *
-   */
-  void Solve() { qp_->Solve(); }
-
-  const Eigen::VectorXd& GetPrimalSolution() const {
-    return qp_->GetPrimalSolution();
-  }
-
- private:
-  // Constraint bindings
-  std::unique_ptr<QPOASESSolverInstance> qp_;
 };
 
 }  // namespace solvers

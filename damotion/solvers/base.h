@@ -14,6 +14,27 @@ class SolverBase {
   using VectorType = Eigen::VectorXd;
   using MatrixType = Eigen::MatrixXd;
 
+  class Context {
+   public:
+    using VectorType = Eigen::VectorXd;
+    using MatrixType = Eigen::MatrixXd;
+
+    VectorType primal;
+    VectorType dual;
+    double objective;
+    VectorType objective_gradient;
+    VectorType constraint_vector;
+
+    Context(const std::size_t& nx, const std::size_t& ng) {
+      // Initialise vectors
+      primal = VectorType::Zero(nx);
+      dual = VectorType::Zero(ng);
+      objective = 0.0;
+      objective_gradient = VectorType::Zero(nx);
+      constraint_vector = VectorType::Zero(ng);
+    }
+  };
+
   class CacheData {
    public:
     using VectorType = Eigen::VectorXd;
@@ -45,17 +66,18 @@ class SolverBase {
     MatrixType constraint_jacobian;
   };
 
-  SolverBase(MathematicalProgram& program) : program_(program) {
-    int nx = program.x().size();
-    int ng = program.g().size();
-
-    CacheData cache_(nx, ng);
-  }
+  SolverBase(MathematicalProgram& program)
+      : program_(program),
+        cache_(program.x().size(), program.g().size()),
+        context_(program.x().size(), program.g().size()) {}
 
   ~SolverBase() {}
 
+  MathematicalProgram& getCurrentProgram() { return program_; }
+
  protected:
   CacheData cache_;
+  Context context_;
 
  private:
   bool is_solved_ = false;

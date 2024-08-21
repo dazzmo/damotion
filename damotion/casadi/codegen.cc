@@ -28,6 +28,9 @@ namespace casadi {
     int ret = system(("gcc -fPIC -shared -O3 -march=native " + f_name +
                       ".c -o " + f_name + ".so")
                          .c_str());
+    if (ret) {
+      // Todo - throw error
+    }
   }
 
   // Load the binary

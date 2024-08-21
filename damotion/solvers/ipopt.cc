@@ -14,7 +14,23 @@ bool IpoptSolverInstance::get_nlp_info(Index& n, Index& m, Index& nnz_jac_g,
   n = getCurrentProgram().x().size();
   m = getCurrentProgram().g().size();
   // TODO - Determine the sparsity of the hessians and jacobians
-  nnz_jac_g = GetSparseConstraintJacobian().nonZeros();
+
+  // Estimate sparsity pattern of the systems
+  // Use a series of random vectors to estimate
+  // todo - if too large, split it up and estimate in smaller bursts
+
+  Eigen::MatrixXd J;
+  J = Eigen::MatrixXd::Zero(m, n);
+  for (Index i = 0; i < 5; ++i) {
+    Eigen::VectorXd in = Eigen::VectorXd::Random(n);
+    J +=
+        constraintJacobian(x, getCurrentProgram().g(), getCurrentProgram().x());
+  }
+
+  // Estimate sparse jacobian
+  Eigen::SparseMatrix<double> jac_sparse = J.sparseView();
+
+  nnz_jac_g = jac_sparse().nonZeros();
   nnz_h_lag = GetSparseLagrangianHessian().nonZeros();
 
   index_style = TNLP::C_STYLE;

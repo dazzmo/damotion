@@ -69,6 +69,10 @@ class ConstraintVector {
     return linear_constraints_.back();
   }
 
+  std::vector<Binding<LinearConstraint>> &getLinearConstraintBindings() {
+    return linear_constraints_;
+  }
+
   // Binding<BoundingBoxConstraint> addBoundingBoxConstraint(
   //     const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
   //     const symbolic::VariableVector &x) {
