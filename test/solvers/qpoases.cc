@@ -32,6 +32,12 @@ class BasicObjective {
     dopt::Cost::SharedPtr obj =
         std::make_shared<dcas::QuadraticCost>("qc", f, s);
 
+    // Add constraint
+    f = s(0) + s(1) - 1;
+    dopt::LinearConstraint::SharedPtr con =
+        std::make_shared<dcas::LinearConstraint>("lc", f, s);
+    con->setBoundsFromType(dopt::BoundType::STRICTLY_POSITIVE);
+
     dsym::Vector vec(2);
     vec << x, y;
 
@@ -39,6 +45,7 @@ class BasicObjective {
     program.x().add(y);
     // Create objective
     program.f().add(obj, vec, {});
+    program.g().add(con, vec, {});
   }
 
   dopt::MathematicalProgram program;
@@ -49,6 +56,11 @@ class BasicObjective {
 TEST(qpoases, BasicObjective) {
   BasicObjective problem;
   dopt::solvers::QPOASESSolverInstance qp(problem.program);
+
+  // Attempt to solve the program
+  qp.solve();
+
+  std::cout << qp.getPrimalSolution() << '\n';
 }
 
 int main(int argc, char **argv) {

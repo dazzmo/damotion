@@ -2,101 +2,99 @@
 namespace damotion {
 namespace optimisation {
 
-template <>
 void BoundedObject<Eigen::VectorXd>::setBoundsFromType(const BoundType &type) {
-  constexpr double inf = std::numeric_limits<Scalar>::infinity();
-  constexpr double eps = std::numeric_limits<Scalar>::epsilon();
+  constexpr double inf = std::numeric_limits<double>::infinity();
+  constexpr double eps = std::numeric_limits<double>::epsilon();
 
   switch (type) {
     case BoundType::EQUALITY: {
-      ub.setConstant(0.0);
-      lb.setConstant(0.0);
+      ub_.setConstant(0.0);
+      lb_.setConstant(0.0);
       break;
     }
 
     case BoundType::POSITIVE: {
-      ub.setConstant(inf);
-      lb.setConstant(0.0);
+      ub_.setConstant(inf);
+      lb_.setConstant(0.0);
       break;
     }
 
     case BoundType::NEGATIVE: {
-      ub.setConstant(0.0);
-      lb.setConstant(-inf);
+      ub_.setConstant(0.0);
+      lb_.setConstant(-inf);
       break;
     }
 
     case BoundType::STRICTLY_POSITIVE: {
-      ub.setConstant(inf);
-      lb.setConstant(eps);
+      ub_.setConstant(inf);
+      lb_.setConstant(eps);
       break;
     }
 
     case BoundType::STRICTLY_NEGATIVE: {
-      ub.setConstant(-eps);
-      lb.setConstant(-inf);
+      ub_.setConstant(-eps);
+      lb_.setConstant(-inf);
       break;
     }
 
     case BoundType::UNBOUNDED: {
-      ub.setConstant(inf);
-      lb.setConstant(-inf);
+      ub_.setConstant(inf);
+      lb_.setConstant(-inf);
       break;
     }
 
     default: {
-      ub.setConstant(inf);
-      lb.setConstant(-inf);
+      ub_.setConstant(inf);
+      lb_.setConstant(-inf);
       break;
     }
   }
 }
 
-template <>
 void BoundedObject<double>::setBoundsFromType(const BoundType &type) {
-  constexpr double inf = std::numeric_limits<Scalar>::infinity();
-  constexpr double eps = std::numeric_limits<Scalar>::epsilon();
+  constexpr double inf = std::numeric_limits<double>::infinity();
+  constexpr double eps = std::numeric_limits<double>::epsilon();
 
   switch (type) {
     case BoundType::EQUALITY: {
-      ub = 0.0;
-      lb = 0.0;
+      ub_ = 0.0;
+      lb_ = 0.0;
       break;
     }
 
     case BoundType::POSITIVE: {
-      ub = inf;
-      lb = 0.0;
+      ub_ = inf;
+      lb_ = 0.0;
       break;
     }
 
     case BoundType::NEGATIVE: {
-      ub = 0.0;
-      lb = -inf;
+      ub_ = 0.0;
+      lb_ = -inf;
       break;
     }
 
     case BoundType::STRICTLY_POSITIVE: {
-      ub = inf;
-      lb = eps;
+      ub_ = inf;
+      lb_ = eps;
       break;
     }
 
     case BoundType::STRICTLY_NEGATIVE: {
-      ub = -eps;
-      lb = -inf;
+      ub_ = -eps;
+      lb_ = -inf;
       break;
     }
 
     case BoundType::UNBOUNDED: {
-      ub = inf;
-      lb = -inf;
+      ub_ = inf;
+      lb_ = -inf;
       break;
     }
 
     default: {
-      ub = inf;
-      lb = -inf;
+      ub_ = inf;
+      lb_ = -inf;
       break;
     }
   }

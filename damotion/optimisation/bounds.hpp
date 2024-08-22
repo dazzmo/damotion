@@ -106,7 +106,11 @@ class BoundedObject<Eigen::VectorXd> {
  public:
   BoundedObject() : sz_(0) {}
   BoundedObject(const Index &sz, const BoundType &type = BoundType::CUSTOM)
-      : sz_(sz), type_(type) {}
+      : sz_(sz), type_(type) {
+    lb_.resize(sz);
+    ub_.resize(sz);
+    setBoundsFromType(type);
+  }
 
   const Index &size() const { return sz_; }
 

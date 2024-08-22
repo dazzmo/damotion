@@ -40,7 +40,11 @@ class Constraint : public FunctionBase<1, Eigen::VectorXd>,
    */
   Constraint(const String &name, const Index &sz, const Index &nx,
              const Index &np = 0)
-      : sz_(sz), nx_(nx), np_(np), name_(name) {
+      : BoundedObject<Eigen::VectorXd>(sz),
+        sz_(sz),
+        nx_(nx),
+        np_(np),
+        name_(name) {
     this->set_parameters(Eigen::VectorXd::Zero(this->np()));
   }
 

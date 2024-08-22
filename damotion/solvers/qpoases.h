@@ -47,6 +47,10 @@ class QPOASESSolverInstance : public SolverBase {
     lbx_ = Vector::Zero(nx);
     ubx_ = Vector::Zero(nx);
 
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    lbx_.setConstant(-inf);
+    ubx_.setConstant(inf);
+
     // // Create variable bounds from bounding box constraints
     // for (Binding<BoundingBoxConstraint<Eigen::MatrixXd>>& binding :
     //      getCurrentProgram().GetBoundingBoxConstraintBindings()) {
@@ -59,12 +63,14 @@ class QPOASESSolverInstance : public SolverBase {
     //   }
     // }
 
+
     // Constraint bounds
     ubA_ = Eigen::VectorXd::Zero(ng);
     lbA_ = Eigen::VectorXd::Zero(ng);
 
     H_ = Eigen::MatrixXd::Zero(nx, nx);
     g_ = Eigen::VectorXd::Zero(nx);
+    A_ = Eigen::MatrixXd::Zero(ng, nx);
   }
 
   ~QPOASESSolverInstance() {}
@@ -96,7 +102,7 @@ class QPOASESSolverInstance : public SolverBase {
     //   }
     // }
 
-    // Linear costs
+    /** Linear costs **/
     for (const Binding<LinearCost>& binding :
          getCurrentProgram().f().getLinearCostBindings()) {
       // Get coefficients
@@ -108,9 +114,10 @@ class QPOASESSolverInstance : public SolverBase {
       // Get index
       auto indices = getCurrentProgram().x().getIndices(binding.x());
       // Insert at locations
-      // todo - gradient_(indices) << b;
+      g_(indices) = b;
     }
-    // Quadratic costs
+
+    /** Quadratic costs **/
     for (Binding<QuadraticCost>& binding :
          getCurrentProgram().f().getQuadraticCostBindings()) {
       auto indices = getCurrentProgram().x().getIndices(binding.x());
@@ -124,10 +131,10 @@ class QPOASESSolverInstance : public SolverBase {
       H_(indices, indices) = 2 * A;
       g_(indices) = b;
     }
-    // Evaluate only the linear constraints of the program
-    // Reset constraint jacobian
+
+    /** Linear constraints **/
     A_.setZero();
-    int cnt = 0;
+    std::size_t cnt = 0;
     for (const Binding<LinearConstraint>& binding :
          getCurrentProgram().g().getLinearConstraintBindings()) {
       // Get coefficients
@@ -136,15 +143,25 @@ class QPOASESSolverInstance : public SolverBase {
       // Evaluate the system
       // todo - update parameters
       binding.get()->coeffs(A, b);
+
+      std::cout << A << std::endl;
+      std::cout << b << std::endl;
+      
       // Get indices
       auto indices = getCurrentProgram().x().getIndices(binding.x());
-
       A_.middleRows(cnt, binding.get()->size())(Eigen::all, indices) = A;
-      A_.middleRows(cnt, binding.get()->size()) = b;
+
+      std::cout << A_ << std::endl;
+      std::cout << binding.get()->ub() << std::endl;
+      std::cout << binding.get()->lb() << std::endl;
 
       // Adapt bounds for the linear constraints
       ubA_.middleRows(cnt, binding.get()->size()) = binding.get()->ub() - b;
       lbA_.middleRows(cnt, binding.get()->size()) = binding.get()->lb() - b;
+
+      std::cout << ubA_ << std::endl;
+      std::cout << lbA_ << std::endl;
+
 
       // Increase constraint index
       cnt += binding.get()->size();
@@ -195,7 +212,7 @@ class QPOASESSolverInstance : public SolverBase {
    *
    * @return const Eigen::VectorXd&
    */
-  const Eigen::VectorXd& GetPrimalSolution() {
+  const Eigen::VectorXd& getPrimalSolution() {
     if (GetProblemStatus() == qpOASES::QProblemStatus::QPS_SOLVED) {
       qp_->getPrimalSolution(context_.primal.data());
     }
