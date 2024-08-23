@@ -85,6 +85,23 @@ class SolverBase {
   MathematicalProgram& program_;
 };
 
+enum class Operation { SET = 0, ADD };
+
+/**
+ * @brief Update the sparse matrix with a block, where the rows and entries of
+ * the block are indexed in the sparse matrix using the provided index vectors.
+ *
+ * @param M
+ * @param block
+ * @param row_indices
+ * @param col_indices
+ */
+void updateSparseMatrix(Eigen::SparseMatrix<double>& M,
+                        const Eigen::MatrixXd& block,
+                        const std::vector<std::size_t>& row_indices,
+                        const std::vector<std::size_t>& col_indices,
+                        const Operation& operation = Operation::SET);
+
 }  // namespace solvers
 }  // namespace optimisation
 }  // namespace damotion

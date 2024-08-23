@@ -3,6 +3,21 @@
 namespace damotion {
 namespace optimisation {
 
+std::ostream &operator<<(std::ostream &os, const ConstraintVector &cv) {
+  std::ostringstream oss;
+  oss << "Constraint\tSize\tLower Bound\tUpper Bound\n";
+  // Get all constraints
+  for (const Binding<Constraint> &b : cv.all()) {
+    oss << b.get()->name() << "\t[" << b.get()->size() << ",1]\n";
+    for (size_t i = 0; i < b.get()->size(); ++i) {
+      oss << b.get()->name() << "_" + std::to_string(i) << "\t\t"
+          << b.get()->lb()[i] << "\t" << b.get()->ub()[i] << "\n";
+    }
+  }
+
+  return os << oss.str();
+}
+
 Eigen::MatrixXd constraintJacobian(const Eigen::VectorXd &x,
                                    const ConstraintVector &g,
                                    const symbolic::VariableVector &v) {
@@ -14,15 +29,15 @@ Eigen::MatrixXd constraintJacobian(const Eigen::VectorXd &x,
     Eigen::MatrixXd jac(binding.get()->size(), binding.x().size());
     auto indices = v.getIndices(binding.x());
     binding.get()->evaluate(x(indices), jac);
-    std::cout << "x : " << x << '\n';
-    std::cout << "jac : " << jac << '\n';
+    VLOG(10) << "x : " << x;
+    VLOG(10) << "jac : " << jac;
 
     // Place into the jacobian
     res.middleRows(cnt, binding.get()->size())(Eigen::all, indices) = jac;
     cnt += binding.get()->size();
   }
 
-  std::cout << "res : " << res << '\n';
+  VLOG(10) << "res : " << res;
 
   return res;
 }
@@ -65,6 +80,16 @@ Eigen::MatrixXd objectiveHessian(const Eigen::VectorXd &x,
   }
 
   return res;
+}
+
+std::ostream &operator<<(std::ostream &os, const ObjectiveFunction &obj) {
+  std::ostringstream oss;
+  // Get all costs
+  for (const Binding<Cost> &b : obj.all()) {
+    oss << b.get()->name() << "\n";
+  }
+
+  return os << oss.str();
 }
 
 }  // namespace optimisation

@@ -14,6 +14,7 @@ casadi/function.cc
 optimisation/binding.cc
 optimisation/objective_function.cc
 optimisation/constraint_vector.cc
+solvers/sparse.cc
 solvers/qpoases.cc
 symbolic/variable.cc
 )

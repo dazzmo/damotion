@@ -15,8 +15,17 @@ namespace solvers {
 
 using namespace Ipopt;
 
+struct IpoptSolverInstanceOptions {
+  std::size_t n_sparse_estimate_iterations = 5;
+};
+
 class IpoptSolverInstance : public Ipopt::TNLP, public SolverBase {
  public:
+  struct Context {
+    Eigen::SparseMatrix<double> jac;
+    Eigen::SparseMatrix<double> lag_hes;
+  };
+
   IpoptSolverInstance(SparseProgram& prog);
 
   ~IpoptSolverInstance() {}
@@ -51,6 +60,7 @@ class IpoptSolverInstance : public Ipopt::TNLP, public SolverBase {
                          IpoptCalculatedQuantities* ip_cq);
 
  private:
+  Context context_;
 };
 
 class IpoptSolver {

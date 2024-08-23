@@ -103,20 +103,7 @@ class ConstraintVector {
   std::vector<Binding<LinearConstraint>> linear_constraints_;
 };
 
-std::ostream &operator<<(std::ostream &os, const ConstraintVector &cv) {
-  std::ostringstream oss;
-  oss << "Constraint\tSize\tLower Bound\tUpper Bound\n";
-  // Get all constraints
-  for (const Binding<Constraint> &b : cv.all()) {
-    oss << b.get()->name() << "\t[" << b.get()->size() << ",1]\n";
-    for (size_t i = 0; i < b.get()->size(); ++i) {
-      oss << b.get()->name() << "_" + std::to_string(i) << "\t\t"
-          << b.get()->lb()[i] << "\t" << b.get()->ub()[i] << "\n";
-    }
-  }
-
-  return os << oss.str();
-}
+std::ostream &operator<<(std::ostream &os, const ConstraintVector &cv);
 
 /**
  * @brief Construct the dense constraint Jacobian for the constraint vector g
@@ -219,15 +206,7 @@ Eigen::MatrixXd objectiveHessian(const Eigen::VectorXd &x,
                                  const ObjectiveFunction &f,
                                  const symbolic::VariableVector &v);
 
-std::ostream &operator<<(std::ostream &os, const ObjectiveFunction &obj) {
-  std::ostringstream oss;
-  // Get all costs
-  for (const Binding<Cost> &b : obj.all()) {
-    oss << b.get()->name() << "\n";
-  }
-
-  return os << oss.str();
-}
+std::ostream &operator<<(std::ostream &os, const ObjectiveFunction &obj);
 
 /**
  * @brief Represents a generic mathematical program of the form \f$ \min f(x, p)

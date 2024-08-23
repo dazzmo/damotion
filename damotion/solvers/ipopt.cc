@@ -19,19 +19,31 @@ bool IpoptSolverInstance::get_nlp_info(Index& n, Index& m, Index& nnz_jac_g,
   // Use a series of random vectors to estimate
   // todo - if too large, split it up and estimate in smaller bursts
 
-  Eigen::MatrixXd J;
+  Eigen::MatrixXd J, H;
   J = Eigen::MatrixXd::Zero(m, n);
+  H = Eigen::MatrixXd::Zero(n, n);
+
+  // Provide estimate of lagrangian hessian
+  Eigen::VectorXd lam = Eigen::VectorXd::Ones(m);
+
   for (Index i = 0; i < 5; ++i) {
     Eigen::VectorXd in = Eigen::VectorXd::Random(n);
+    // Approximate Jacobian with current value
     J +=
         constraintJacobian(x, getCurrentProgram().g(), getCurrentProgram().x());
+    // Approximate Hessian with current value
+    H += objectiveHessian(x, getCurrentProgram().f(), getCurrentProgram().x());
+    H += constraintHessian(x, lam, getCurrentProgram().g(),
+                           getCurrentProgram().x());
   }
 
-  // Estimate sparse jacobian
-  Eigen::SparseMatrix<double> jac_sparse = J.sparseView();
+  // Provide estimate of constraint Jacobian
+  context_.jac = J.sparseView();
+  context_.lag_hes = H.sparseView();
 
-  nnz_jac_g = jac_sparse().nonZeros();
-  nnz_h_lag = GetSparseLagrangianHessian().nonZeros();
+  nnz_jac_g = context_.jac.nonZeros();
+  // TODO - Get lower triangular representation
+  nnz_h_lag = context_.lag_hes().nonZeros();
 
   index_style = TNLP::C_STYLE;
 
@@ -111,10 +123,10 @@ bool IpoptSolverInstance::eval_jac_g(Index n, const Number* x, bool new_x,
   VLOG(10) << "eval_jac_g()";
   if (values == NULL) {
     // Return the sparsity of the constraint Jacobian
-    const Eigen::SparseMatrix<double>& Jc = GetSparseConstraintJacobian();
     int cnt = 0;
-    for (int k = 0; k < Jc.outerSize(); ++k) {
-      for (Eigen::SparseMatrix<double>::InnerIterator it(Jc, k); it; ++it) {
+    for (int k = 0; k < context_.jac.outerSize(); ++k) {
+      for (Eigen::SparseMatrix<double>::InnerIterator it(context_.jac, k); it;
+           ++it) {
         if (cnt > nele_jac) {
           return false;
         }
@@ -130,11 +142,20 @@ bool IpoptSolverInstance::eval_jac_g(Index n, const Number* x, bool new_x,
       cache_.decision_variables =
           Eigen::Map<Eigen::VectorXd>(const_cast<double*>(x), n);
     }
+
+    // For each constraint, update the sparse jacobian
+    for (auto& b : getCurrentProgram().g().all()) {
+      Eigen::MatrixXd J(b->size(), b->x().size());
+      b->evaluate(cache_.decision_variables, J);
+      std::vector<std::size_t> rows = {0, 1};
+      auto cols = getCurrentProgram().x().getIndices(b->x());
+      updateSparseMatrix(context_.jac, J, rows, cols, Operation::SET);
+    }
+
     // Update caches
-    EvaluateConstraints(cache_.decision_variables, true, false);
     VLOG(10) << "x : " << cache_.decision_variables.transpose();
     VLOG(10) << "jac : " << constraint_jacobian_cache_;
-    std::copy_n(constraint_jacobian_cache_.valuePtr(), nele_jac, values);
+    std::copy_n(context_.jac.valuePtr(), nele_jac, values);
   }
   return true;
 }
@@ -148,10 +169,10 @@ bool IpoptSolverInstance::eval_h(Index n, const Number* x, bool new_x,
   VLOG(10) << "eval_h()";
   if (values == NULL) {
     // Return the sparsity of the constraint Jacobian
-    const Eigen::SparseMatrix<double>& H = GetSparseLagrangianHessian();
     int cnt = 0;
-    for (int k = 0; k < H.outerSize(); ++k) {
-      for (Eigen::SparseMatrix<double>::InnerIterator it(H, k); it; ++it) {
+    for (int k = 0; k < context_.lag_hes.outerSize(); ++k) {
+      for (Eigen::SparseMatrix<double>::InnerIterator it(context_.lag_hes, k);
+           it; ++it) {
         if (cnt > nele_hess) {
           return false;
         }
@@ -172,12 +193,25 @@ bool IpoptSolverInstance::eval_h(Index n, const Number* x, bool new_x,
           Eigen::Map<Eigen::VectorXd>(const_cast<double*>(lambda), m);
     }
     // Reset cache for hessian
-    lagrangian_hes_cache_ *= 0.0;
-    // Update caches
-    EvaluateCosts(cache_.decision_variables, false, true);
-    EvaluateConstraints(cache_.decision_variables, false, true);
-    VLOG(10) << "hes\n" << lagrangian_hes_cache_;
-    std::copy_n(lagrangian_hes_cache_.valuePtr(), nele_hess, values);
+    context_.lag_hes *= 0.0;
+
+    // Objective hessian
+    for (auto& b : getCurrentProgram().f().all()) {
+      Eigen::MatrixXd H(b->x().size(), b->x().size());
+      auto x_idx = getCurrentProgram().x().getIndices(b->x());
+      b->hessian(cache_.decision_variables(x_idx), obj_factor, H);
+      updateSparseMatrix(context_.lag_hes, H, x_idx, x_idx, Operation::ADD);
+    }
+    // Constraint hessians
+    for (auto& b : getCurrentProgram().g().all()) {
+      Eigen::MatrixXd H(b->x().size(), b->x().size());
+      auto x_idx = getCurrentProgram().x().getIndices(b->x());
+      b->hessian(cache_.decision_variables(x_idx),
+                 cache_.decision_variables(x_idx), H);
+      updateSparseMatrix(context_.lag_hes, H, x_idx, x_idx, Operation::ADD);
+    }
+
+    std::copy_n(context_.lag_hes.valuePtr(), nele_hess, values);
   }
 
   return true;
@@ -197,10 +231,7 @@ bool IpoptSolverInstance::get_bounds_info(Index n, Number* x_l, Number* x_u,
 
   getCurrentProgram().updateDecisionVariableBoundVectors();
   getCurrentProgram().UpdateConstraintBoundVectors();
-  VLOG(10) << getCurrentProgram().decisionVariableupperBounds();
-  VLOG(10) << getCurrentProgram().decisionVariablelowerBounds();
-  VLOG(10) << getCurrentProgram().ConstraintupperBounds();
-  VLOG(10) << getCurrentProgram().ConstraintlowerBounds();
+
   // Decision variable bounds
   std::copy_n(getCurrentProgram().decisionVariableupperBounds().data(), n, x_u);
   std::copy_n(getCurrentProgram().decisionVariablelowerBounds().data(), n, x_l);
