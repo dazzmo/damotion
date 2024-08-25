@@ -114,6 +114,14 @@ class QuadraticCost : public Cost {
   using UniquePtr = std::unique_ptr<QuadraticCost>;
   using SharedPtr = std::shared_ptr<QuadraticCost>;
 
+  /**
+   * @brief Compute the coefficients of the quadratic expression \f$ 0.5 x^T A x
+   * + b^T x + c \f$
+   *
+   * @param A The lower-triangular component of the hessian matrix
+   * @param b
+   * @param c
+   */
   virtual void coeffs(OptionalHessianType A, OptionalVectorType b,
                       double &c) const = 0;
 
@@ -131,7 +139,7 @@ class QuadraticCost : public Cost {
     // Copy jacobian
     if (g) *g = A_ * x + b_;
     // Compute linear cost
-    return 0.5 * x.transpose() * A_ * x + b_.dot(x) + c_;
+    return 0.5 * x.transpose() * A_.selfadjointView<Eigen::Lower>() * x + b_.dot(x) + c_;
   }
 
  private:

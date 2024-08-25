@@ -12,10 +12,11 @@ SET(${PROJECT_NAME}_SOURCES
 # solvers/base.cc
 casadi/codegen.cc
 # casadi/pinocchio_model.cc
+solvers/base.cc
 solvers/qpoases.cc
+solvers/ipopt.cc
 optimisation/program.cc
 optimisation/bounds.cc
-# optimisation/block.cc
 # core/math/log.cc
 # core/math/binomial.cc
 # core/math/quaternion.cc

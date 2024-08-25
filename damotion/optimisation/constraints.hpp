@@ -151,40 +151,59 @@ class LinearConstraint : public Constraint {
   mutable Eigen::VectorXd b_;
 };
 
-// class BoundingBoxConstraint : public Constraint {
-//  public:
-//   BoundingBoxConstraint(const std::string &name) {}
+/**
+ * @brief Constraint of the form \f$ x_l \le x \le x_u \f$
+ *
+ */
+class BoundingBoxConstraint : public Constraint {
+ public:
+  using UniquePtr = std::unique_ptr<BoundingBoxConstraint>;
+  using SharedPtr = std::shared_ptr<BoundingBoxConstraint>;
 
-//   /**
-//    * @brief Provides the bounds for the bounding box constraint. On default,
-//    it
-//    * returns the bounds set with setLowerBound() and setUpperBound()
-//    * respectively.
-//    *
-//    * @param xl
-//    * @param xu
-//    */
-//   virtual void bounds(OptionalVector xl = nullptr,
-//                       OptionalVector xu = nullptr) {
-//     if (xl) *xl = this->lb();
-//     if (xu) *xu = this->ub();
-//   }
+  BoundingBoxConstraint(const std::string &name, const Index &nx)
+      : Constraint(name, nx, nx) {}
 
-//   ReturnType eval(const InputVectorType &x, OptionalJacobianType J = nullptr)
-//   {
-//     // Perform evaluation depending on what method is used
-//     bounds(xl_, xu_);
-//     if (J) {
-//       // J->topRows().setIdentity();
-//       // J->bottomRows().setIdentity();
-//     }
-//     return x - xl_;  // todo (damian) - add xu and xl as single vector
-//   }
+  /**
+   * @brief Provides the bounds for the bounding box constraint. By default,
+   * returns the bounds set with setLowerBound() and setUpperBound()
+   * respectively.
+   *
+   * @param xl
+   * @param xu
+   */
+  virtual void bounds(OptionalVector xl = nullptr,
+                      OptionalVector xu = nullptr) const {
+    if (xl) *xl = this->lb();
+    if (xu) *xu = this->ub();
+  }
 
-//  private:
-//   Eigen::VectorXd xl_;
-//   Eigen::VectorXd xu_;
-// };
+  ReturnType evaluate(const InputVectorType &x,
+                      OptionalJacobianType J = nullptr) const {
+    // Perform evaluation depending on what method is used
+    bounds(xl_, xu_);
+    if (J) {
+      J->setIdentity();
+    }
+    return x;
+  }
+
+  /**
+   * @brief Constructs a single vector of the form \f$ c(x) \ge 0 \f$ to
+   * represent the bounding box constraint.
+   *
+   * @return ReturnType
+   */
+  ReturnType toVector(const InputVectorType &x) const {
+    Eigen::VectorXd res(2 * this->nx());
+    bounds(xl_, xu_);
+    res << x - xu_, xl_ - x;
+    return res;
+  }
+
+ private:
+  mutable Eigen::VectorXd xl_;
+  mutable Eigen::VectorXd xu_;
+};
 
 }  // namespace optimisation
 }  // namespace damotion

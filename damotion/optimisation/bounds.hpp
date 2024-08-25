@@ -131,7 +131,7 @@ class BoundedObject<Eigen::VectorXd> {
   const Eigen::VectorXd &ub() const { return ub_; }
 
   void setLowerBound(const Eigen::Ref<const Eigen::VectorXd> &lb) { lb_ = lb; }
-  void setLowerBound(const double &lb) { ub_.setConstant(lb); }
+  void setLowerBound(const double &lb) { lb_.setConstant(lb); }
 
   void setUpperBound(const Eigen::Ref<const Eigen::VectorXd> &ub) { ub_ = ub; }
   void setUpperBound(const double &ub) { ub_.setConstant(ub); }

@@ -1,6 +1,6 @@
 #define DAMOTION_USE_PROFILING
 
-#include "damotion/solvers/qpoases.h"
+#include "damotion/solvers/ipopt.h"
 
 #include <gflags/gflags.h>
 #include <gtest/gtest.h>
@@ -57,12 +57,10 @@ class BasicObjective {
 
 TEST(qpoases, BasicObjective) {
   BasicObjective problem;
-  dopt::solvers::QPOASESSolverInstance qp(problem.program);
+  dopt::solvers::IpoptSolver nlp(problem.program);
 
   // Attempt to solve the program
-  qp.solve();
-
-  std::cout << qp.getPrimalSolution() << '\n';
+  nlp.solve();
 }
 
 int main(int argc, char **argv) {
@@ -73,7 +71,7 @@ int main(int argc, char **argv) {
   FLAGS_logtostderr = 1;
   FLAGS_colorlogtostderr = 1;
   FLAGS_log_prefix = 1;
-  FLAGS_v = 0;
+  FLAGS_v = 10;
 
   int status = RUN_ALL_TESTS();
 

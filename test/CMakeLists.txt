@@ -16,6 +16,7 @@ optimisation/objective_function.cc
 optimisation/constraint_vector.cc
 solvers/sparse.cc
 solvers/qpoases.cc
+solvers/ipopt.cc
 symbolic/variable.cc
 )
 

@@ -11,9 +11,6 @@ namespace solvers {
 
 class SolverBase {
  public:
-  using VectorType = Eigen::VectorXd;
-  using MatrixType = Eigen::MatrixXd;
-
   class Context {
    public:
     using VectorType = Eigen::VectorXd;
@@ -25,6 +22,9 @@ class SolverBase {
     VectorType objective_gradient;
     VectorType constraint_vector;
 
+    Context() = default;
+    ~Context() = default;
+
     Context(const std::size_t& nx, const std::size_t& ng) {
       // Initialise vectors
       primal = VectorType::Zero(nx);
@@ -35,50 +35,13 @@ class SolverBase {
     }
   };
 
-  class CacheData {
-   public:
-    using VectorType = Eigen::VectorXd;
-    using MatrixType = Eigen::MatrixXd;
-
-    VectorType decision_variable;
-    VectorType primal_solution_x;
-    VectorType primal_solution_g;
-    double objective_cache;
-    VectorType objective_gradient;
-    VectorType constraint_vector;
-    VectorType dual_vector;
-
-    CacheData(const std::size_t& nx, const std::size_t& ng) {
-      // Initialise vectors
-      decision_variable = VectorType::Zero(nx);
-      primal_solution_x = VectorType::Zero(nx);
-      primal_solution_g = VectorType::Zero(ng);
-      objective_cache = 0.0;
-      objective_gradient = VectorType::Zero(nx);
-      constraint_vector = VectorType::Zero(ng);
-      dual_vector = VectorType::Zero(ng);
-    }
-  };
-
-  class Derivative {
-   public:
-    VectorType objective_gradient;
-    MatrixType constraint_jacobian;
-  };
-
-  SolverBase(MathematicalProgram& program)
-      : program_(program),
-        cache_(program.x().size(), program.g().size()),
-        context_(program.x().size(), program.g().size()) {}
+  SolverBase(MathematicalProgram& program) : program_(program) {}
 
   ~SolverBase() {}
 
   MathematicalProgram& getCurrentProgram() { return program_; }
 
  protected:
-  CacheData cache_;
-  Context context_;
-
  private:
   bool is_solved_ = false;
   // Reference to current program in solver
@@ -98,8 +61,8 @@ enum class Operation { SET = 0, ADD };
  */
 void updateSparseMatrix(Eigen::SparseMatrix<double>& M,
                         const Eigen::MatrixXd& block,
-                        const std::vector<std::size_t>& row_indices,
-                        const std::vector<std::size_t>& col_indices,
+                        const std::vector<Eigen::Index>& row_indices,
+                        const std::vector<Eigen::Index>& col_indices,
                         const Operation& operation = Operation::SET);
 
 }  // namespace solvers

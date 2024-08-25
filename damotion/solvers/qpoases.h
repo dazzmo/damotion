@@ -36,6 +36,40 @@ class QPOASESSolverInstance : public SolverBase {
   using Matrix = Eigen::MatrixXd;
   using Vector = Eigen::VectorXd;
 
+  struct QPOASESSolverContext : public SolverBase::Context {
+   public:
+    QPOASESSolverContext() = default;
+    ~QPOASESSolverContext() = default;
+
+    QPOASESSolverContext(const Index& nx, const Index& ng)
+        : SolverBase::Context(nx, ng) {
+      H = Eigen::MatrixXd::Zero(nx, nx);
+      g = Eigen::VectorXd::Zero(nx);
+      A = Eigen::MatrixXd::Zero(ng, nx);
+
+      lbx = Vector::Zero(nx);
+      ubx = Vector::Zero(nx);
+
+      constexpr double inf = std::numeric_limits<double>::infinity();
+      lbx.setConstant(-inf);
+      ubx.setConstant(inf);
+
+      lbA = Eigen::VectorXd::Zero(ng);
+      ubA = Eigen::VectorXd::Zero(ng);
+    }
+
+    Eigen::MatrixXd H;
+    Eigen::VectorXd g;
+
+    Eigen::MatrixXd A;
+
+    Eigen::VectorXd lbx;
+    Eigen::VectorXd ubx;
+
+    Eigen::VectorXd lbA;
+    Eigen::VectorXd ubA;
+  };
+
   QPOASESSolverInstance() = default;
 
   QPOASESSolverInstance(MathematicalProgram& prog);
@@ -65,20 +99,9 @@ class QPOASESSolverInstance : public SolverBase {
   bool first_solve_ = true;
   int n_solves_ = 0;
 
-  // Sparse method
   std::unique_ptr<qpOASES::SQProblem> qp_;
 
-  Eigen::MatrixXd H_;
-  Eigen::VectorXd g_;
-
-  Eigen::MatrixXd A_;
-  Eigen::VectorXd b_;
-
-  Eigen::VectorXd lbx_;
-  Eigen::VectorXd ubx_;
-
-  Eigen::VectorXd lbA_;
-  Eigen::VectorXd ubA_;
+  QPOASESSolverContext context_;
 };
 
 }  // namespace solvers

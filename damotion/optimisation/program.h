@@ -64,31 +64,28 @@ class ConstraintVector {
   Binding<LinearConstraint> add(const LinearConstraint::SharedPtr &con,
                                 const symbolic::Vector &x,
                                 const symbolic::Vector &p) {
-    linear_constraints_.push_back(Binding<LinearConstraint>(con, x, p));
+    linear_.push_back(Binding<LinearConstraint>(con, x, p));
     sz_ += con->size();
-    return linear_constraints_.back();
+    return linear_.back();
   }
 
-  std::vector<Binding<LinearConstraint>> &getLinearConstraintBindings() {
-    return linear_constraints_;
+  Binding<BoundingBoxConstraint> add(
+      const BoundingBoxConstraint::SharedPtr &con, const symbolic::Vector &x,
+      const symbolic::Vector &p) {
+    bounding_box_.push_back(Binding<BoundingBoxConstraint>(con, x, p));
+    return bounding_box_.back();
   }
 
-  // Binding<BoundingBoxConstraint> addBoundingBoxConstraint(
-  //     const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
-  //     const symbolic::VariableVector &x) {
-  //   std::shared_ptr<BoundingBoxConstraint> con =
-  //       std::make_shared<BoundingBoxConstraint>("", lb, ub);
-  //   bounding_box_constraints_.push_back(
-  //       Binding<BoundingBoxConstraint>(con, {x}));
-  //   return bounding_box_constraints_.back();
-  // }
+  std::vector<Binding<LinearConstraint>> &linear() { return linear_; }
+  std::vector<Binding<BoundingBoxConstraint>> &boundingBox() {
+    return bounding_box_;
+  }
 
   std::vector<Binding<Constraint>> all() const {
     std::vector<Binding<Constraint>> constraints;
     constraints.insert(constraints.begin(), constraints_.begin(),
                        constraints_.end());
-    constraints.insert(constraints.begin(), linear_constraints_.begin(),
-                       linear_constraints_.end());
+    constraints.insert(constraints.begin(), linear_.begin(), linear_.end());
     // Return vector of all constraints
     return constraints;
   }
@@ -100,7 +97,8 @@ class ConstraintVector {
 
   // Constraint collections
   std::vector<Binding<Constraint>> constraints_;
-  std::vector<Binding<LinearConstraint>> linear_constraints_;
+  std::vector<Binding<LinearConstraint>> linear_;
+  std::vector<Binding<BoundingBoxConstraint>> bounding_box_;
 };
 
 std::ostream &operator<<(std::ostream &os, const ConstraintVector &cv);
@@ -128,6 +126,7 @@ class ObjectiveFunction {
  public:
   Binding<Cost> add(const Cost::SharedPtr &cost, const symbolic::Vector &x,
                     const symbolic::Vector &p) {
+    VLOG(10) << "adding generic cost";
     Binding<Cost> binding(cost, x, p);
     costs_.push_back(binding);
     return costs_.back();
@@ -136,6 +135,7 @@ class ObjectiveFunction {
   Binding<LinearCost> add(const LinearCost::SharedPtr &cost,
                           const symbolic::Vector &x,
                           const symbolic::Vector &p) {
+    VLOG(10) << "adding linear cost";
     linear_costs_.push_back(Binding<LinearCost>(cost, x, p));
     return linear_costs_.back();
   }
@@ -143,6 +143,7 @@ class ObjectiveFunction {
   Binding<QuadraticCost> add(const QuadraticCost::SharedPtr &cost,
                              const symbolic::Vector &x,
                              const symbolic::Vector &p) {
+    VLOG(10) << "adding quadratic cost";
     quadratic_costs_.push_back(Binding<QuadraticCost>(cost, x, p));
     return quadratic_costs_.back();
   }

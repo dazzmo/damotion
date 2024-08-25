@@ -4,10 +4,10 @@
 #include <coin-or/IpIpoptApplication.hpp>
 #include <coin-or/IpTNLP.hpp>
 
-#include "damotion/core/logging.h"
-#include "damotion/core/profiler.h"
+#include "damotion/core/logging.hpp"
+#include "damotion/core/profiler.hpp"
 #include "damotion/optimisation/program.h"
-#include "damotion/solvers/sparse.h"
+#include "damotion/solvers/base.h"
 
 namespace damotion {
 namespace optimisation {
@@ -21,12 +21,29 @@ struct IpoptSolverInstanceOptions {
 
 class IpoptSolverInstance : public Ipopt::TNLP, public SolverBase {
  public:
-  struct Context {
+  using Index = Ipopt::Index;
+
+  class Context : public SolverBase::Context {
+   public:
+    Context() = default;
+
+    Context(const Index& nx, const Index& ng) : SolverBase::Context(nx, ng) {
+      lbx.resize(nx);
+      ubx.resize(nx);
+
+      constexpr double inf = std::numeric_limits<double>::infinity();
+      lbx.setConstant(-inf);
+      ubx.setConstant(inf);
+    }
+
+    Eigen::VectorXd lbx;
+    Eigen::VectorXd ubx;
+
     Eigen::SparseMatrix<double> jac;
     Eigen::SparseMatrix<double> lag_hes;
   };
 
-  IpoptSolverInstance(SparseProgram& prog);
+  IpoptSolverInstance(MathematicalProgram& prog);
 
   ~IpoptSolverInstance() {}
 
@@ -60,17 +77,18 @@ class IpoptSolverInstance : public Ipopt::TNLP, public SolverBase {
                          IpoptCalculatedQuantities* ip_cq);
 
  private:
+  Context cache_;
   Context context_;
 };
 
 class IpoptSolver {
  public:
-  IpoptSolver(SparseProgram& program) : program_(program) {}
+  IpoptSolver(MathematicalProgram& program) : program_(program) {}
 
   int solve();
 
  private:
-  SparseProgram& program_;
+  MathematicalProgram& program_;
 };
 
 }  // namespace solvers

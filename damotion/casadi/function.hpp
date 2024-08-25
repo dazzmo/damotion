@@ -116,7 +116,7 @@ class Constraint : public optimisation::Constraint {
     ::casadi::SX hes = ::casadi::SX::hessian(lc, x);
 
     hessian_ = std::make_unique<FunctionWrapper<3, 1>>(
-        ::casadi::Function("hessian", {x, l, p}, {densify(hes)}));
+        ::casadi::Function("hessian", {x, l, p}, {densify(tril(hes))}));
   }
 
   Eigen::VectorXd evaluate(const InputVectorType &x,
@@ -127,6 +127,14 @@ class Constraint : public optimisation::Constraint {
     return out;
   }
 
+  /**
+   * @brief Compute the lower triangular component of the Hessian matrix of the
+   * expression \f$ \lambda^T c(x, p) \f$.
+   *
+   * @param x
+   * @param lam
+   * @param hes
+   */
   void hessian(const InputVectorType &x, const ReturnType &lam,
                OptionalHessianType hes = nullptr) const override {
     if (hes) {
@@ -185,7 +193,7 @@ class Cost : public optimisation::Cost {
     gradient_ = std::make_unique<FunctionWrapper<2, 1>>(
         ::casadi::Function("jacobian", {x, p}, {densify(grd)}));
     hessian_ = std::make_unique<FunctionWrapper<2, 1>>(
-        ::casadi::Function("hessian", {x, p}, {densify(hes)}));
+        ::casadi::Function("hessian", {x, p}, {densify(tril(hes))}));
   }
 
   ReturnType evaluate(const InputVectorType &x,
@@ -196,8 +204,15 @@ class Cost : public optimisation::Cost {
     return out;
   }
 
-  void hessian(const InputVectorType &x, const double &lam = 1.0,
-               OptionalHessianType hes = nullptr) const override {
+  /**
+   * @brief Computes the lower triangular component of the Hessian matrix
+   *
+   * @param x
+   * @param lam
+   * @param hes
+   */
+  void hessian(const InputVectorType &x, const double &lam,
+               OptionalHessianType hes) const override {
     if (hes) {
       hessian_->call({x, get_parameters()}, {hes});
       (*hes) *= lam;
@@ -247,7 +262,7 @@ class QuadraticCost : public optimisation::QuadraticCost {
     // todo - the function
     coeffs_ = std::make_unique<FunctionWrapper<1, 3>>(
         ::casadi::Function("quadratic_coeffs", {p},
-                           {::casadi::SX::densify(A), ::casadi::SX::densify(b),
+                           {::casadi::SX::densify(tril(A)), ::casadi::SX::densify(b),
                             ::casadi::SX::densify(c)}));
   }
 
