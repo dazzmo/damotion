@@ -26,23 +26,32 @@ bool IpoptSolverInstance::get_nlp_info(Index& n, Index& m, Index& nnz_jac_g,
   ObjectiveFunction& f = getCurrentProgram().f();
   ConstraintVector& g = getCurrentProgram().g();
 
+  cache_ = Context(n, m);
+
+  // Get current bounds
+  g.boundingBoxBounds(cache_.lbx, cache_.ubx, x);
+
   for (Index i = 0; i < 5; ++i) {
     Eigen::VectorXd in = Eigen::VectorXd::Random(n);
 
-    // TODO: Make sure x is within the specified bounds
+    // Restrict input to be within bounds
+    // todo - make this a class eventually
+    in.noalias() = cache_.ubx.cwiseMin(cache_.lbx.cwiseMax(in));
 
     // Approximate Jacobian with current value
     J += constraintJacobian(in, g, x);
+
     // Approximate Hessian with current value
     H += objectiveHessian(in, f, x);
     H += constraintHessian(in, lam, g, x);
   }
 
-  cache_ = Context(n, m);
-
   // Provide estimate of constraint Jacobian
-  cache_.jac = J.sparseView();
-  cache_.lag_hes = H.sparseView();
+  cache_.jac = J.sparseView(1e-3);
+  cache_.lag_hes = H.sparseView(1e-3);
+
+  VLOG(10) << "constraint jacobian " << cache_.jac;
+  VLOG(10) << "lagrangian hessian " << cache_.lag_hes;
 
   nnz_jac_g = cache_.jac.nonZeros();
   nnz_h_lag = cache_.lag_hes.nonZeros();
@@ -79,14 +88,15 @@ bool IpoptSolverInstance::eval_grad_f(Index n, const Number* x, bool new_x,
 
   // Update caches
   for (auto& binding : getCurrentProgram().f().all()) {
-    Eigen::RowVectorXd grd(binding.x().size());
+    Eigen::RowVectorXd grd = Eigen::RowVectorXd::Zero(binding.x().size());
     binding.get()->evaluate(cache_.primal, grd);
-    cache_.objective_gradient(getCurrentProgram().x().getIndices(binding.x())) =
-        grd;
+    VLOG(10) << "grd : " << grd;
+    cache_.objective_gradient(
+        getCurrentProgram().x().getIndices(binding.x())) += grd;
   }
 
   // TODO - See about mapping these
-  std::copy_n(cache_.objective_gradient.data(), n, grad_f);
+  copy(cache_.objective_gradient, grad_f, n);
   VLOG(10) << "grad f : " << cache_.objective_gradient.transpose();
   return true;
 }
@@ -98,13 +108,14 @@ bool IpoptSolverInstance::eval_g(Index n, const Number* x, bool new_x, Index m,
   if (new_x) mapVector(cache_.primal, x, n);
 
   // Update caches
+  std::size_t idx = 0;
   for (auto& binding : getCurrentProgram().g().all()) {
     Eigen::VectorXd g = binding.get()->evaluate(cache_.primal);
-    cache_.constraint_vector(getCurrentProgram().x().getIndices(binding.x())) =
-        g;
+    cache_.constraint_vector.middleRows(idx, g.size()) = g;
+    idx += g.size();
   }
   VLOG(10) << "c : " << cache_.constraint_vector.transpose();
-  std::copy_n(cache_.constraint_vector.data(), m, g);
+  copy(cache_.constraint_vector, g, m);
   return true;
 };
 
@@ -185,14 +196,16 @@ bool IpoptSolverInstance::eval_h(Index n, const Number* x, bool new_x,
       updateSparseMatrix(cache_.lag_hes, H, x_idx, x_idx, Operation::ADD);
     }
     // Constraint hessians
+    std::size_t idx = 0;
     for (auto& b : getCurrentProgram().g().all()) {
       Eigen::MatrixXd H(b.x().size(), b.x().size());
       auto x_idx = getCurrentProgram().x().getIndices(b.x());
-      b.get()->hessian(cache_.primal(x_idx), cache_.dual(x_idx), H);
+      Eigen::VectorXd lam_i = cache_.dual.middleRows(idx, b.get()->size());
+      b.get()->hessian(cache_.primal(x_idx), lam_i, H);
       updateSparseMatrix(cache_.lag_hes, H, x_idx, x_idx, Operation::ADD);
     }
 
-    std::copy_n(cache_.lag_hes.valuePtr(), nele_hess, values);
+    copy(cache_.lag_hes, values, nele_hess);
   }
   return true;
 }
@@ -200,19 +213,19 @@ bool IpoptSolverInstance::eval_h(Index n, const Number* x, bool new_x,
 bool IpoptSolverInstance::get_bounds_info(Index n, Number* x_l, Number* x_u,
                                           Index m, Number* g_l, Number* g_u) {
   VLOG(10) << "get_bounds_info()";
-  // Convert any bounding box constraints
-  for (auto& binding : getCurrentProgram().g().boundingBox()) {
-    // Update information
-  }
 
-  // // Decision variable bounds
-  // std::copy_n(context_.ubx.data(), n, x_u);
-  // std::copy_n(context_.lbx.data(), n, x_l);
+  getCurrentProgram().g().boundingBoxBounds(cache_.lbx, cache_.ubx,
+                                            getCurrentProgram().x());
 
-  // TODO: Constraint vector addition
-  // // Constraint bounds
-  // std::copy_n(getCurrentProgram().ConstraintupperBounds().data(), m, g_u);
-  // std::copy_n(getCurrentProgram().ConstraintlowerBounds().data(), m, g_l);
+  // Decision variable bounds
+  copy(cache_.ubx, x_u, n);
+  copy(cache_.lbx, x_l, n);
+
+  // Constraint bounds
+  getCurrentProgram().g().constraintBounds(cache_.lbg, cache_.ubg);
+
+  copy(cache_.lbg, g_l, m);
+  copy(cache_.ubg, g_u, m);
 
   return true;
 }
@@ -223,12 +236,10 @@ bool IpoptSolverInstance::get_starting_point(Index n, bool init_x, Number* x,
                                              bool init_lambda, Number* lambda) {
   VLOG(10) << "get_starting_point()";
   if (init_x) {
-    // TODO: Need this!
-    // getCurrentProgram().UpdateInitialValueVector();
-    // VLOG(10) << getCurrentProgram().decisionVariableInitialValues();
-    // std::copy_n(getCurrentProgram().decisionVariableInitialValues().data(),
-    // n,
-    //             x);
+    for (const symbolic::Variable& v : getCurrentProgram().x().all()) {
+      std::size_t idx = getCurrentProgram().x().getIndex(v);
+      x[idx] = getCurrentProgram().x().getInitialValue(v);
+    }
   }
 
   return true;

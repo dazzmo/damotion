@@ -139,7 +139,14 @@ class QuadraticCost : public Cost {
     // Copy jacobian
     if (g) *g = A_ * x + b_;
     // Compute linear cost
-    return 0.5 * x.transpose() * A_.selfadjointView<Eigen::Lower>() * x + b_.dot(x) + c_;
+    return 0.5 * x.transpose() * A_.selfadjointView<Eigen::Lower>() * x +
+           b_.dot(x) + c_;
+  }
+
+  void hessian(const InputVectorType &x, const ReturnType &lam,
+               OptionalHessianType hes) const override {
+    coeffs(A_, b_, c_);
+    *hes = lam * A_;
   }
 
  private:

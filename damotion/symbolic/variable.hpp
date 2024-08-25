@@ -90,6 +90,13 @@ class VariableVector {
   bool add(const Variable &var);
 
   /**
+   * @brief Returns the vector of all variables within the variable vector.
+   *
+   * @return const std::vector<Variable>&
+   */
+  const std::vector<Variable> &all() const { return variables_; }
+
+  /**
    * @brief Add decision variables to the vector. Returns true if added, false
    * if it is already included.
    *
@@ -121,6 +128,18 @@ class VariableVector {
    * @return false
    */
   bool contains(const Variable &var);
+
+  /**
+   * @brief Initialise the variables with the value val.
+   *
+   * @param var
+   * @param val
+   */
+  void initialise(const Variable &var, const double &val);
+
+  void initialise(const Vector &var, const Eigen::VectorXd &val);
+
+  const double &getInitialValue(const Variable &var) const;
 
   /**
    * @brief Returns the index of the given variable within the created
@@ -158,8 +177,17 @@ class VariableVector {
   // Number of decision variables
   Index sz_;
 
+  Eigen::VectorXd initial_value_;
+  Eigen::VectorXd value_;
+
+  struct VariableData {
+    Index index;
+    double initial_value;
+    double value;
+  };
+
   // Location of each decision variable within the optimisation vector
-  std::unordered_map<Variable::Id, Index> variable_idx_;
+  std::unordered_map<Variable::Id, VariableData> variable_data_;
   // Vector of all decision variables used
   std::vector<Variable> variables_;
 };

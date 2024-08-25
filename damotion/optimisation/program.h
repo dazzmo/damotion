@@ -81,6 +81,12 @@ class ConstraintVector {
     return bounding_box_;
   }
 
+  /**
+   * @brief Provides all constraints in the vector, excluding bounding box
+   * constraints.
+   *
+   * @return std::vector<Binding<Constraint>>
+   */
   std::vector<Binding<Constraint>> all() const {
     std::vector<Binding<Constraint>> constraints;
     constraints.insert(constraints.begin(), constraints_.begin(),
@@ -114,6 +120,23 @@ class ConstraintVector {
       auto idx = var.getIndices(binding.x());
       lb(idx) = binding.get()->lb();
       ub(idx) = binding.get()->ub();
+    }
+  }
+
+  void constraintBounds(Eigen::Ref<Eigen::VectorXd> lb,
+                        Eigen::Ref<Eigen::VectorXd> ub) {
+    VLOG(10) << "ConstraintVector::constraintBounds";
+    // For each bounding box constraint
+    std::size_t idx = 0;
+    for (Binding<Constraint> &binding : all()) {
+      // Get bounds
+      std::size_t sz = binding.get()->size();
+      VLOG(10) << "lb: " << binding.get()->lb().transpose();
+      VLOG(10) << "ub: " << binding.get()->ub().transpose();
+
+      lb.middleRows(idx, sz) = binding.get()->lb();
+      ub.middleRows(idx, sz) = binding.get()->ub();
+      idx += sz;
     }
   }
 

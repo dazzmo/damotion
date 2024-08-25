@@ -26,7 +26,8 @@ Eigen::MatrixXd constraintJacobian(const Eigen::VectorXd &x,
   std::size_t cnt = 0;
   for (const auto &binding : g.all()) {
     // Evaluate the Jacobian
-    Eigen::MatrixXd jac(binding.get()->size(), binding.x().size());
+    Eigen::MatrixXd jac =
+        Eigen::MatrixXd::Zero(binding.get()->size(), binding.x().size());
     auto indices = v.getIndices(binding.x());
     binding.get()->evaluate(x(indices), jac);
     VLOG(10) << "x : " << x;
@@ -51,10 +52,14 @@ Eigen::MatrixXd constraintHessian(const Eigen::VectorXd &x,
   std::size_t cnt = 0;
   for (const auto &binding : g.all()) {
     // Evaluate the Hessian
-    Eigen::MatrixXd hes(binding.x().size(), binding.x().size());
+    Eigen::MatrixXd hes =
+        Eigen::MatrixXd::Zero(binding.x().size(), binding.x().size());
     auto indices = v.getIndices(binding.x());
     binding.get()->hessian(x(indices),
                            lam.middleRows(cnt, binding.get()->size()), hes);
+
+    VLOG(10) << "x : " << x;
+    VLOG(10) << "hes : " << hes;
 
     // Place into the hessian
     res(indices, indices) += hes;
@@ -71,10 +76,14 @@ Eigen::MatrixXd objectiveHessian(const Eigen::VectorXd &x,
   // Loop through all objectives
   for (const auto &binding : f.all()) {
     // Evaluate the Jacobian
-    Eigen::MatrixXd hes(binding.x().size(), binding.x().size());
+    Eigen::MatrixXd hes =
+        Eigen::MatrixXd::Zero(binding.x().size(), binding.x().size());
     auto indices = v.getIndices(binding.x());
     // Evaluate the hessian
     binding.get()->hessian(x(indices), 1.0, hes);
+
+    VLOG(10) << "x : " << x;
+    VLOG(10) << "hes : " << hes;
     // Add to the hessian
     res(indices, indices) += hes;
   }

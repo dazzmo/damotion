@@ -63,7 +63,8 @@ bool VariableVector::add(const Variable &var) {
     return false;
   }
   // Add to variable vector to index map
-  variable_idx_[var.id()] = sz_++;
+  variable_data_[var.id()] =
+      VariableData({.index = sz_++, .initial_value = 0.0, .value = 0.0});
   // Add variable to vector
   variables_.push_back(var);
   return true;
@@ -122,16 +123,16 @@ bool VariableVector::reorder(const VectorRef &var) {
       return false;
     }
 
-    variable_idx_[v.id()] = idx;
+    variable_data_[v.id()].index = idx;
   }
 
   return true;
 }
 
 const VariableVector::Index &VariableVector::getIndex(const Variable &v) const {
-  auto it = variable_idx_.find(v.id());
-  assert(it != variable_idx_.end() && "Variable does not exist");
-  return it->second;
+  auto it = variable_data_.find(v.id());
+  assert(it != variable_data_.end() && "Variable does not exist");
+  return it->second.index;
 }
 
 VariableVector::IndexVector VariableVector::getIndices(const Vector &v) const {
@@ -142,6 +143,24 @@ VariableVector::IndexVector VariableVector::getIndices(const Vector &v) const {
   }
   // Return vector of indices
   return indices;
+}
+
+void VariableVector::initialise(const Variable &var, const double &val) {
+  auto it = variable_data_.find(var.id());
+  assert(it != variable_data_.end() && "Variable does not exist");
+  it->second.initial_value = val;
+}
+
+void VariableVector::initialise(const Vector &var, const Eigen::VectorXd &val) {
+  for (Index i = 0; i < var.size(); ++i) {
+    initialise(var[i], val[i]);
+  }
+}
+
+const double &VariableVector::getInitialValue(const Variable &var) const {
+  auto it = variable_data_.find(var.id());
+  assert(it != variable_data_.end() && "Variable does not exist");
+  return it->second.initial_value;
 }
 
 // void VariableVector::setVariableBounds(const Variable &v, const double &bl,

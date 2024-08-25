@@ -31,13 +31,22 @@ class IpoptSolverInstance : public Ipopt::TNLP, public SolverBase {
       lbx.resize(nx);
       ubx.resize(nx);
 
+      lbg.resize(ng);
+      ubg.resize(ng);
+
       constexpr double inf = std::numeric_limits<double>::infinity();
       lbx.setConstant(-inf);
       ubx.setConstant(inf);
+
+      lbg.setConstant(-inf);
+      ubg.setConstant(inf);
     }
 
     Eigen::VectorXd lbx;
     Eigen::VectorXd ubx;
+
+    Eigen::VectorXd lbg;
+    Eigen::VectorXd ubg;
 
     Eigen::SparseMatrix<double> jac;
     Eigen::SparseMatrix<double> lag_hes;
@@ -82,6 +91,16 @@ class IpoptSolverInstance : public Ipopt::TNLP, public SolverBase {
   inline void mapVector(Eigen::VectorXd& vec, const double* data_ptr,
                         const Index& n) const {
     vec = Eigen::Map<Eigen::VectorXd>(const_cast<double*>(data_ptr), n);
+  }
+
+  inline void copy(const Eigen::VectorXd& vec, double* res,
+                   const Index& n) const {
+    std::copy_n(vec.data(), n, res);
+  }
+
+  inline void copy(const Eigen::SparseMatrix<double>& mat, double* res,
+                   const Index& n) const {
+    std::copy_n(mat.valuePtr(), n, res);
   }
 };
 

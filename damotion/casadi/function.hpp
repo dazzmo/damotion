@@ -19,7 +19,9 @@ class FunctionWrapper {
   using SharedPtr = std::shared_ptr<FunctionWrapper>;
 
   FunctionWrapper() = default;
-  FunctionWrapper(const ::casadi::Function &f) { *this = f; }
+  FunctionWrapper(const ::casadi::Function &f, const bool &codegen = false) {
+    *this = f;
+  }
 
   ~FunctionWrapper() {
     // Release memory for casadi function
@@ -182,11 +184,16 @@ class Cost : public optimisation::Cost {
         function_(nullptr),
         gradient_(nullptr),
         hessian_(nullptr) {
+    VLOG(10) << "ex: ";
+    VLOG(10) << ex;
     // Compute Jacobian
     ::casadi::SX grd = ::casadi::SX::jacobian(ex, x);
+    VLOG(10) << "jac: ";
+    VLOG(10) << grd;
     // Compute Hessian
     ::casadi::SX hes = ::casadi::SX::hessian(ex, x);
-
+    VLOG(10) << "hes: ";
+    VLOG(10) << hes;
     // Create function
     function_ = std::make_unique<FunctionWrapper<2, 1>>(
         ::casadi::Function("function", {x, p}, {densify(ex)}));
@@ -260,10 +267,13 @@ class QuadraticCost : public optimisation::QuadraticCost {
     // Create function
     // todo - check compile time that these number of outputs are correct for
     // todo - the function
-    coeffs_ = std::make_unique<FunctionWrapper<1, 3>>(
-        ::casadi::Function("quadratic_coeffs", {p},
-                           {::casadi::SX::densify(tril(A)), ::casadi::SX::densify(b),
-                            ::casadi::SX::densify(c)}));
+    VLOG(10) << "A = " << tril(A);
+    VLOG(10) << "b = " << b;
+    VLOG(10) << "c = " << c;
+    coeffs_ = std::make_unique<FunctionWrapper<1, 3>>(::casadi::Function(
+        "quadratic_coeffs", {p},
+        {::casadi::SX::densify(tril(A)), ::casadi::SX::densify(b),
+         ::casadi::SX::densify(c)}));
   }
 
   void coeffs(OptionalHessianType A, OptionalVectorType b,
