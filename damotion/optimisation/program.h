@@ -90,6 +90,33 @@ class ConstraintVector {
     return constraints;
   }
 
+  /**
+   * @brief Computes the vector bounds from the available bounding box
+   * constraints using ordering provided by the variable vector.
+   *
+   * @param lb
+   * @param ub
+   */
+  void boundingBoxBounds(const Eigen::Ref<Eigen::VectorXd> &lb,
+                         const Eigen::Ref<Eigen::VectorXd> &ub,
+                         const symbolic::VariableVector &var) {
+    VLOG(10) << "ConstraintVector::boundingBoxBounds";
+    // For each bounding box constraint
+    for (Binding<BoundingBoxConstraint> &binding : boundingBox()) {
+      // Get bounds
+      std::size_t n = binding.x().size();
+      Eigen::VectorXd lb(n), ub(n);
+      binding.get()->bounds(lb, ub);
+
+      VLOG(10) << "lb: " << lb.transpose();
+      VLOG(10) << "ub: " << ub.transpose();
+
+      auto idx = var.getIndices(binding.x());
+      lb(idx) = binding.get()->lb();
+      ub(idx) = binding.get()->ub();
+    }
+  }
+
   // TODO - Ordering of the constraints
 
  private:

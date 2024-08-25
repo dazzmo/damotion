@@ -13,12 +13,8 @@ bool IpoptSolverInstance::get_nlp_info(Index& n, Index& m, Index& nnz_jac_g,
   VLOG(10) << "get_nlp_info()";
   n = getCurrentProgram().x().size();
   m = getCurrentProgram().g().size();
-  // TODO - Determine the sparsity of the hessians and jacobians
 
-  // Estimate sparsity pattern of the systems
-  // Use a series of random vectors to estimate
   // todo - if too large, split it up and estimate in smaller bursts
-
   Eigen::MatrixXd J, H;
   J = Eigen::MatrixXd::Zero(m, n);
   H = Eigen::MatrixXd::Zero(n, n);
@@ -61,9 +57,7 @@ bool IpoptSolverInstance::eval_f(Index n, const Number* x, bool new_x,
   damotion::Profiler profiler("IpoptSolverInstance::eval_f");
   VLOG(10) << "eval_f()";
 
-  if (new_x) {
-    cache_.primal = Eigen::Map<Eigen::VectorXd>(const_cast<double*>(x), n);
-  }
+  if (new_x) mapVector(cache_.primal, x, n);
   // Update caches
   cache_.objective = 0.0;
   for (auto& binding : getCurrentProgram().f().all()) {
@@ -81,9 +75,7 @@ bool IpoptSolverInstance::eval_grad_f(Index n, const Number* x, bool new_x,
   damotion::Profiler profiler("IpoptSolverInstance::eval_grad_f");
   VLOG(10) << "eval_grad_f()";
 
-  if (new_x) {
-    cache_.primal = Eigen::Map<Eigen::VectorXd>(const_cast<double*>(x), n);
-  }
+  if (new_x) mapVector(cache_.primal, x, n);
 
   // Update caches
   for (auto& binding : getCurrentProgram().f().all()) {
@@ -103,9 +95,7 @@ bool IpoptSolverInstance::eval_g(Index n, const Number* x, bool new_x, Index m,
                                  Number* g) {
   damotion::Profiler profiler("IpoptSolverInstance::eval_g");
   VLOG(10) << "eval_g()";
-  if (new_x) {
-    cache_.primal = Eigen::Map<Eigen::VectorXd>(const_cast<double*>(x), n);
-  }
+  if (new_x) mapVector(cache_.primal, x, n);
 
   // Update caches
   for (auto& binding : getCurrentProgram().g().all()) {
@@ -139,9 +129,7 @@ bool IpoptSolverInstance::eval_jac_g(Index n, const Number* x, bool new_x,
     }
 
   } else {
-    if (new_x) {
-      cache_.primal = Eigen::Map<Eigen::VectorXd>(const_cast<double*>(x), n);
-    }
+    if (new_x) mapVector(cache_.primal, x, n);
 
     // For each constraint, update the sparse jacobian
     for (auto& b : getCurrentProgram().g().all()) {
@@ -183,12 +171,9 @@ bool IpoptSolverInstance::eval_h(Index n, const Number* x, bool new_x,
     }
 
   } else {
-    if (new_x) {
-      cache_.primal = Eigen::Map<Eigen::VectorXd>(const_cast<double*>(x), n);
-    }
-    if (new_lambda) {
-      cache_.dual = Eigen::Map<Eigen::VectorXd>(const_cast<double*>(lambda), m);
-    }
+    if (new_x) mapVector(cache_.primal, x, n);
+    if (new_lambda) mapVector(cache_.dual, lambda, m);
+
     // Reset cache for hessian
     cache_.lag_hes *= 0.0;
 
@@ -217,7 +202,7 @@ bool IpoptSolverInstance::get_bounds_info(Index n, Number* x_l, Number* x_u,
   VLOG(10) << "get_bounds_info()";
   // Convert any bounding box constraints
   for (auto& binding : getCurrentProgram().g().boundingBox()) {
-    // Udate information
+    // Update information
   }
 
   // // Decision variable bounds

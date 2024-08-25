@@ -102,6 +102,8 @@ class QPOASESSolverInstance : public SolverBase {
   std::unique_ptr<qpOASES::SQProblem> qp_;
 
   QPOASESSolverContext context_;
+
+  QPOASESSolverContext& getContext() { return context_; }
 };
 
 }  // namespace solvers

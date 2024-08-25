@@ -78,7 +78,11 @@ class IpoptSolverInstance : public Ipopt::TNLP, public SolverBase {
 
  private:
   Context cache_;
-  Context context_;
+
+  inline void mapVector(Eigen::VectorXd& vec, const double* data_ptr,
+                        const Index& n) const {
+    vec = Eigen::Map<Eigen::VectorXd>(const_cast<double*>(data_ptr), n);
+  }
 };
 
 class IpoptSolver {

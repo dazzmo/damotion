@@ -16,19 +16,8 @@ QPOASESSolverInstance::QPOASESSolverInstance(MathematicalProgram& prog)
   context_ = QPOASESSolverContext(nx, ng);
 
   // Create variable bounds from bounding box constraints
-  VLOG(10) << "bounding box constraints";
-  for (Binding<BoundingBoxConstraint>& binding :
-       getCurrentProgram().g().boundingBox()) {
-    // Get bounds
-    std::size_t n = binding.x().size();
-    Eigen::VectorXd lb(n), ub(n);
-    binding.get()->bounds(lb, ub);
-    VLOG(10) << "lb: " << lb.transpose();
-    VLOG(10) << "ub: " << ub.transpose();
-    auto idx = getCurrentProgram().x().getIndices(binding.x());
-    context_.lbx(idx) = binding.get()->lb();
-    context_.ubx(idx) = binding.get()->ub();
-  }
+  getCurrentProgram().g().boundingBoxBounds(getContext().lbx, getContext().ubx,
+                                            getCurrentProgram().x());
 }
 
 QPOASESSolverInstance::~QPOASESSolverInstance() = default;
@@ -46,21 +35,13 @@ void QPOASESSolverInstance::solve() {
   int nc = getCurrentProgram().g().size();
 
   // Reset costs and gradients
-  context_.g.setZero();
-  context_.H.setZero();
+  getContext().g.setZero();
+  getContext().H.setZero();
 
   // Create variable bounds from bounding box constraints
   LOG(INFO) << "bounding box";
-  for (Binding<BoundingBoxConstraint>& binding :
-       getCurrentProgram().g().boundingBox()) {
-    // Get bounds
-    std::size_t n = binding.x().size();
-    Eigen::VectorXd lb(n), ub(n);
-    binding.get()->bounds(lb, ub);
-    auto idx = getCurrentProgram().x().getIndices(binding.x());
-    context_.lbx(idx) = binding.get()->lb();
-    context_.ubx(idx) = binding.get()->ub();
-  }
+  getCurrentProgram().g().boundingBoxBounds(getContext().lbx, getContext().ubx,
+                                            getCurrentProgram().x());
 
   /** Linear costs **/
   LOG(INFO) << "linear costs";
@@ -76,7 +57,7 @@ void QPOASESSolverInstance::solve() {
     // Get index
     auto indices = getCurrentProgram().x().getIndices(binding.x());
     // Insert at locations
-    context_.g(indices) = b;
+    getContext().g(indices) = b;
   }
 
   /** Quadratic costs **/
@@ -94,13 +75,13 @@ void QPOASESSolverInstance::solve() {
     VLOG(10) << "b: " << b.transpose();
     VLOG(10) << "c: " << c;
     // Update the hessian
-    context_.H(indices, indices) = 2 * A;
-    context_.g(indices) = b;
+    getContext().H(indices, indices) = 2 * A;
+    getContext().g(indices) = b;
   }
 
   /** Linear constraints **/
   LOG(INFO) << "linear constraints";
-  context_.A.setZero();
+  getContext().A.setZero();
   std::size_t cnt = 0;
   for (const Binding<LinearConstraint>& binding :
        getCurrentProgram().g().linear()) {
@@ -114,12 +95,13 @@ void QPOASESSolverInstance::solve() {
     VLOG(10) << "b: " << b.transpose();
     // Get indices
     auto indices = getCurrentProgram().x().getIndices(binding.x());
-    context_.A.middleRows(cnt, binding.get()->size())(Eigen::all, indices) = A;
+    getContext().A.middleRows(cnt, binding.get()->size())(Eigen::all, indices) =
+        A;
 
     // Adapt bounds for the linear constraints
-    context_.ubA.middleRows(cnt, binding.get()->size()) =
+    getContext().ubA.middleRows(cnt, binding.get()->size()) =
         binding.get()->ub() - b;
-    context_.lbA.middleRows(cnt, binding.get()->size()) =
+    getContext().lbA.middleRows(cnt, binding.get()->size()) =
         binding.get()->lb() - b;
 
     // Increase constraint index
@@ -127,36 +109,36 @@ void QPOASESSolverInstance::solve() {
   }
 
   // Show the problem coefficients
-  VLOG(10) << "H = " << context_.H;
-  VLOG(10) << "g = " << context_.g;
-  VLOG(10) << "A = " << context_.A;
-  VLOG(10) << "lbA = " << context_.lbA;
-  VLOG(10) << "ubA = " << context_.ubA;
-  VLOG(10) << "lbx = " << context_.lbx;
-  VLOG(10) << "ubx = " << context_.ubx;
+  VLOG(10) << "H = " << getContext().H;
+  VLOG(10) << "g = " << getContext().g;
+  VLOG(10) << "A = " << getContext().A;
+  VLOG(10) << "lbA = " << getContext().lbA;
+  VLOG(10) << "ubA = " << getContext().ubA;
+  VLOG(10) << "lbx = " << getContext().lbx;
+  VLOG(10) << "ubx = " << getContext().ubx;
 
   typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
       RowMajorMatrixXd;
 
   RowMajorMatrixXd H = Eigen::Map<RowMajorMatrixXd>(
-      context_.H.data(), context_.H.rows(), context_.H.cols());
+      getContext().H.data(), getContext().H.rows(), getContext().H.cols());
   RowMajorMatrixXd A = Eigen::Map<RowMajorMatrixXd>(
-      context_.A.data(), context_.A.rows(), context_.A.cols());
+      getContext().A.data(), getContext().A.rows(), getContext().A.cols());
 
   // Solve
   // todo - make this a parameter
   int nWSR = 100;
   if (first_solve_) {
     // Initialise the program and solve it
-    qp_->init(H.data(), context_.g.data(), A.data(), context_.lbx.data(),
-              context_.ubx.data(), context_.lbA.data(), context_.ubA.data(),
-              nWSR);
+    qp_->init(H.data(), getContext().g.data(), A.data(),
+              getContext().lbx.data(), getContext().ubx.data(),
+              getContext().lbA.data(), getContext().ubA.data(), nWSR);
     first_solve_ = false;
   } else {
     // Use previous solution to hot-start the program
-    qp_->hotstart(H.data(), context_.g.data(), A.data(), context_.lbx.data(),
-                  context_.ubx.data(), context_.lbA.data(), context_.ubA.data(),
-                  nWSR);
+    qp_->hotstart(H.data(), getContext().g.data(), A.data(),
+                  getContext().lbx.data(), getContext().ubx.data(),
+                  getContext().lbA.data(), getContext().ubA.data(), nWSR);
   }
 
   // Get primal solution
@@ -180,9 +162,9 @@ qpOASES::QProblemStatus QPOASESSolverInstance::GetProblemStatus() const {
  */
 const Eigen::VectorXd& QPOASESSolverInstance::getPrimalSolution() {
   if (GetProblemStatus() == qpOASES::QProblemStatus::QPS_SOLVED) {
-    qp_->getPrimalSolution(context_.primal.data());
+    qp_->getPrimalSolution(getContext().primal.data());
   }
-  return context_.primal;
+  return getContext().primal;
 }
 
 }  // namespace solvers
