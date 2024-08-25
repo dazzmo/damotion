@@ -144,7 +144,7 @@ bool IpoptSolverInstance::eval_jac_g(Index n, const Number* x, bool new_x,
 
     // For each constraint, update the sparse jacobian
     for (auto& b : getCurrentProgram().g().all()) {
-      Eigen::MatrixXd J(b.get()->size(), b.x().size());
+      Eigen::MatrixXd J = Eigen::MatrixXd::Zero(b.get()->size(), b.x().size());
       b.get()->evaluate(cache_.primal, J);
       std::vector<Eigen::Index> rows = {0, 1};
       auto cols = getCurrentProgram().x().getIndices(b.x());
@@ -190,7 +190,7 @@ bool IpoptSolverInstance::eval_h(Index n, const Number* x, bool new_x,
 
     // Objective hessian
     for (auto& b : getCurrentProgram().f().all()) {
-      Eigen::MatrixXd H(b.x().size(), b.x().size());
+      Eigen::MatrixXd H = Eigen::MatrixXd::Zero(b.x().size(), b.x().size());
       auto x_idx = getCurrentProgram().x().getIndices(b.x());
       b.get()->hessian(cache_.primal(x_idx), obj_factor, H);
       updateSparseMatrix(cache_.lag_hes, H, x_idx, x_idx, Operation::ADD);
@@ -198,12 +198,15 @@ bool IpoptSolverInstance::eval_h(Index n, const Number* x, bool new_x,
     // Constraint hessians
     std::size_t idx = 0;
     for (auto& b : getCurrentProgram().g().all()) {
-      Eigen::MatrixXd H(b.x().size(), b.x().size());
+      Eigen::MatrixXd H = Eigen::MatrixXd::Zero(b.x().size(), b.x().size());
       auto x_idx = getCurrentProgram().x().getIndices(b.x());
       Eigen::VectorXd lam_i = cache_.dual.middleRows(idx, b.get()->size());
       b.get()->hessian(cache_.primal(x_idx), lam_i, H);
       updateSparseMatrix(cache_.lag_hes, H, x_idx, x_idx, Operation::ADD);
     }
+
+    VLOG(10) << "H = ";
+    VLOG(10) << cache_.lag_hes;
 
     copy(cache_.lag_hes, values, nele_hess);
   }
@@ -217,12 +220,18 @@ bool IpoptSolverInstance::get_bounds_info(Index n, Number* x_l, Number* x_u,
   getCurrentProgram().g().boundingBoxBounds(cache_.lbx, cache_.ubx,
                                             getCurrentProgram().x());
 
+  VLOG(10) << cache_.ubx.transpose();
+  VLOG(10) << cache_.lbx.transpose();
+  
   // Decision variable bounds
   copy(cache_.ubx, x_u, n);
   copy(cache_.lbx, x_l, n);
 
   // Constraint bounds
   getCurrentProgram().g().constraintBounds(cache_.lbg, cache_.ubg);
+
+  VLOG(10) << cache_.ubg.transpose();
+  VLOG(10) << cache_.lbg.transpose();
 
   copy(cache_.lbg, g_l, m);
   copy(cache_.ubg, g_u, m);

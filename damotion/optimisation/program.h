@@ -103,23 +103,23 @@ class ConstraintVector {
    * @param lb
    * @param ub
    */
-  void boundingBoxBounds(const Eigen::Ref<Eigen::VectorXd> &lb,
-                         const Eigen::Ref<Eigen::VectorXd> &ub,
+  void boundingBoxBounds(Eigen::Ref<Eigen::VectorXd> lb,
+                         Eigen::Ref<Eigen::VectorXd> ub,
                          const symbolic::VariableVector &var) {
     VLOG(10) << "ConstraintVector::boundingBoxBounds";
     // For each bounding box constraint
     for (Binding<BoundingBoxConstraint> &binding : boundingBox()) {
       // Get bounds
       std::size_t n = binding.x().size();
-      Eigen::VectorXd lb(n), ub(n);
-      binding.get()->bounds(lb, ub);
+      Eigen::VectorXd lb_b(n), ub_b(n);
+      binding.get()->bounds(lb_b, ub_b);
 
-      VLOG(10) << "lb: " << lb.transpose();
-      VLOG(10) << "ub: " << ub.transpose();
+      VLOG(10) << "lb: " << lb_b.transpose();
+      VLOG(10) << "ub: " << ub_b.transpose();
 
       auto idx = var.getIndices(binding.x());
-      lb(idx) = binding.get()->lb();
-      ub(idx) = binding.get()->ub();
+      lb(idx) = lb_b;
+      ub(idx) = ub_b;
     }
   }
 

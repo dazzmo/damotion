@@ -21,7 +21,7 @@ namespace dopt = damotion::optimisation;
 class BasicObjective {
  public:
   BasicObjective() : program() {
-    std::size_t n = 10;
+    std::size_t n = 2;
     // Symbolic cost creation
     sym s = sym::sym("s", n);
 
@@ -29,13 +29,13 @@ class BasicObjective {
         std::make_shared<dcas::QuadraticCost>("qc", sym::dot(s, s), s);
 
     dopt::LinearConstraint::SharedPtr con =
-        std::make_shared<dcas::LinearConstraint>("lc", s(0) + s(1) - 2.0, s);
-    con->setBoundsFromType(dopt::BoundType::NEGATIVE);
+        std::make_shared<dcas::LinearConstraint>("lc", s(0) + s(1), s);
+    con->setBoundsFromType(dopt::BoundType::POSITIVE);
 
     dopt::BoundingBoxConstraint::SharedPtr bb =
         std::make_shared<dopt::BoundingBoxConstraint>("bb", n);
-    bb->setLowerBound(-10.0);
-    bb->setUpperBound(-4.5);
+    bb->setLowerBound(-1.0);
+    bb->setUpperBound(1.0);
 
     // Create variables
     dsym::Vector x = dsym::createVector("x", n);
@@ -45,6 +45,7 @@ class BasicObjective {
     program.f().add(obj, x, {});
     // Add constraints
     program.g().add(con, x, {});
+    // TODO - Add bounding box constraint functionality
     program.g().add(bb, x, {});
 
     LOG(INFO) << program.g();
