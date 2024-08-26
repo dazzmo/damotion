@@ -76,6 +76,32 @@ class ConstraintVector {
     return bounding_box_.back();
   }
 
+  /**
+   * @brief Directly creates and adds a bounding box constraint to the
+   * constraint vector
+   *
+   * @param name
+   * @param x
+   * @param lb
+   * @param ub
+   * @return Binding<BoundingBoxConstraint>
+   */
+  Binding<BoundingBoxConstraint> addBoundingBoxConstraint(
+      const std::string &name, const symbolic::Vector &x, const double &lb,
+      const double &ub) {
+    // Create bounding box constraint
+    auto con = std::make_shared<BoundingBoxConstraint>(name, x.size(), lb, ub);
+    return add(con, x, {});
+  }
+
+  Binding<BoundingBoxConstraint> addBoundingBoxConstraint(
+      const std::string &name, const symbolic::Vector &x,
+      const Eigen::VectorXd &lb, const Eigen::VectorXd &ub) {
+    // Create bounding box constraint
+    auto con = std::make_shared<BoundingBoxConstraint>(name, x.size(), lb, ub);
+    return add(con, x, {});
+  }
+
   std::vector<Binding<LinearConstraint>> &linear() { return linear_; }
   std::vector<Binding<BoundingBoxConstraint>> &boundingBox() {
     return bounding_box_;

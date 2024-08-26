@@ -47,8 +47,8 @@ bool IpoptSolverInstance::get_nlp_info(Index& n, Index& m, Index& nnz_jac_g,
   }
 
   // Provide estimate of constraint Jacobian
-  cache_.jac = J.sparseView(1e-3);
-  cache_.lag_hes = H.sparseView(1e-3);
+  cache_.jac = J.sparseView(1e-4);
+  cache_.lag_hes = H.sparseView(1e-4);
 
   VLOG(10) << "constraint jacobian " << cache_.jac;
   VLOG(10) << "lagrangian hessian " << cache_.lag_hes;
@@ -222,7 +222,7 @@ bool IpoptSolverInstance::get_bounds_info(Index n, Number* x_l, Number* x_u,
 
   VLOG(10) << cache_.ubx.transpose();
   VLOG(10) << cache_.lbx.transpose();
-  
+
   // Decision variable bounds
   copy(cache_.ubx, x_u, n);
   copy(cache_.lbx, x_l, n);
@@ -244,6 +244,10 @@ bool IpoptSolverInstance::get_starting_point(Index n, bool init_x, Number* x,
                                              Number* z_U, Index m,
                                              bool init_lambda, Number* lambda) {
   VLOG(10) << "get_starting_point()";
+  
+  assert(init_z == false);
+  assert(init_lambda == false);
+
   if (init_x) {
     for (const symbolic::Variable& v : getCurrentProgram().x().all()) {
       std::size_t idx = getCurrentProgram().x().getIndex(v);
@@ -272,7 +276,7 @@ int IpoptSolver::solve() {
 
   Ipopt::SmartPtr<IpoptApplication> app = IpoptApplicationFactory();
 
-  app->Options()->SetNumericValue("tol", 1e-4);
+  app->Options()->SetNumericValue("tol", 1e-3);
   app->Options()->SetStringValue("mu_strategy", "adaptive");
 
   // Initialize the IpoptApplication and process the options

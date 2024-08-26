@@ -1,4 +1,3 @@
-#define DAMOTION_USE_PROFILING
 
 #include "damotion/solvers/ipopt.h"
 
@@ -29,24 +28,20 @@ class BasicObjective {
         std::make_shared<dcas::QuadraticCost>("qc", sym::dot(s, s), s);
 
     dopt::LinearConstraint::SharedPtr con =
-        std::make_shared<dcas::LinearConstraint>("lc", s(0) + s(1), s);
+        std::make_shared<dcas::LinearConstraint>("lc", s(0) - s(1), s);
     con->setBoundsFromType(dopt::BoundType::POSITIVE);
-
-    dopt::BoundingBoxConstraint::SharedPtr bb =
-        std::make_shared<dopt::BoundingBoxConstraint>("bb", n);
-    bb->setLowerBound(-1.0);
-    bb->setUpperBound(1.0);
 
     // Create variables
     dsym::Vector x = dsym::createVector("x", n);
 
     program.x().add(x);
+    program.x().initialise(x[0], 0.5);
+    program.x().initialise(x[1], -0.5);
     // Create objective
     program.f().add(obj, x, {});
     // Add constraints
     program.g().add(con, x, {});
-    // TODO - Add bounding box constraint functionality
-    program.g().add(bb, x, {});
+    program.g().addBoundingBoxConstraint("bb", x, -1.0, 1.0);
 
     LOG(INFO) << program.g();
   }
@@ -72,7 +67,7 @@ int main(int argc, char **argv) {
   FLAGS_logtostderr = 1;
   FLAGS_colorlogtostderr = 1;
   FLAGS_log_prefix = 1;
-  FLAGS_v = 10;
+  FLAGS_v = 0;
 
   int status = RUN_ALL_TESTS();
 

@@ -1,4 +1,3 @@
-#define DAMOTION_USE_PROFILING
 
 #include "damotion/symbolic/variable.hpp"
 

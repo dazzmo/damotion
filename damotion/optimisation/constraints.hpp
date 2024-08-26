@@ -163,6 +163,20 @@ class BoundingBoxConstraint : public Constraint {
   BoundingBoxConstraint(const std::string &name, const Index &nx)
       : Constraint(name, nx, nx) {}
 
+  BoundingBoxConstraint(const std::string &name, const Index &nx,
+                        const double &lb, const double &ub)
+      : Constraint(name, nx, nx) {
+    this->setLowerBound(lb);
+    this->setUpperBound(ub);
+  }
+
+  BoundingBoxConstraint(const std::string &name, const Index &nx,
+                        const Eigen::VectorXd &lb, const Eigen::VectorXd &ub)
+      : Constraint(name, nx, nx) {
+    this->setLowerBound(lb);
+    this->setUpperBound(ub);
+  }
+
   /**
    * @brief Provides the bounds for the bounding box constraint. By default,
    * returns the bounds set with setLowerBound() and setUpperBound()

@@ -1,4 +1,3 @@
-#define DAMOTION_USE_PROFILING
 
 #include <gflags/gflags.h>
 #include <gtest/gtest.h>

@@ -10,6 +10,7 @@ option(WITH_IPOPT "Build with IPOPT functionality" OFF)
 # Collect source files
 SET(${PROJECT_NAME}_SOURCES
 # solvers/base.cc
+core/profiler.cc
 casadi/codegen.cc
 # casadi/pinocchio_model.cc
 solvers/base.cc
@@ -36,6 +37,14 @@ glog
 )
 
 include(GNUInstallDirs)
+
+add_compile_definitions(DAMOTION_USE_PROFILING=${OpenCV_VERSION})
+
+option(DAMOTION_USE_PROFILING "Use profiling" OFF)
+
+if(DAMOTION_USE_PROFILING)
+  add_definitions(-DDAMOTION_USE_PROFILING)
+endif()
 
 if(WITH_QPOASES)
   message(STATUS "Including qpOASES as numeric optimization solver")
