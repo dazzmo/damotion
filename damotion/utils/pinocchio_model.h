@@ -57,6 +57,7 @@ class PinocchioModelWrapper {
         const std::string &frame_name,
         pinocchio::ModelTpl<::casadi::Matrix<AD>> &model,
         pinocchio::DataTpl<::casadi::Matrix<AD>> &data,
+        const std::string &reference_frame = "universe",
         const pinocchio::ReferenceFrame &ref = pinocchio::LOCAL_WORLD_ALIGNED)
         : name_(frame_name) {
       typedef ::casadi::Matrix<AD> MatrixType;
@@ -76,37 +77,33 @@ class PinocchioModelWrapper {
       pinocchio::forwardKinematics(model, data, qpos_e, qvel_e, qacc_e);
       pinocchio::updateFramePlacements(model, data);
       // Get SE3 data for the target frame
-      pinocchio::SE3Tpl<MatrixType> se3_frame =
+      pinocchio::SE3Tpl<MatrixType> oMf =
           data.oMf[model.getFrameId(frame_name)];
 
-      // Convert to preferred orientation
-      if (ref == pinocchio::LOCAL) {
-      } else if (ref == pinocchio::LOCAL_WORLD_ALIGNED) {
-      }
+      pinocchio::SE3Tpl<MatrixType> oMb =
+          data.oMf[model.getFrameId(reference_frame)];
 
       Eigen::VectorX<MatrixType> pos_e(7), vel_e(6), acc_e(6);
 
+      // Convert rotation matrix to quaternion representation
+      auto bMf = oMb.actInv(oMf);
+
       // Translational component
-      pos_e.topRows(3) = se3_frame.translation();
+      pos_e.topRows(3) = bMf.translation();
 
       // Rotational component
-      Eigen::Matrix3<MatrixType> R = se3_frame.rotation();
+      Eigen::Matrix3<MatrixType> R = bMf.rotation();
       Eigen::Quaternion<MatrixType> qR;
       pinocchio::quaternion::assignQuaternion(qR, R);
-
-      // Convert rotation matrix to quaternion representation
       pos_e.bottomRows(4) << qR.w(), qR.vec();
 
-      // Compute velocity of the point at the end-effector frame with
-      // respect to the chosen reference frame
-      vel_e = pinocchio::getFrameVelocity(model, data,
-                                          model.getFrameId(frame_name), ref)
+      // Convert to relevant frame
+      vel_e = oMb.actInv(pinocchio::getFrameVelocity(
+                             model, data, model.getFrameId(frame_name), ref))
                   .toVector();
 
-      // Compute acceleration of the point at the end-effector frame with
-      // respect to the chosen reference frame
-      acc_e = pinocchio::getFrameClassicalAcceleration(
-                  model, data, model.getFrameId(frame_name), ref)
+      acc_e = oMb.actInv(pinocchio::getFrameClassicalAcceleration(
+                             model, data, model.getFrameId(frame_name), ref))
                   .toVector();
 
       // Convert to casadi matrices
@@ -159,6 +156,7 @@ class PinocchioModelWrapper {
      */
     CentreOfMass(pinocchio::ModelTpl<::casadi::Matrix<AD>> &model,
                  pinocchio::DataTpl<::casadi::Matrix<AD>> &data,
+                 const std::string &reference_frame = "universe",
                  const pinocchio::ReferenceFrame &ref = pinocchio::WORLD)
         : name_("centre_of_mass") {
       typedef ::casadi::Matrix<AD> MatrixType;
@@ -174,6 +172,9 @@ class PinocchioModelWrapper {
       toEigen(qvel, qvel_e);
       toEigen(qacc, qacc_e);
 
+      pinocchio::SE3Tpl<MatrixType> oMb =
+          data.oMf[model.getFrameId(reference_frame)];
+
       // Perform forward kinematics on model
       pinocchio::forwardKinematics(model, data, qpos_e, qvel_e, qacc_e);
       pinocchio::updateFramePlacements(model, data);
@@ -183,6 +184,11 @@ class PinocchioModelWrapper {
       // Get data for centre of mass
       Eigen::Vector<MatrixType, 3> com = data.com[0], vcom = data.vcom[0],
                                    acom = data.acom[0];
+
+      // Convert to reference frame
+      com = oMb.actInv(com);
+      vcom = oMb.actInv(vcom);
+      acom = oMb.actInv(acom);
 
       // Convert to preferred orientation
       if (ref == pinocchio::LOCAL) {
